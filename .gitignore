@@ -3,3 +3,4 @@
 *.nd2
 *.mat
 tmp.xml
+data/*
