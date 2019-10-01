@@ -1,3 +1,4 @@
+from sys import argv
 import javabridge
 import bioformats as bf
 javabridge.start_vm(class_path=bf.JARS)
@@ -41,6 +42,16 @@ def plotImage(IM,pxSize=1,pxUnit="µm",rescale=1./30,log=True,savePath = None, a
         fig.savefig(savePath,dpi=120)
         plt.close(fig)
 
+def getApparentFreq(idx_,xml_=None):
+    if xml_ is None:
+        # assert "xml" in globals()
+        xml_ = xml
+    Pixels = xml_.image(index=idx_).Pixels
+    nPlanes = Pixels.get_plane_count()
+    if nPlanes==1:
+        return 0
+    else:
+        return (nPlanes-1)/Pixels.Plane(nPlanes-1).DeltaT
 
 pathToFile = argv[1]
 try:
@@ -86,7 +97,7 @@ for iSeries in nSeries:
     else:
         Name = Name.replace(extension,"").strip().replace("(","").replace(")","").replace("  "," ").replace(" ","_")
 
-    outName = Name+".png"
+    outName = ("%02i_"%iSeries)+Name+".png"
     dimensions = dict(zip("TXY",(getattr(im.Pixels, "Size"+dim) for dim in "TXY")))
     image = importFirstFrames(rdr,iSeries)
     image = np.mean(image,axis=0)
@@ -98,5 +109,14 @@ for iSeries in nSeries:
 
     pxSize = im.Pixels.get_PhysicalSizeX()
     pxUnit = im.Pixels.get_PhysicalSizeXUnit()
+    
+    text = "\n".join([" %s:%i"%(c,dimensions[c])  for c in "XYT"])
+    if dimensions["T"]>1:
+        text += "\n f:%.1f Hz"%getApparentFreq(iSeries,xml)
 
-    plotImage(image.T,pxSize=pxSize,pxUnit=pxUnit,savePath=saveDir+outName)
+    if extension!=".nd2":
+        image = image.T
+    plotImage(image.T,pxSize=pxSize,pxUnit=pxUnit,
+              savePath=saveDir+outName,
+              addInfo=text)
+    
