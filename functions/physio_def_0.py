@@ -196,9 +196,9 @@ def multiProfilePlotWithRoi(pxShows,pxWin,
                           image_=None,
                           firstDeriv=False,
                           stdDev=False,
-                          showRaw=False
+                          showRaw=False,
+                          imgHeight = None
                           ):
-    global dimensions
     from matplotlib.patches import Rectangle
     if times_ is None: times_ = times
     if image_ is None: image_ = image
@@ -207,9 +207,10 @@ def multiProfilePlotWithRoi(pxShows,pxWin,
     twSlice = slice(*(np.where(times_>=tl)[0][0] for tl in timeWindow))
     times_ = times_[twSlice]
     rebTime    = rebin(times_ , timeAverageWindow,0)
-
     dd = .2
-    fig,axs = plt.subplots(int(stdDev)+1,1,figsize=(15,(1+int(stdDev))*dimensions["Y"]/20))
+    if imgHeight is None:
+        imgHeight = image_.shape[-1]/20
+    fig,axs = plt.subplots(int(stdDev)+1,1,figsize=(15,(1+int(stdDev))*imgHeight))
     try: axs[0]
     except: axs = [axs]
     axs[0].imshow(np.log10(10+image_.mean(axis=(0)).T))
