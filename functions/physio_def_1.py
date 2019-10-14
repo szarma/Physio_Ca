@@ -72,12 +72,7 @@ def importFrames(rdr,idx=0,which=None):
                 ix += (slice(*ix_),)
             except:
                 ix += (slice(ix_),)
-        # for el in :
-        #     if el is None:
-        #         ix += (slice(None))
-        #     else:
-        #         ix += (el)
-        
+                
         image = np.zeros( (len(Ts),) + firstImage[ix].shape)
         for i,t in enumerate(Ts):
             try:
@@ -89,7 +84,7 @@ def importFrames(rdr,idx=0,which=None):
     return image
     
 def plotImageWithRois(
-    pxShows,
+    pxShows=[],
     pxWin=1,
     image_=None,
     stdDev=False,
