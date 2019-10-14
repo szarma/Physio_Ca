@@ -41,8 +41,10 @@ def getApparentFreq(idx_,xml_=None):
     nPlanes = Pixels.get_plane_count()
     if nPlanes==1:
         return 0
-    else:
-        return (nPlanes-1)/Pixels.Plane(nPlanes-1).DeltaT
+    for j in range(1,10):
+        frq = (nPlanes-j)/Pixels.Plane(nPlanes-j).DeltaT
+        if frq>0:
+            return frq
 
 def importFrames(rdr,idx=0,which=None):
     from warnings import warn
@@ -170,6 +172,7 @@ def getRoiProfiles(
     image_=None,
     tWin_ = 1
 ):
+    from collections import OrderedDict
     if isinstance(pxShows,dict):
         roiLabels,roiCoords = pxShows.keys(), pxShows.values()
     else:
