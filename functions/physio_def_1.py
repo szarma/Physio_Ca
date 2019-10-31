@@ -78,9 +78,9 @@ def importFrames(rdr,idx=0,which=None,dtype=None):
         else:
             Ts = which[0]
             t=Ts[0]
-        image = np.zeros( (len(Ts),) + firstImage[ix].shape)
-        if dtype is not None:
-            image = image.astype(dtype)
+        if dtype is None:
+            dtype = "float32"
+        image = np.zeros( (len(Ts),) + firstImage[ix].shape, dtype=dtype)
     
     while True:       ######## dangerous!
         try:
@@ -92,7 +92,7 @@ def importFrames(rdr,idx=0,which=None,dtype=None):
             else:
                 image[t-Ts[0]] = nextImage[ix]
         except:
-            warn(f"Could not give all required time points. I advise you double check the output")
+            # warn(f"Could not give all required time points. I advise you double check the output")
             break
         if Ts is not None:
             if t not in Ts:
