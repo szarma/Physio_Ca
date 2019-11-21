@@ -6,3 +6,4 @@ data/*
 *.tif
 *.pyc
 *-checkpoint.ipynb
+*.mmap
