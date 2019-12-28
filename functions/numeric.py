@@ -7,7 +7,6 @@ from numba import jit,prange
 def decay(time,top,bottom,rate):
 #     top,bottom,rate = p
     return bottom+(top-bottom)*np.exp(-time*rate)
-from scipy.optimize import curve_fit
 
 def guessDecayPars(y):
     b0 = np.nanmin(y)
@@ -184,10 +183,10 @@ def agglomerativeLinkage(X,distMatrix):
             break
         del idx[j], idx[i]
         idx = idx + [k]
-    return Z
+    return np.array(Z)
 
 def eventIdx2Rois(ks, evIndices, dims):
-    from opencv import Laplacian,CV_16F
+    from cv2 import Laplacian,CV_16F
     M = np.zeros(dims)
     for k in ks:
         x,y= evIndices[k]
@@ -207,6 +206,29 @@ def get_cluster_color_classes(den, labels = None):
                 cluster_idxs[c].append(labels[int(i)])
     return cluster_idxs
 
+# code
+def putRois(ks, evIndices, dims):
+    from cv2 import Laplacian,CV_64F
+    M = np.zeros(dims)
+    for k in ks:
+        x,y= evIndices[k]
+        # y,x = np.array(evi).T[1:]
+        M[x,y] = 1
+    return M # Laplacian(M.T.astype(float),CV_64F,)>0
+
+def getEdges(image,rescale=0):
+    from scipy.ndimage import binary_fill_holes
+    from skimage.feature import canny
+    from skimage.morphology import remove_small_objects
+    edges = canny(image)
+    fill_coins = binary_fill_holes(edges)
+    roiEdges = ndi.label(remove_small_objects(fill_coins, 21))[0]
+    return mark_boundaries(image*rescale, roiEdges)
+
+def showEventEdges(ks, evIndices, dims, resc=0):
+    imm = putRois(ks,evIndices,dims)
+    return getEdges(imm)
+
 def clusterCutAndPlot(Xdata,
                       function=linkage,
                       functionArgs=("complete","correlation"),
@@ -216,14 +238,14 @@ def clusterCutAndPlot(Xdata,
                       imshow_kw = dict(), #vmin=-vmax,vmax=vmax, cmap="bwr"
                       showClusterBoundaries=False,
                       ):
-
-    if labels is not None:
+    from collections import OrderedDict
+    if labels is None:
         labels = np.arange(len(Xdata))
     assert len(labels)==len(Xdata)
     Z = function(Xdata,*functionArgs)
     clusterIds = fcluster(Z, threshold, criterion=criterion)
     if criterion=="maxclust":
-        threshold = Z[-threshold,2]
+        threshold = Z[-threshold:-threshold+2,2].mean()
     fig, axs = plt.subplots(1,3,figsize=(18, 8), gridspec_kw={'width_ratios': [1, 1, 2.2]})
 
     dnd = dendrogram(
@@ -237,34 +259,38 @@ def clusterCutAndPlot(Xdata,
         )
     
     color_classes = get_cluster_color_classes(dnd)
+    color_classes = OrderedDict([(c,np.array([labels[j] for j in color_classes[c]])) for c in color_classes])
     axs[0].set_yticks(5+10*np.arange(len(labels)))
     axs[0].set_yticklabels(labels[dnd['leaves']]);
+    xt = axs[0].get_xticks()
+    axs[0].set_xticklabels(["%3.1f"%n for n in 1-xt])
 
     ax = axs[1]
     ax.imshow((Xdata)[dnd["leaves"]], origin="bottom", **imshow_kw)
     ax.set_aspect("auto")
-    axs[0].axvline(threshold,color="darkgrey")
+    axs[0].axvline(threshold,color="red",ls="--")
     if showClusterBoundaries:
         for j in np.where(np.diff(clusterIds[dnd["leaves"]]))[0]:
             axs[1].axhline(j+.5,color="grey")
     axs[1].set_yticks(np.arange(len(labels)))
     axs[1].set_yticklabels(labels[dnd["leaves"]]);
 
-
-    for c in color_classes.keys():
-    #     if c!="grey": continue
-        y,x = np.where(getLines(labels[np.array(color_classes[c])], evIndices))
-    #     y,x = np.where(getLines(np.array(color_classes[c]), evIndices))
-        plt.plot(x,y,".",ms=.7,ls="none",c=c)
-        for k in labels[np.array(color_classes[c])]:
-            evi = evIndices[k]
-            y,x = np.array(evi).T[1:]
-    #         c = axs[2].plot(x,y,".",c=c)[0].get_color()
-            axs[2].text(x.mean(),y.mean(),k,color=c,
-    #                     va="center",ha="center",
-    #                     bbox=dict(facecolor='w', alpha=0.7,edgecolor="none")
+    try:
+        for c in color_classes.keys():
+            for jEvent in color_classes[c]:
+                x,y = eventDF["indices"][jEvent]
+                axs[2].plot(y,x,"s",c=c,ms=.7*500/subdims[0],alpha = .5)
+                axs[2].text(y.mean(),x.mean(),jEvent,color=c,
+                        va="center",ha="center",
+                        # bbox=dict(facecolor='w', alpha=0.7,edgecolor="none")
                        )
-    #     break
-    # axs[2].set_xlim(-.5,submovie.shape[1])
-    # axs[2].set_ylim(-.5,submovie.shape[2])
-    axs[2].set_aspect("equal")
+
+        axs[2].set_aspect("equal")
+        axs[2].set_xlim(-.5,subdims[1]-.5)
+        axs[2].set_ylim(subdims[0]-.5,-.5)
+    except:
+        axs[0].remove()
+    
+    return {"dendrogram":dnd,
+            "clusters":color_classes,
+            "labels":labels}
