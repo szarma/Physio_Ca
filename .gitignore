@@ -5,5 +5,6 @@ tmp.xml
 data/*
 **.tif
 **.pyc
+**/.ipynb_checkpoints
 **/*-checkpoint.ipynb
 **.mmap
