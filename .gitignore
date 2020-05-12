@@ -1,9 +1,9 @@
-*.lif
-*.nd2
-*.mat
+**.lif
+**.nd2
+**.mat
 tmp.xml
 data/*
-*.tif
-*.pyc
-*-checkpoint.ipynb
-*.mmap
+**.tif
+**.pyc
+**/*-checkpoint.ipynb
+**.mmap

@@ -4,26 +4,73 @@ from scipy.stats import distributions as dst
 from scipy.optimize import curve_fit#,minimize,basinhopping
 from numba import jit,prange
 
+def get_sep_th(x_,ax=None,plot=False,thMax=None):
+    from scipy.stats import gaussian_kde
+    from Regions import crawlDict
+    if ax is None:
+        ax = plt.subplot(111)
+    gkde = gaussian_kde(x_)
+#     if plot:
+    ax.hist(x_,100,histtype="step",density=True)
+    if thMax is not None:
+        x_ = x_[x_<thMax]
+    if thMax == "median":
+        x_ = x_[x_<np.median(x_)]
+    h,edges = np.histogram(x_,100)
+    bincenters = (edges[:-1]+edges[1:])/2
+#     bincenters = bincenters[:np.argmax(h)]
+    gkde_vals = gkde.evaluate(bincenters)
+    peaks = np.array(list(crawlDict(gkde_vals.reshape(-1,1)).keys())).T[0]
+    twoHighestPeaks = sorted(np.argsort(-h[peaks])[:2])
+    if len(twoHighestPeaks)==1:
+        return -np.inf
+    lowerPeak, higherPeak = peaks[twoHighestPeaks]
+    bincenters = bincenters[lowerPeak:higherPeak]
+    if len(bincenters)<3:
+        if not plot: plt.close()
+        return x_.min()
+    gkde_vals = gkde.evaluate(bincenters)
+#     if plot:
+    ax.plot(bincenters,gkde_vals)
+    sinks = np.array(list(crawlDict(-gkde_vals.reshape(-1,1)+gkde_vals.max()+1,).keys())).T[0]
+    sinks = sorted(sinks,key=lambda xi: gkde_vals[xi])
+    th = bincenters[sinks[0]]
+#     if plot:
+        # ax.plot(bincenters,gkde_vals)
+    ax.axvline(th,color="r",ls="--")
+    if not plot: plt.close()
+    return th
+
+
 def decay(time,top,bottom,rate):
 #     top,bottom,rate = p
     return bottom+(top-bottom)*np.exp(-time*rate)
 
 def guessDecayPars(y):
-    b0 = np.nanmin(y)
+    b0 = np.nanpercentile(y,1)
     y  = np.log(y-b0)
-    r0 = np.diff(y)
-    r0 = r0[np.isfinite(r0)]
-    r0 = -np.mean(r0)
+#     r0 = np.diff(y)
+#     r0 = r0[np.isfinite(r0)]
+#     r0 = -np.mean(r0)
+    r0 = .1/len(y)#y[1]-y[-2]/len(y)
     t0 = np.nanpercentile(y,99)
     p0 = (np.exp(t0)+b0,b0,r0)
     return p0
 
-def decayfit(x,Ntrials=None):
+def mydebleach(x_):
+    try:
+        out = decayfit(x_)
+    except:
+        p = np.polyfit(range(len(x_)),x_,1)
+        out = p[1]+p[0]*np.arange(len(x_))
+    return out
+
+def decayfit(x,Ntrials=None, outPars=False):
     if Ntrials is None:
         lx = 10
     else:
         lx = Ntrials
-    nx = len(x)//10
+    nx = len(x)//(lx+5)
     TT = np.arange(len(x))
     tt = TT.copy()
     for j_ in range(lx):
@@ -32,11 +79,44 @@ def decayfit(x,Ntrials=None):
             ff = np.isfinite(x)
             popt = curve_fit(decay,tt[ff],x[ff],p0=p0)[0]
             expDecay = decay(TT,*popt)
-            return expDecay
+            if outPars:
+                return expDecay, popt
+            else:
+                return expDecay
         except:
-            x = x[:-nx]
-            tt = tt[:-nx]
-    return p0
+            if j_%2==0:
+                tt=tt[:len(x)-nx]
+                x = x[:len(x)-nx]
+            else:
+                tt=tt[nx:]
+                x = x[nx:]
+    popt = (np.nan,)*3
+    expDecay = decay(TT,*popt)
+    if outPars:
+        return expDecay, popt
+    else:
+        return expDecay
+
+
+# def decayfit(x,Ntrials=None):
+#     if Ntrials is None:
+#         lx = 10
+#     else:
+#         lx = Ntrials
+#     nx = len(x)//10
+#     TT = np.arange(len(x))
+#     tt = TT.copy()
+#     for j_ in range(lx):
+#         try:
+#             p0 = guessDecayPars(x)
+#             ff = np.isfinite(x)
+#             popt = curve_fit(decay,tt[ff],x[ff],p0=p0)[0]
+#             expDecay = decay(TT,*popt)
+#             return expDecay
+#         except:
+#             x = x[:-nx]
+#             tt = tt[:-nx]
+#     return p0
 
 @jit 
 def percFilter(x_,perc,filterSize):
@@ -44,43 +124,81 @@ def percFilter(x_,perc,filterSize):
         raise ValueError("filter size needs to be odd number")
     delta = filterSize//2
     out = np.zeros_like(x_)
-    # x_ = np.hstack([[x_[0]]*delta,x_,[x_[-1]]*delta])
-    x_ = np.hstack([x_[:delta][::-1], x_, x_[-delta:][::-1]])
-#     print (x_.shape, out.shape)
+    x_ = np.concatenate((x_[:delta][::-1], x_, x_[-delta:][::-1]))
     for i in prange(len(out)):
-        out[i] = np.percentile(x_[i:i+filterSize],perc)
+        out[i] = np.nanpercentile(x_[i:i+filterSize],perc,axis=0)
     return out
+@jit 
+def runningMode(x_, filterSize, boundary="reflective"):
+    if filterSize%2==0:
+        raise ValueError("filter size needs to be odd number")
+    delta = filterSize//2
+    out = np.zeros_like(x_)
+    allowedBoundaries = ["reflective","equal"]
+    if boundary not in allowedBoundaries:
+        raise ValueError(f"boundary {boundary} not recognized. Allowed values are: "+repr(allowedBoundaries))
+    if boundary=="reflective":
+        x_ = np.concatenate((x_[:delta][::-1], x_, x_[-delta:][::-1]))
+    if boundary=="equal":
+        x_ = np.concatenate(([x_[0]]*delta, x_, [x_[-1]]*delta))
+    for i in range(len(out)):
+        c,v = np.histogram(x_[i:i+filterSize], nbins)
+        out[i] = v[np.argmax(c)]
+    return out
+
 @jit 
 def runningAverage(x_,filterSize):
     if filterSize%2==0:
         raise ValueError("filter size needs to be odd number")
     delta = filterSize//2
     out = np.zeros_like(x_)
-    # x_ = np.hstack([[x_[0]]*delta,x_,[x_[-1]]*delta])
-    x_ = np.hstack([x_[:delta][::-1], x_, x_[-delta:][::-1]])
-#     print (x_.shape, out.shape)
-    for i in prange(len(out)):
-        out[i] = np.nanmean(x_[i:i+filterSize])
+    x_ = np.concatenate((x_[:delta][::-1], x_, x_[-delta:][::-1]))
+    for i in range(len(out)):
+        out[i] = np.nanmean(x_[i:i+filterSize],axis=0)
     return out
+
 @jit 
 def runningStd(x_,filterSize):
     if filterSize%2==0:
         raise ValueError("filter size needs to be odd number")
     delta = filterSize//2
     out = np.zeros_like(x_)
-    # x_ = np.hstack([[x_[0]]*delta,x_,[x_[-1]]*delta])
-    x_ = np.hstack([x_[:delta][::-1], x_, x_[-delta:][::-1]])
-#     print (x_.shape, out.shape)
+    x_ = np.concatenate((x_[:delta][::-1], x_, x_[-delta:][::-1]))
+    for i in range(len(out)):
+        out[i] = np.nanstd(x_[i:i+filterSize],axis=0)
+    return out
+
+@jit 
+def runningMin(x_,filterSize):
+    if filterSize%2==0:
+        raise ValueError("filter size needs to be odd number")
+    delta = filterSize//2
+    out = np.zeros_like(x_)
+    x_ = np.concatenate((x_[:delta][::-1], x_, x_[-delta:][::-1]))
+    for i in range(len(out)):
+        out[i] = np.nanmin(x_[i:i+filterSize],axis=0)
+    return out
+
+@jit 
+def runningMax(x_,filterSize):
+    if filterSize%2==0:
+        raise ValueError("filter size needs to be odd number")
+    delta = filterSize//2
+    out = np.zeros_like(x_)
+    x_ = np.concatenate((x_[:delta][::-1], x_, x_[-delta:][::-1]))
     for i in prange(len(out)):
-        out[i] = np.nanstd(x_[i:i+filterSize])
+        out[i] = np.nanmax(x_[i:i+filterSize],axis=0)
     return out
 
 def lowPass(x, wIron, wAvg=None, perc=5,npass = 1):
-    ironedx = percFilter(x, perc, wIron)
+    try: perc[0]
+    except: perc = [perc]*npass
+    npass = len(perc)
+    ironedx = percFilter(x, perc[0], wIron)
     if wAvg is not None:
         ironedx = runningAverage(ironedx,wAvg)
     for i in range(npass-1):
-        ironedx += lowPass(x-ironedx,wIron,wAvg,perc,)
+        ironedx += lowPass(x-ironedx,wIron,wAvg,perc[i+1],)
     return ironedx
 
 def getInterestingROIcenters(image_, Nsample=10000, exponent=3, bandwidth=10, n_jobs=4):
@@ -120,14 +238,21 @@ def getEventIndices(event,spaceDims):
     coords = np.array([(coord//nc,(coord%nc)//spaceDims[1],(coord%nc)%spaceDims[1]) for coord in event])
     return coords
 
-def getEvents(tfMatrix_,DistMatrix_):
+def getEvents(tfMatrix_,DistMatrix_=None, offset=(0,0,0)):
     from scipy.sparse import dok_matrix
     import networkx as nx
     allGraph = dok_matrix((tfMatrix_.size,tfMatrix_.size),dtype=np.int0)
+    if DistMatrix_ is None:
+        DistMatrix_ = createNNDistanceMatrix(tfMatrix_.shape[1:])
     nc = DistMatrix_.shape[0]
+    
+    frames = np.where(tfMatrix_.any(axis=(1,2)))[0]
+#     frames = frames[:-1][np.diff(frames)==1]
 
-    for iframe in range(len(tfMatrix_)):
-        hereActiveCells = np.where(tfMatrix_[iframe].flatten())[0]
+    for iframe in frames:
+        curFrame = tfMatrix_[iframe]
+        if not curFrame.any(): continue
+        hereActiveCells = np.where(curFrame.flatten())[0]
         for ic in hereActiveCells:
             nodeID = iframe*nc+ic
             for diframe in [0,1]:
@@ -139,22 +264,37 @@ def getEvents(tfMatrix_,DistMatrix_):
                     if tfMatrix_[iframe1].flatten()[jc]:
                         allGraph[iframe1*nc+jc, nodeID] = 1
                         allGraph[nodeID, iframe1*nc+jc] = 1
-    #         break
-    #     break
 
     G = nx.from_scipy_sparse_matrix(allGraph)
-
-    events = [cmp for cmp in nx.connected_components(G) 
-              if len(cmp)>1 or allGraph[tuple(cmp)*2]]
+    G.remove_nodes_from(list(nx.isolates(G)))
+    
+#     events = [cmp for cmp in nx.connected_components(G) 
+#               if #len(cmp)>1 or \
+#               allGraph[tuple(cmp)*2]
+#              ]
+#     events = []
+    events = [getEventIndices(ev,tfMatrix_.shape[1:]) for ev in nx.connected_components(G)]
+    if any(offset):
+        events = [ev+np.repeat([offset],len(ev),axis=0) for ev in events]
+              
     return events
 
+# def getEvents(tfMatrix_,DistMatrix_):
+#     import networkx as nx
+#     G = nx.from_scipy_sparse_matrix(getEvents_(tfMatrix_,DistMatrix_))
+#     events = [cmp for cmp in nx.connected_components(G) 
+#               if len(cmp)>1 or allGraph[tuple(cmp)*2]]
+#     return events
 
-def blurInTime(original_, k, s):
+
+def blurInTime(original_, k, s=-1):
     from caiman import movie
-    from opencv import GaussianBlur
+    from cv2 import GaussianBlur
     out = original_.copy()
     out = GaussianBlur(
-        out.reshape((len(out),-1)),ksize=(k,1),sigmaX=s, sigmaY=0
+        out.reshape((len(out),-1)),
+#         ksize=(k,1),sigmaX=s, sigmaY=0
+        ksize=(1,k),sigmaX=0, sigmaY=s
     ).reshape(out.shape)
     out = movie(out)
     return out
@@ -230,14 +370,39 @@ def showEventEdges(ks, evIndices, dims, resc=0):
     return getEdges(imm)
 
 def clusterCutAndPlot(Xdata,
-                      function=linkage,
-                      functionArgs=("complete","correlation"),
+                      mode = "simple",
+                      function=None,
+                      functionArgs=None,
                       threshold=4,
                       criterion="maxclust",
                       labels=None,
                       imshow_kw = dict(), #vmin=-vmax,vmax=vmax, cmap="bwr"
                       showClusterBoundaries=False,
                       ):
+    if mode == "simple":
+        return clusterCutAndPlot(Xdata,
+                      mode=None,
+                      function=linkage,
+                      functionArgs=("complete","correlation"),
+                      threshold=threshold,
+                      criterion=criterion,
+                      labels=labels,
+                      imshow_kw = imshow_kw,
+                      showClusterBoundaries=showClusterBoundaries,
+                      )
+    if mode == "agglomerative":
+        def distM(xi): return 1-np.corrcoef(xi)
+        return clusterCutAndPlot(Xdata,
+                      mode=None,
+                      function=agglomerativeLinkage,
+                      functionArgs=(distM, ),
+                      threshold=threshold,
+                      criterion=criterion,
+                      labels=labels,
+                      imshow_kw = imshow_kw,
+                      showClusterBoundaries=showClusterBoundaries,
+                      )
+
     from collections import OrderedDict
     if labels is None:
         labels = np.arange(len(Xdata))
@@ -289,8 +454,32 @@ def clusterCutAndPlot(Xdata,
         axs[2].set_xlim(-.5,subdims[1]-.5)
         axs[2].set_ylim(subdims[0]-.5,-.5)
     except:
-        axs[0].remove()
+        axs[2].remove()
     
     return {"dendrogram":dnd,
             "clusters":color_classes,
             "labels":labels}
+
+
+@jit
+def getEvents_(tfMatrix_,DistMatrix_):
+    from scipy.sparse import dok_matrix
+    allGraph = dok_matrix((tfMatrix_.size,tfMatrix_.size),dtype=np.int0)
+    nc = DistMatrix_.shape[0]
+
+    for iframe in prange(len(tfMatrix_)):
+        curFrame = tfMatrix_[iframe]
+        if not curFrame.any(): continue
+        hereActiveCells = np.where(curFrame.flatten())[0]
+        for ic in hereActiveCells:
+            nodeID = iframe*nc+ic
+            for diframe in [0,1]:
+                iframe1 = iframe+diframe
+                if iframe1<0: continue
+                if iframe1>=len(tfMatrix_): continue
+                for el in DistMatrix_[ic].keys():
+                    jc = el[1]
+                    if tfMatrix_[iframe1].flatten()[jc]:
+                        allGraph[iframe1*nc+jc, nodeID] = 1
+                        allGraph[nodeID, iframe1*nc+jc] = 1
+    return allGraph
