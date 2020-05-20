@@ -17,8 +17,8 @@ from plotly import colors as plxcolors
 import numpy as np
 
 def saveRois(regions,outDir,filename="",movie=None,col="trace",formats=["vienna","maribor"]):
-    feedback = []
-    try:
+        feedback = []
+#     try:
         from copy import deepcopy
         from datetime import date
         import pickle
@@ -70,10 +70,10 @@ def saveRois(regions,outDir,filename="",movie=None,col="trace",formats=["vienna"
                 feedback += [f"Coordinates saved in {coordFile}."]
             else:
                 return "Output format not recognized. Currently, only 'vienna' and 'maribor' are implemented."
-    except:
-        from sys import exc_info
-        feedback += ["ERROR: "+ exc_info().__repr__()]
-    return feedback
+#     except:
+#         from sys import exc_info
+#         feedback += ["ERROR: "+ exc_info().__repr__()]
+        return feedback
 
 
 def plotStatsFig(regions,which=["mean","diff_std"], showRois=False):
@@ -162,7 +162,10 @@ def plotTraces(regions,indices=None, showCol=["trace"], time=None, offset=0):
         t = time
     ia = 0
     for i in indices:
-        cl = MYCOLORS[i%len(MYCOLORS)]
+        if len(indices)==1:
+            cl = "black"
+        else:
+            cl = MYCOLORS[i%len(MYCOLORS)]
         for col in showCol:
             y = regions.df.loc[i,col]
             f.add_trace(go.Scatter(
@@ -176,8 +179,8 @@ def plotTraces(regions,indices=None, showCol=["trace"], time=None, offset=0):
             ))
         ia += 1
     f.update_layout({
-        "height":360,
-        "width":500,
+        "height":370,
+        "width":600,
         "margin":dict(l=10, r=10, t=50, b=10),
         #"plot_bgcolor":"white",
         "xaxis": {
@@ -186,22 +189,18 @@ def plotTraces(regions,indices=None, showCol=["trace"], time=None, offset=0):
     })
     return f
 
-def fov_trace(regions, showFreq = 2):
-    from numeric import mydebleach
+    
+def fov_trace(region):
+    
     f = make_subplots(rows=2, cols=1,
                       row_heights=[0.7, 0.3],
                       shared_xaxes=True, 
                      )
     
-    n = int(regions.movie.fr/showFreq)
-    if n==0: n=1
-    x = rebin(regions.time,n)
-    y = rebin(sum(regions.df.trace), n)
-    ydbl = mydebleach(y)
     f.add_trace(
         go.Scatter(
-            x = x,
-            y = y,
+            x = region.fov_trace["time"],
+            y = region.fov_trace["raw"],
             mode = "lines",
             line=dict(width=.9,color="navy"),
             showlegend = False,
@@ -211,8 +210,8 @@ def fov_trace(regions, showFreq = 2):
     )
     f.add_trace(
         go.Scatter(
-            x = x,
-            y = ydbl,
+            x = region.fov_trace["time"],
+            y = region.fov_trace["trend"],
             mode = "lines",
             line=dict(width=.6,color="navy"),
             showlegend = False,
@@ -220,11 +219,10 @@ def fov_trace(regions, showFreq = 2):
         ),
             row=1, col=1
     )
-    y = y - ydbl
-    n = 100
+    y = region.fov_trace["raw"] - region.fov_trace["trend"]
     f.add_trace(
         go.Scatter(
-            x = x,
+            x = region.fov_trace["time"],
             y = y,
             mode = "lines",
             line=dict(width=.9,color="navy"),
@@ -239,9 +237,9 @@ def fov_trace(regions, showFreq = 2):
                 "rangeslider":{"visible":True},
                 "title": 'time [s]',
             },
-        "height":340,
-        "width":300,
-        "margin":dict(l=10, r=10, t=50, b=10),
+        "height":420,
+        "width":480,
+        "margin":dict(l=10, r=10, t=50, b=20),
         })
     return f
 
@@ -269,19 +267,25 @@ def showRoisOnly(regions, indices=None, im=None, showall=True):
                         opacity = .5,
                      )
         f.add_trace(ln)
+    if len(indices):    
+        y,x = np.vstack([np.mean(regions.df.pixels[i],axis=0) for i in indices]).T
+        pts = go.Scatter(x=x,y=y,
+                    mode="markers",
+                    showlegend = False,
+                    # opacity=0.5,
+                    # name=list(map(str,indices)),
+                    marker=dict(color=[MYCOLORS[i%len(MYCOLORS)] for i in indices],size=3),
+                    hovertext=list(map(str,indices)),
+                    hoverinfo="text"
+                 )
+        f.add_trace(pts)
+    else:
+        f.add_trace(go.Scatter(x=[0],y=[0],
+                    mode="markers",
+                    marker=dict(color="blue",size=3, opacity=0),
+                    hovertext=None,
+                 ))
         
-    y,x = np.vstack([np.mean(regions.df.pixels[i],axis=0) for i in indices]).T
-    pts = go.Scatter(x=x,y=y,
-                mode="markers",
-                showlegend = False,
-                # opacity=0.5,
-                # name=list(map(str,indices)),
-                marker=dict(color=[MYCOLORS[i%len(MYCOLORS)] for i in indices],size=3),
-                hovertext=list(map(str,indices)),
-                hoverinfo="text"
-             )
-    f.add_trace(pts)
-
     if im!="none":
         # f.add_heatmap(z=im, hoverinfo='skip',showscale=False,colorscale=plxcolors.sequential.Greys)
         imgpointer = createStaticImage(im,regions,showall=showall, separate=True)
@@ -292,9 +296,9 @@ def showRoisOnly(regions, indices=None, im=None, showall=True):
                 xref="x",
                 yref="y",
                 x=-.5,
-                y=(regions.image.shape[0]-.5),
-                sizex=regions.image.shape[1],
-                sizey=regions.image.shape[0],
+                y=(im.shape[0]-.5),
+                sizex=im.shape[1],
+                sizey=im.shape[0],
                 sizing="stretch",
                 opacity=1,
                 layer="below")
@@ -302,22 +306,22 @@ def showRoisOnly(regions, indices=None, im=None, showall=True):
     
     f.update_layout({
         #"title":regions.mode+" (filtered)",
-        "height":310,
-        "width":270*regions.image.shape[1]/regions.image.shape[0],
-        "margin":dict(l=10, r=10, t=50, b=10),
+        "height":400,
+        "width":360*im.shape[1]/im.shape[0],
+        "margin":dict(l=10, r=10, t=50, b=20),
         "xaxis": {
             "linecolor": 'black',
             "linewidth": 1,
             "mirror": True,
             "tickvals": [],
-            "range":[-.5,regions.image.shape[1]-.5]
+            "range":[-.5,im.shape[1]-.5]
         },
         "yaxis": {
             "linecolor": 'black',
             "linewidth": 1,
             "mirror": True,
             "tickvals": [],
-            "range":[-.5,regions.image.shape[0]-.5]
+            "range":[-.5,im.shape[0]-.5]
         },
         'clickmode': 'event+select'
     })
@@ -340,7 +344,10 @@ def createStaticImage(im,regions,showall=False,color="grey",separate=False):
     ax.imshow(np.log(im),cmap="Greys",origin="bottom")
     for sp in ax.spines: ax.spines[sp].set_visible(False)
     if showall:
-        regions.plotEdges(ax=ax,color=color,image=False,lw=figsize[0]*.15,separate=separate)
+        try:
+            regions.plotEdges(ax=ax,color=color,image=False,lw=figsize[0]*.15,separate=separate)
+        except:
+            pass
     plt.xticks([])
     plt.yticks([])
     plt.savefig(bkg_img_file,dpi=150)

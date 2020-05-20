@@ -198,7 +198,29 @@ class Regions:
         self.df["peakValue"] = [image[p] for p in B_]
         self.update()
 #         print(f"Initialized with {len(self.df)} rois.")
+    
+    def get_fov_trace(self, showFreq = 5, pixels=None):
+        from numeric import mydebleach
+        from physio_def_1 import rebin
+        n = int(self.movie.fr/showFreq)
+        if n==0: n=1
+        x = rebin(self.time,n)
+        try:
+            y = sum(self.df.trace)
+        except:
+            if pixels is None:
+                y = self.movie.mean(axis=(1,2))
+            else:
+                y = self.movie[(slice(None),)+pixels].mean(axis=1)
+        y = rebin(y,n)
+        ydbl = mydebleach(y)
+        self.fov_trace = {
+                "time": x,
+                "raw": y,
+                "trend":ydbl
+            }
 
+    
     def update(self, movie_=None):
         self.df["size"] = self.df["pixels"].apply(len)
         self.df["interest"] = [np.sum([self.image[px[0],px[1]] for px in pxs]) for pxs in self.df["pixels"]]
