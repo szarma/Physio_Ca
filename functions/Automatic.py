@@ -39,10 +39,13 @@ def saveRois(regions,outDir,filename="",movie=None,col="trace",formats=["vienna"
             feedback += f"Output {outdir} directory created."
 
         traces = pd.DataFrame(np.vstack(regions.df[col]).T)
-        traces["time"] = regions.showTime[col]
+        try:
+            traces["time"] = regions.showTime[col]
+        except:
+            traces["time"] = regions.time
         traces = traces[["time"]+list(traces.columns[:-1])]
         for format in formats:
-            
+            print (format)
             if format=="vienna":
                 saving = ['statImages', 'mode', 'image', 'filterSize', 'df']
                 allAttrs = list(regions.__dict__.keys())
@@ -59,11 +62,10 @@ def saveRois(regions,outDir,filename="",movie=None,col="trace",formats=["vienna"
                     pickle.dump(subRegions,f)
                 feedback += [f"ROI info saved in {roifile}."]
 
-            if format=="maribor":
+            elif format=="maribor":
                 tracefile = f"{outDir}/{filename}_trace_for_mb.txt"
                 np.savetxt(tracefile, traces.values)
-                feedback += [f"Traces saved in {tracefile}.",html.Br()]
-                
+                feedback += [f"Traces saved in {tracefile}."]
                 coordFile = f"{outDir}/{filename}_coords_for_mb.txt"
                 coords = np.array([np.mean(pxs,axis=0) for pxs in regions.df["pixels"]])
                 np.savetxt(coordFile, coords)
