@@ -104,7 +104,7 @@ def getStatImages(movie_, debleach=True, downsampleFreq=10):
 
 
 class Regions:
-    def __init__(self, movie_, crawl_th=0, diag=False, min_gradient=0, debleach=True, gSig_filt=None, mode="diff_std", full=True, img_th=-np.inf, FrameRange=None, nRebin=1):
+    def __init__(self, movie_, crawl_th=0, diag=False, min_gradient=0, debleach=True, gSig_filt=None, mode="diff_std", full=True, img_th=-np.inf, FrameRange=None):
         self.mode = mode
         if isinstance(movie_, (np.ndarray,)):
             if len(movie_.shape)==2:
@@ -112,14 +112,13 @@ class Regions:
                 self.statImages = {mode:image0}
             if len(movie_.shape)==3:
                 self.movie = movie_
-                self.nRebin = nRebin
                 time = np.arange(len(movie_))/movie_.fr
                 if FrameRange is None:
                     FrameRange = [0, len(movie_)]
                 i0, ie = FrameRange
                 self.FrameRange = FrameRange
-                self.statImages = getStatImages(movie_[i0:ie], debleach=debleach, downsampleFreq=movie_.fr/nRebin)
-                self.time = rebin(time[i0:ie], nRebin)
+                self.statImages = getStatImages(movie_[i0:ie], debleach=debleach, downsampleFreq=5)
+                self.time = time[i0:ie]
         elif isinstance(movie_, dict):
             self.statImages = movie_
         else:
@@ -227,7 +226,7 @@ class Regions:
             }
 
     
-    def update(self, movie_=None, nRebin=None):
+    def update(self, movie_=None):
         self.df["size"] = self.df["pixels"].apply(len)
         self.df["interest"] = [np.sum([self.image[px[0],px[1]] for px in pxs]) for pxs in self.df["pixels"]]
         self.calcEdgeIds()
@@ -235,10 +234,7 @@ class Regions:
         self.df["boundary"] = [edges2nodes(self.df["edges"][j]) for j in self.df.index]
         self.calcNNmap()
         if movie_ is not None:
-            if nRebin is None:
-                try: nRebin = self.nRebin
-                except: nRebin = 1
-            self.calcTraces(movie_, nRebin)
+            self.calcTraces(movie_)
             self.movie = movie_
     
     
@@ -366,21 +362,18 @@ class Regions:
         self.df = self.df.drop(index=toDel)
         print (f"deleted {len(toDel)} rois. {len(self.df)} remain.")
     
-    def calcTraces(self, movie_=None, nRebin=None, FrameRange=None):
+    def calcTraces(self, movie_=None, FrameRange=None):
         if movie_ is None:
             movie_ = self.movie
-        if nRebin is None:
-            try: nRebin = self.nRebin
-            except: nRebin = 1
         if FrameRange is None:
             try: FrameRange = self.FrameRange
             except: FrameRange = [0,len(movie)]
         i0,ie = FrameRange
-        traces = np.ones((len(self.df),(ie-i0)//nRebin))*np.nan
+        traces = np.ones((len(self.df),(ie-i0)))*np.nan
         for i,ix in enumerate(self.df.index):
             x = self.df.loc[ix,"pixels"]
             x = [ el[0] for el in x ] , [ el[1] for el in x ]
-            traces[i] = rebin(movie_[i0:ie, x[0], x[1] ].mean(axis=1), nRebin)
+            traces[i] = movie_[i0:ie, x[0], x[1] ].mean(axis=1)
         self.df["trace"] = list(traces)
         time = np.arange(len(movie_))/movie_.fr
         self.time = rebin(time[i0:ie], nRebin)

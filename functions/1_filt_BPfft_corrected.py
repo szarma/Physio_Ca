@@ -1,6 +1,8 @@
 ﻿import numpy as np
 from scipy.fftpack import rfft, irfft, fftfreq
-import pylab as plt
+import matplotlib.pyplot as plt
+from sys import argv
+
 
 lowBF=0.03
 highBF=4.0
@@ -9,7 +11,7 @@ highBF=4.0
 Tzac=1200  # zacetek vizualizacije v izhodnih slikah, v sekundah
 Tkon=2400  # konec vizualizacije v izhodnih slikah, v sekundah
 
-data=np.loadtxt("data.txt")
+data=np.loadtxt(argv[1])
 time   = data[:-1,0]  #za time uporabi celoten 0-ti stolpec minus zadnji zapis
 signal = data[:-1,1:len(data[0])] #za signal pa uporabi vse podatke (-zadnji zapis), razen podatke v prvem stolpcu
 # sampling=np.loadtxt("sampling.txt")
@@ -52,7 +54,7 @@ for i in range(len(signal[0])):
     cut_f_signal[(Wt>highBF)] = 0
     cut_signal = irfft(cut_f_signal)
     FS.append(cut_signal)
-    print 'Obdelujem TS: ',i
+    print ('Obdelujem TS: ',i)
        
     plt.subplot(211)
     plt.plot(time,signal[:,i])
@@ -87,6 +89,6 @@ datoteka=open("DATAfilt.txt","w+")
 for i in range(len(signal)):
     for j in range(len(signal[0])-1):
         if j not in zanemari: ## dodano za zanemari
-            print>>datoteka,FS[j][i],    #   vejica -> presledek, no new line
-    print>>datoteka,FS[len(signal[0])-1][i]     # brez vejice ->new line
+            print(datoteka,FS[j][i],end=" " )    #   vejica -> presledek, no new line
+    print(datoteka,FS[len(signal[0])-1][i])     # brez vejice ->new line
 datoteka.close()

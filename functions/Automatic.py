@@ -16,10 +16,16 @@ from Regions import MYCOLORS
 from plotly import colors as plxcolors
 import numpy as np
 
+def lassoToMask(points, dims):
+    from matplotlib.path import Path
+    p = Path(points)
+    mask = np.array([[p.contains_point((i,j))  for j in range(dims[1])] for i in range(dims[0])])
+    return mask
+
 def saveRois(regions,outDir,filename="",movie=None,col="trace",formats=["vienna","maribor"]):
         feedback = []
 #     try:
-        from copy import deepcopy
+        from copy import deepcopy,copy
         from datetime import date
         import pickle
         import pandas as pd
@@ -47,9 +53,13 @@ def saveRois(regions,outDir,filename="",movie=None,col="trace",formats=["vienna"
         for format in formats:
             print (format)
             if format=="vienna":
-                saving = ['statImages', 'mode', 'image', 'filterSize', 'df']
+                saving = ['statImages', 'mode', 'image', 'filterSize', 'df', 'trange']
+                movie = regions.movie
+                del regions.movie
                 allAttrs = list(regions.__dict__.keys())
                 subRegions = deepcopy(regions)
+                regions.movie = movie
+                del movie
                 for k in allAttrs:
                     if k not in saving:
                         del subRegions.__dict__[k]
@@ -153,7 +163,8 @@ def plotRawTraces(regions,indices=None, nAvg=1):
     return f
 
 
-def plotTraces(regions,indices=None, showCol=["trace"], time=None, offset=0):
+def plotTraces(regions,indices=None, showCol=["trace"], time=None, offset=0, smooth=0):
+    from numeric import runningAverage
     if indices is None:
         indices = regions.df.sort_values("size",ascending=False).index[:10]
     
@@ -170,6 +181,8 @@ def plotTraces(regions,indices=None, showCol=["trace"], time=None, offset=0):
             cl = MYCOLORS[i%len(MYCOLORS)]
         for col in showCol:
             y = regions.df.loc[i,col]
+            if smooth:
+                y = runningAverage(y,2*smooth+1)
             f.add_trace(go.Scatter(
                 x=t,
                 y=y+ia*offset,
@@ -192,57 +205,65 @@ def plotTraces(regions,indices=None, showCol=["trace"], time=None, offset=0):
     return f
 
     
-def fov_trace(region):
+def fov_trace(region, twoRows=True):
     
-    f = make_subplots(rows=2, cols=1,
-                      row_heights=[0.7, 0.3],
-                      shared_xaxes=True, 
-                     )
-    
-    f.add_trace(
-        go.Scatter(
-            x = region.fov_trace["time"],
+    if twoRows:
+        f = make_subplots(rows=2, cols=1,
+                          row_heights=[0.7, 0.3],
+                          shared_xaxes=True, 
+                         )
+    else:
+        f = go.Figure()
+    x = region.fov_trace["time"]
+    if twoRows:
+        tr0 = go.Scatter(
+            x = x,
             y = region.fov_trace["raw"],
             mode = "lines",
             line=dict(width=.9,color="navy"),
             showlegend = False,
-
-        ),
-            row=1, col=1
-    )
-    f.add_trace(
-        go.Scatter(
-            x = region.fov_trace["time"],
+            )
+        tr1 = go.Scatter(
+            x = x,
             y = region.fov_trace["trend"],
             mode = "lines",
             line=dict(width=.6,color="navy"),
             showlegend = False,
-
-        ),
-            row=1, col=1
-    )
+            )
+        f.add_trace(tr0,row=1, col=1)
+        f.add_trace(tr1,row=1, col=1)
+        
     y = region.fov_trace["raw"] - region.fov_trace["trend"]
-    f.add_trace(
-        go.Scatter(
-            x = region.fov_trace["time"],
-            y = y,
-            mode = "lines",
-            line=dict(width=.9,color="navy"),
-            showlegend = False,
-        ), row=2, col=1
-    )
-    f.update_layout({
-#             "height":360,
-#             "width":500,
-    #         "margin":dict(l=10, r=10, t=50, b=10),
-            "xaxis2": {
-                "rangeslider":{"visible":True},
-                "title": 'time [s]',
-            },
-        "height":420,
-        "width":480,
-        "margin":dict(l=10, r=10, t=50, b=20),
-        })
+    tr = go.Scatter(
+        x = x,
+        y = y,
+        mode = "lines",
+        line=dict(width=.9,color="navy"),
+        showlegend = False,
+        )
+    if twoRows:
+        f.add_trace(tr, row=2, col=1)
+        f.update_layout({
+                "xaxis2": {
+                    "rangeslider":{"visible":True, "range":(0,x.max()+np.diff(x)[0])},
+                    "title": 'time [s]',
+                },
+            "height":420,
+            "width":480,
+            "margin":dict(l=10, r=10, t=20, b=20),
+            })
+    else:
+        f.add_trace(tr)
+        f.update_layout({
+                "xaxis": {
+                    "rangeslider":{"visible":True},
+                    "title": 'time [s]',
+                    "range": (0,x.max()+np.diff(x)[0])
+                },
+            "height":250,
+            "width":500,
+            "margin":dict(l=10, r=10, t=20, b=40),
+            })
     return f
 
 def showRoisOnly(regions, indices=None, im=None, showall=True):
@@ -388,8 +409,8 @@ def getRigidShifts(movie_, gSig_filt):
     except: pass
     return mc.shifts_rig
 
-def createRegions(movie_,gSig_filt, drop_weak=True, drop_small=False, mode="diff_std",plot=False, diag=False, full=True):
-    regions = Regions(movie_, gSig_filt=gSig_filt, mode=mode, diag=diag, full=full)
+def createRegions(movie_,gSig_filt, drop_weak=True, drop_small=False, mode="diff_std",plot=False, diag=False, full=True, FrameRange=None, nRebin=1):
+    regions = Regions(movie_, gSig_filt=gSig_filt, mode=mode, diag=diag, full=full, nRebin=nRebin, FrameRange=FrameRange)
     C = regions.df
     if drop_weak:
         ## drop very weak Rois

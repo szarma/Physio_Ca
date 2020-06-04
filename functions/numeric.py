@@ -4,6 +4,58 @@ from scipy.stats import distributions as dst
 from scipy.optimize import curve_fit#,minimize,basinhopping
 from numba import jit,prange
 
+
+
+def nan_helper(y):
+    """Helper to handle indices and logical indices of NaNs.
+
+    Input:
+        - y, 1d numpy array with possible NaNs
+    Output:
+        - nans, logical indices of NaNs
+        - index, a function, with signature indices= index(logical_indices),
+          to convert logical indices of NaNs to 'equivalent' indices
+    Example:
+        >>> # linear interpolation of NaNs
+        >>> nans, x= nan_helper(y)
+        >>> y[nans]= np.interp(x(nans), x(~nans), y[~nans])
+    """
+
+    return np.isnan(y), lambda z: z.nonzero()[0]
+
+class sosFilter:
+    def __init__(self, cutoff, frequency, order=5, btype="low"):
+        from scipy.signal import butter
+        nyq = 0.5 * frequency
+        try:
+            normal_cutoff = cutoff / nyq
+        except:
+            normal_cutoff = np.array(cutoff) / nyq
+        self.sos_pars = butter(order, normal_cutoff, btype=btype, analog=False, output="sos")
+        self.frequency = frequency
+        
+    def run(self,data):
+        from scipy.signal import sosfiltfilt
+        return sosfiltfilt(self.sos_pars, data)
+    
+    def get_shape(self, worN=2000):
+        from scipy.signal import sosfreqz
+        w, h = sosfreqz(self.sos_pars, worN=worN)
+        return 0.5*self.frequency*w/np.pi, np.abs(h)
+        
+    
+
+def power_spectrum(x, fr, mean=True):
+    from scipy.fft import rfft, rfftfreq
+    freq = rfftfreq(x.shape[-1], 1/fr)
+    FA = rfft(x)
+    if mean: 
+        ndim = len(x.shape)
+        if ndim>1:
+            FA = FA.mean(axis=tuple(range(ndim-1)))
+    return freq, FA
+
+
 def get_sep_th(x_,ax=None,plot=False,thMax=None):
     from scipy.stats import gaussian_kde
     from Regions import crawlDict
