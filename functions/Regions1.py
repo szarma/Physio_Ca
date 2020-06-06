@@ -119,6 +119,7 @@ class Regions:
                 self.FrameRange = FrameRange
                 self.statImages = getStatImages(movie_[i0:ie], debleach=debleach, downsampleFreq=5)
                 self.time = time[i0:ie]
+                self.showTime = {}
         elif isinstance(movie_, dict):
             self.statImages = movie_
         else:
@@ -376,8 +377,7 @@ class Regions:
             traces[i] = movie_[i0:ie, x[0], x[1] ].mean(axis=1)
         self.df["trace"] = list(traces)
         time = np.arange(len(movie_))/movie_.fr
-        self.time = rebin(time[i0:ie], nRebin)
-        self.nRebin = nRebin
+        self.time = time[i0:ie]
         
     def sortFromCenter(self):
         center = np.array(self.image.shape)/2
@@ -413,17 +413,22 @@ class Regions:
         if calcStd:
             self.df["faster_%g_std"%ironScale] = multi_map(iterf,self.df["faster_%g"%ironScale].values,processes=n_processes)
     
-    def fast_filter_traces(self, ironTimeScale, z_sp = 2, order=5):
-        # from general_functions import multi_map
+    def fast_filter_traces(self, ironTimeScale, z_sp = 2, order=5, Npoints = None):
         from numeric import sosFilter
-        try:
-            freq = self.movie.fr/self.nRebin
-        except:
-            freq = 1./np.diff(self.time).mean()
-        cutFreq = 1/ironTimeScale
-        self.sosFilter = sosFilter(cutFreq, freq, order=order)
+        if Npoints is None: Npoints = 10
+        minDt = np.diff(self.time).mean()
+        freq = 1/minDt
+        assert np.abs(freq/self.movie.fr-1)<1e-5
+        N_dt = ironTimeScale/minDt
+        Nrebin = max(1,int(np.round(N_dt/Npoints)))
         C = self.df
         data = np.vstack([C.loc[i,"trace"] for i in C.index])
+        if Nrebin>1:
+            freq = freq/Nrebin
+            data = rebin(data, Nrebin, axis=1)
+            self.showTime["%g"%ironTimeScale] = rebin(self.time, Nrebin)
+        cutFreq = 1/ironTimeScale
+        self.sosFilter = sosFilter(cutFreq, freq, order=order)
         dataFilt = self.sosFilter.run(data)
         
         self.df["slower_%g"%ironTimeScale] = list(dataFilt)
@@ -433,8 +438,8 @@ class Regions:
             return None
         from cv2 import dilate
         from numeric import nan_helper
-        absFast = np.vstack([C.loc[i,"faster_%g"%ironTimeScale]*C.loc[i,"size"] for i in C.index])*self.nRebin
-        absSlow = np.vstack([C.loc[i,"slower_%g"%ironTimeScale]*C.loc[i,"size"] for i in C.index])*self.nRebin
+        absFast = np.vstack([C.loc[i,"faster_%g"%ironTimeScale]*C.loc[i,"size"] for i in C.index])*Nrebin
+        absSlow = np.vstack([C.loc[i,"slower_%g"%ironTimeScale]*C.loc[i,"size"] for i in C.index])*Nrebin
         std = absSlow**.5
         ff = (absFast > z_sp*std).astype("uint8")
         dilateKernelSize = max(3,int(ironTimeScale*freq*.03))
@@ -454,16 +459,13 @@ class Regions:
         std = absSlow**.5
         zScore = absFast/std
         C["zScore_%g"%ironTimeScale] = list(zScore)
-        C["slower_%g"%ironTimeScale] = [absSlow[i]/C["size"].iloc[i]/self.nRebin for i in range(len(C))]
-        C["faster_%g"%ironTimeScale] = [absFast[i]/C["size"].iloc[i]/self.nRebin for i in range(len(C))]
-            
-#         C["slower_%g"%ironTimeScale] = [C["slower_%g"%ironTimeScale].iloc[i]+ dFast[i]/C["size"].iloc[i]/self.nRebin for i in range(len(C))]
-#         self.df["faster_%g"%ironTimeScale] = [self.df.loc[i,"trace"] - \
-#                                               self.df.loc[i,"slower_%g"%ironTimeScale] for i in self.df.index]
-    def calc_raster(self, ts, z_th = 3, smooth=0):
+        C["slower_%g"%ironTimeScale] = [absSlow[i]/C["size"].iloc[i]/Nrebin for i in range(len(C))]
+        C["faster_%g"%ironTimeScale] = [absFast[i]/C["size"].iloc[i]/Nrebin for i in range(len(C))]
+
+    def calc_raster(self, ts, z_th = 3, Npoints=10):
         from numeric import runningAverage
         if "zScore_%g"%ts not in self.df.columns:
-            self.fast_filter_traces(ts)
+            self.fast_filter_traces(ts,Npoints=Npoints)
         zScores = np.vstack(self.df["zScore_%g"%ts])
         if smooth:
             ksize = 2*smooth+1
