@@ -84,13 +84,15 @@ def edges2nodes(x,start=0,direction=1):
     return nodes
 
 def getStatImages(movie_, debleach=True, downsampleFreq=10):
-    m_for_image = movie_.astype("float")
-    if m_for_image.fr>downsampleFreq:
-        n_rebin = int(m_for_image.fr/downsampleFreq)
+    if movie_.fr>downsampleFreq:
+        n_rebin = int(movie_.fr/downsampleFreq)
         if n_rebin>=2:
-            m_for_image = rebin(m_for_image,n_rebin)
+            m_for_image = rebin(movie_,n_rebin)
+        else:
+            m_for_image = movie_
     statImages = {}
     if debleach:
+        m_for_image = m_for_image.astype("float32")
         m_for_image.debleach()
 
     for f in [np.mean,np.std]:
@@ -104,7 +106,7 @@ def getStatImages(movie_, debleach=True, downsampleFreq=10):
 
 
 class Regions:
-    def __init__(self, movie_, crawl_th=0, diag=False, min_gradient=0, debleach=True, gSig_filt=None, mode="diff_std", full=True, img_th=-np.inf, FrameRange=None):
+    def __init__(self, movie_, crawl_th=0, diag=False, min_gradient=0, debleach=False, gSig_filt=None, mode="diff_std", full=True, img_th=-np.inf, FrameRange=None):
         self.mode = mode
         if isinstance(movie_, (np.ndarray,)):
             if len(movie_.shape)==2:

@@ -43,7 +43,7 @@ def saveRois(regions,outDir,filename="",movie=None,col="trace",formats=["vienna"
                 filename = today.strftime("%Y_%m_%d")
         if not isdir(outDir):
             makedirs(outDir)
-            feedback += f"Output {outDir} directory created."
+            feedback += [f"Output {outDir} directory created."]
 
         traces = pd.DataFrame(np.vstack(regions.df[col]).T)
         try:
