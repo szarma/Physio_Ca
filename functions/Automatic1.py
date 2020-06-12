@@ -4,7 +4,7 @@ from sys import path as syspath
 syspath.append(os.path.expanduser("~/srdjan_functs/"))
 
 from physio_def_1 import *
-from Regions import Regions
+from Regions1 import Regions
 
 
 from plotly.subplots import make_subplots
@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 # from plotly.colors import DEFAULT_PLOTLY_COLORS
 # DEFAULT_PLOTLY_COLORS[3] = "aqua"
 # DEFAULT_PLOTLY_COLORS[-3] = "darkgoldenrod"
-from Regions import MYCOLORS
+from Regions1 import MYCOLORS
 from plotly import colors as plxcolors
 import numpy as np
 
@@ -22,7 +22,7 @@ def lassoToMask(points, dims):
     mask = np.array([[p.contains_point((i,j))  for j in range(dims[1])] for i in range(dims[0])])
     return mask
 
-def saveRois(regions,outDir,filename="",movie=None,col="trace",formats=["vienna","maribor"]):
+def saveRois(regions,outDir,filename="",movie=None,col="trace",formats=["vienna","maribor"],add_date=True):
         feedback = []
 #     try:
         from copy import deepcopy,copy
@@ -35,25 +35,26 @@ def saveRois(regions,outDir,filename="",movie=None,col="trace",formats=["vienna"
         if movie is not None:
             regions.update(movie)
         filename = filename.replace(" ","_")
-        today = date.today()
-        if len(filename):
-            filename = "_".join([today.strftime("%Y_%m_%d"),filename])
-        else:
-            filename = today.strftime("%Y_%m_%d")
+        if add_date:
+            today = date.today()
+            if len(filename):
+                filename = "_".join([today.strftime("%Y_%m_%d"),filename])
+            else:
+                filename = today.strftime("%Y_%m_%d")
         if not isdir(outDir):
             makedirs(outDir)
-            feedback += f"Output {outdir} directory created."
+            feedback += f"Output {outDir} directory created."
 
         traces = pd.DataFrame(np.vstack(regions.df[col]).T)
         try:
-            traces["time"] = regions.showTime[col]
+            traces["time"] = regions.showTime[col.split("_")[-1]]
         except:
             traces["time"] = regions.time
         traces = traces[["time"]+list(traces.columns[:-1])]
         for format in formats:
             print (format)
             if format=="vienna":
-                saving = ['statImages', 'mode', 'image', 'filterSize', 'df', 'trange']
+                saving = ['statImages', 'mode', 'image', 'filterSize', 'df', 'trange', "FrameRange", "analysisFolder", "time", "Freq"]
                 movie = regions.movie
                 del regions.movie
                 allAttrs = list(regions.__dict__.keys())
@@ -64,7 +65,7 @@ def saveRois(regions,outDir,filename="",movie=None,col="trace",formats=["vienna"
                     if k not in saving:
                         del subRegions.__dict__[k]
                 for k in regions.df.columns:
-                    if k not in ["peak", "pixels"]:
+                    if k not in ["peak", "pixels", "trace"]:
                         del subRegions.df[k]
                         
                 roifile = f"{outDir}/{filename}_rois.pkl"

@@ -5,7 +5,7 @@ from itertools import product
 from collections import OrderedDict
 import matplotlib.pyplot as plt
 import networkx as nx
-from physio_def_1 import rebin
+from physio_def_2 import rebin
 
 from matplotlib._color_data import TABLEAU_COLORS, CSS4_COLORS
 MYCOLORS = OrderedDict(TABLEAU_COLORS)
@@ -119,12 +119,20 @@ class Regions:
                 self.FrameRange = FrameRange
                 self.statImages = getStatImages(movie_[i0:ie], debleach=debleach, downsampleFreq=5)
                 self.time = time[i0:ie]
+                self.Freq = movie_.fr
                 self.showTime = {}
         elif isinstance(movie_, dict):
             self.statImages = movie_
         else:
             raise ValueError("Regions can initialize either from a movie, or image, or a dictionary of stats images.")
+        
+        if full:
+            self.constructRois(mode=mode, crawl_th=crawl_th, img_th=img_th, diag=diag, min_gradient=min_gradient, gSig_filt=gSig_filt)
             
+    def constructRois(self, mode="diff_std", crawl_th=0, img_th=-np.inf, diag=False, min_gradient=0, gSig_filt=None):
+        from caiman.motion_correction import high_pass_filter_space
+        from pandas import DataFrame
+        
         for k0 in self.statImages:
             break
         tmp = np.zeros_like(self.statImages[k0])
@@ -134,13 +142,6 @@ class Regions:
             tmp += im
         self.statImages[mode] = tmp/tmp.max()
         image0 = tmp/tmp.max()
-        
-        if full:
-            self.constructRois(image0, crawl_th=crawl_th, img_th=img_th, diag=diag, min_gradient=min_gradient, gSig_filt=gSig_filt)
-            
-    def constructRois(self, image0, crawl_th=0, img_th=-np.inf, diag=False, min_gradient=0, gSig_filt=None):
-        from caiman.motion_correction import high_pass_filter_space
-        from pandas import DataFrame
         toMin = image0<img_th
         if gSig_filt is None:
             image = image0
@@ -415,25 +416,33 @@ class Regions:
     
     def fast_filter_traces(self, ironTimeScale, z_sp = 2, order=5, Npoints = None):
         from numeric import sosFilter
-        if Npoints is None: Npoints = 10
+        if Npoints is None: Npoints = 20
         minDt = np.diff(self.time).mean()
         freq = 1/minDt
-        assert np.abs(freq/self.movie.fr-1)<1e-5
+        try:
+            self.movie
+            if np.abs(freq/self.movie.fr-1)<1e-5:
+                print (f"movie frame rate ({regions.movie.fr}) and inferred frame ({freq}) rate are different!")
+        except:
+            pass
         N_dt = ironTimeScale/minDt
         Nrebin = max(1,int(np.round(N_dt/Npoints)))
+        print (f"Nrebin = {Nrebin}")
         C = self.df
         data = np.vstack([C.loc[i,"trace"] for i in C.index])
         if Nrebin>1:
             freq = freq/Nrebin
             data = rebin(data, Nrebin, axis=1)
+            try: self.showTime
+            except: self.showTime = {}
             self.showTime["%g"%ironTimeScale] = rebin(self.time, Nrebin)
-        cutFreq = 1/ironTimeScale
+        cutFreq = .5/ironTimeScale
         self.sosFilter = sosFilter(cutFreq, freq, order=order)
         dataFilt = self.sosFilter.run(data)
         
         self.df["slower_%g"%ironTimeScale] = list(dataFilt)
-        self.df["faster_%g"%ironTimeScale] = [self.df.loc[i,"trace"] - \
-                                              self.df.loc[i,"slower_%g"%ironTimeScale] for i in self.df.index]
+        self.df["faster_%g"%ironTimeScale] = list(data - dataFilt)
+        
         if z_sp==0:
             return None
         from cv2 import dilate
@@ -442,43 +451,91 @@ class Regions:
         absSlow = np.vstack([C.loc[i,"slower_%g"%ironTimeScale]*C.loc[i,"size"] for i in C.index])*Nrebin
         std = absSlow**.5
         ff = (absFast > z_sp*std).astype("uint8")
-        dilateKernelSize = max(3,int(ironTimeScale*freq*.03))
-        if dilateKernelSize%2==0:
-            dilateKernelSize+=1
-        print (dilateKernelSize)
-        ff = dilate(ff, np.ones(dilateKernelSize, dtype = np.uint8).reshape(1,-1)).astype("bool")
-        absFast_tmp = absFast.copy()
-        absFast_tmp[ff] = np.nan
-        for j in range(C.shape[0]):
-            y = absFast_tmp[j]
-            nans, x= nan_helper(y)
-            y[nans]= np.interp(x(nans), x(~nans), y[~nans])
-        dFast = self.sosFilter.run(absFast_tmp)
-        absSlow = absSlow + dFast
-        absFast = absFast - dFast
+        if ff.any():
+            dilateKernelSize = int(ironTimeScale/minDt/Nrebin*.3)#*.03)
+            if dilateKernelSize%2==0:
+                dilateKernelSize+=1
+            print (dilateKernelSize)
+            if dilateKernelSize>=3:
+                ff = dilate(ff, np.ones(dilateKernelSize, dtype = np.uint8).reshape(1,-1)).astype("bool")
+            absFast_tmp = absFast.copy()
+            absFast_tmp[ff] = np.nan
+            for j in range(C.shape[0]):
+                y = absFast_tmp[j]
+                nans, x= nan_helper(y)
+                if nans.any(): 
+                    y[nans]= np.interp(x(nans), x(~nans), y[~nans])
+            dFast = self.sosFilter.run(absFast_tmp)
+            absSlow = absSlow + dFast
+            absFast = absFast - dFast
         std = absSlow**.5
         zScore = absFast/std
         C["zScore_%g"%ironTimeScale] = list(zScore)
         C["slower_%g"%ironTimeScale] = [absSlow[i]/C["size"].iloc[i]/Nrebin for i in range(len(C))]
         C["faster_%g"%ironTimeScale] = [absFast[i]/C["size"].iloc[i]/Nrebin for i in range(len(C))]
 
-    def calc_raster(self, ts, z_th = 3, Npoints=10):
+    def calc_raster(self, ts, z_th = 3, Npoints=None, smooth = 0):
         from numeric import runningAverage
         if "zScore_%g"%ts not in self.df.columns:
             self.fast_filter_traces(ts,Npoints=Npoints)
         zScores = np.vstack(self.df["zScore_%g"%ts])
         if smooth:
-            ksize = 2*smooth+1
-            zScores = runningAverage(zScores.T,ksize).T
-            zScores *= ksize**.5
-            k = "%g_%g"%(ts,smooth)
-        else:
-            k = ts
+            avgSize = 2*smooth+1
+            zScores = runningAverage(zScores.T,avgSize).T#*avgSize**.5
+        k = "%g"%(ts)
         try:
             self.raster
         except:
             self.raster = {}
         self.raster[k] = zScores>z_th
+        
+    def calc_peaks(self, ts, z_th = 3, Npoints=None, smooth=None, tWindow = (None,None)):
+        from numeric import runningAverage
+        from scipy.signal import find_peaks, peak_widths
+        if "zScore_%g"%ts not in self.df.columns:
+            self.fast_filter_traces(ts,Npoints=Npoints)
+        zScores = np.vstack(self.df["zScore_%g"%ts])
+        t = self.showTime["%g"%ts]
+        dt = np.diff(t).mean()
+        if smooth is None:
+            smooth = int(ts/np.diff(t).mean()/5)
+            if smooth%2==0: smooth += 1
+        if smooth:
+            zScores = runningAverage(zScores.T,smooth).T
+        peaks = []
+        for i,z in zip(self.df.index,zScores):
+            pp = find_peaks(z,
+                            width=ts/dt/5,
+                            height=z_th
+                              )
+            w,h,x0 = peak_widths(z, pp[0], rel_height=.5)[:3]
+            w = w*(t[1]-t[0])
+            x0 = x0*(t[1]-t[0])
+            df = pd.DataFrame({"peak height [z]":z[pp[0]],"peak half-width [s]":w, "t0":x0})
+            df["roi"] = i
+            peaks += [df]
+        peaks = pd.concat(peaks,ignore_index=True)
+        k = "%g"%(ts)
+        try:
+            self.peaks
+        except:
+            self.peaks = {}
+        self.peaks[k] = peaks
+        
+    def show_scatter_peaks(self,ts):
+        from plotly_express import scatter
+        peaks = self.peaks["%g"%ts]
+        fig = scatter(peaks,
+                      x="peak half-width [s]",
+                      y="peak height [z]",
+                      hover_data=["roi"],
+                      marginal_x="box",
+                      width=500, opacity=.5, height=500,)
+        return fig
+        
+        
+        
+        
         
         
     def calcIntraCCs(self,movie_,diff=False,indices=None):
