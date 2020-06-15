@@ -90,6 +90,8 @@ def getStatImages(movie_, debleach=True, downsampleFreq=10):
             m_for_image = rebin(movie_,n_rebin)
         else:
             m_for_image = movie_
+    else:
+        m_for_image = movie_
     statImages = {}
     if debleach:
         m_for_image = m_for_image.astype("float32")
