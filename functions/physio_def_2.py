@@ -12,6 +12,10 @@ class Recording:
         self.metafile = os.path.join(self.folder,  f".{self.Experiment}.meta")
         try:
             self.metadata = pd.read_csv(self.metafile, index_col=0)
+            for c in ["Start time","End time"]:
+                self.metadata[c] = pd.to_datetime(self.metadata[c])
+            for c in ["Duration"]:
+                self.metadata[c] = pd.to_timedelta(self.metadata[c])
             # print (f"metadata imported from {self.metafile}.")
         except:
             print (f"Recording not yet preprocessed. Preprocessing takes a few seconds and will speed up the usage later...", end=" ")
@@ -70,11 +74,13 @@ class Recording:
         metadata["Start time"] = pd.to_datetime(metadata["Start time"])
         metadata["Duration"] = pd.to_timedelta(metadata["SizeT"]/metadata["Frequency"], unit="s")
         metadata["End time"] = metadata["Start time"]+metadata["Duration"]
+        self.metadata = metadata
+        
+    def calc_gaps(self):
+        metadata = self.metadata
         x = [metadata["Start time"].iloc[i+1]-metadata["End time"].iloc[i] for i in range(len(metadata)-1)]
         x = [el if el>=pd.Timedelta(0) else pd.Timedelta(0) for el in x]
         metadata["gap"] = [pd.NaT]+x
-        self.metadata = metadata
-        
         
     def save_metadata(self):
         self.metadata.to_csv(self.metafile, float_format = "%#.3g")

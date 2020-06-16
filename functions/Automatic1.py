@@ -22,7 +22,7 @@ def lassoToMask(points, dims):
     mask = np.array([[p.contains_point((i,j))  for j in range(dims[1])] for i in range(dims[0])])
     return mask
 
-def saveRois(regions,outDir,filename="",movie=None,col="trace",formats=["vienna","maribor"],add_date=True):
+def saveRois(regions,outDir,filename="",movie=None,col=["trace"],formats=["vienna","maribor"],add_date=True):
         feedback = []
 #     try:
         from copy import deepcopy,copy
@@ -31,7 +31,7 @@ def saveRois(regions,outDir,filename="",movie=None,col="trace",formats=["vienna"
         import pandas as pd
         from os.path import isdir
         from os import makedirs
-        regions.sortFromCenter()
+#         regions.sortFromCenter()
         if movie is not None:
             regions.update(movie)
         filename = filename.replace(" ","_")
@@ -45,27 +45,23 @@ def saveRois(regions,outDir,filename="",movie=None,col="trace",formats=["vienna"
             makedirs(outDir)
             feedback += [f"Output {outDir} directory created."]
 
-        traces = pd.DataFrame(np.vstack(regions.df[col]).T)
-        try:
-            traces["time"] = regions.showTime[col.split("_")[-1]]
-        except:
-            traces["time"] = regions.time
-        traces = traces[["time"]+list(traces.columns[:-1])]
         for format in formats:
             print (format)
             if format=="vienna":
                 saving = ['statImages', 'mode', 'image', 'filterSize', 'df', 'trange', "FrameRange", "analysisFolder", "time", "Freq"]
-                movie = regions.movie
-                del regions.movie
+                if hasattr(regions, "movie"):
+                    movie = regions.movie
+                    del regions.movie
                 allAttrs = list(regions.__dict__.keys())
                 subRegions = deepcopy(regions)
-                regions.movie = movie
-                del movie
+                if hasattr(regions, "movie"):
+                    regions.movie = movie
+                    del movie
                 for k in allAttrs:
                     if k not in saving:
                         del subRegions.__dict__[k]
                 for k in regions.df.columns:
-                    if k not in ["peak", "pixels", "trace"]:
+                    if k not in ["peak", "pixels"]+col:
                         del subRegions.df[k]
                         
                 roifile = f"{outDir}/{filename}_rois.pkl"
@@ -74,6 +70,13 @@ def saveRois(regions,outDir,filename="",movie=None,col="trace",formats=["vienna"
                 feedback += [f"ROI info saved in {roifile}."]
 
             elif format=="maribor":
+                
+                traces = pd.DataFrame(np.vstack(regions.df[col]).T)
+                try:
+                    traces["time"] = regions.showTime[col.split("_")[-1]]
+                except:
+                    traces["time"] = regions.time
+                traces = traces[["time"]+list(traces.columns[:-1])]
                 tracefile = f"{outDir}/{filename}_trace_for_mb.txt"
                 np.savetxt(tracefile, traces.values)
                 feedback += [f"Traces saved in {tracefile}."]
@@ -290,7 +293,7 @@ def showRoisOnly(regions, indices=None, im=None, showall=True):
         
     return f
 
-def createStaticImage(im,regions,showall=False,color="grey",separate=False):
+def createStaticImage(im,regions,showall=False,color="grey",separate=False, returnPath=False):
     if im is None:
         im = regions.image
     from PIL import Image as PilImage
@@ -314,6 +317,9 @@ def createStaticImage(im,regions,showall=False,color="grey",separate=False):
     plt.yticks([])
     plt.savefig(bkg_img_file,dpi=150)
     plt.close(fig)
+    if returnPath:
+        return bkg_img_file
+    
     return PilImage.open(bkg_img_file)
 
 def getRigidShifts(movie_, gSig_filt):

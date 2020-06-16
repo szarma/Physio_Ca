@@ -214,11 +214,14 @@ class Regions:
         from numeric import mydebleach
         from physio_def_1 import rebin
         i0, ie = self.FrameRange
-        n = int(self.movie.fr/showFreq)
+#         n = int(self.movie.fr/showFreq)
+        n = int(self.Freq/showFreq)
         if n==0: n=1
-        x = rebin(np.arange(i0,ie)/self.movie.fr,n)
+        x = rebin(np.arange(i0,ie)/self.Freq,n)
         try:
-            y = sum(self.df.trace)
+            y = np.sum([self.df.loc[i,"trace"]*self.df.loc[i,"size"] for i in self.df.index],axis=0)/self.df["size"].sum()
+            if n>1:
+                y = rebin(y,n)
         except:
             if pixels is None:
                 y = self.movie[i0:ie:n].mean(axis=(1,2))
@@ -499,7 +502,10 @@ class Regions:
         if "zScore_%g"%ts not in self.df.columns:
             self.fast_filter_traces(ts,Npoints=Npoints)
         zScores = np.vstack(self.df["zScore_%g"%ts])
-        t = self.showTime["%g"%ts]
+        try:
+            t = self.showTime["%g"%ts]
+        except:
+            t = self.time
         dt = np.diff(t).mean()
         if smooth is None:
             smooth = int(ts/np.diff(t).mean()/5)
@@ -515,7 +521,7 @@ class Regions:
             w,h,x0 = peak_widths(z, pp[0], rel_height=.5)[:3]
             w = w*(t[1]-t[0])
             x0 = x0*(t[1]-t[0])
-            df = pd.DataFrame({"peak height [z]":z[pp[0]],"peak half-width [s]":w, "t0":x0})
+            df = pd.DataFrame({"peak height [z-score]":z[pp[0]],"peak half-width [s]":w, "t0":x0})
             df["roi"] = i
             peaks += [df]
         peaks = pd.concat(peaks,ignore_index=True)
@@ -530,16 +536,14 @@ class Regions:
         from plotly_express import scatter
         peaks = self.peaks["%g"%ts]
         fig = scatter(peaks,
-                      x="peak half-width [s]",
-                      y="peak height [z]",
+                      x=peaks.columns[1],
+                      y=peaks.columns[0],
                       hover_data=["roi"],
-                      marginal_x="box",
-                      width=500, opacity=.5, height=500,)
+                      marginal_x="histogram",
+                      log_y=True,
+                      width=450, opacity=.5, height=450,)
+        fig.update_layout({"margin":dict(l=10, r=10, t=20, b=40),})
         return fig
-        
-        
-        
-        
         
         
     def calcIntraCCs(self,movie_,diff=False,indices=None):
