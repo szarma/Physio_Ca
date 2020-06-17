@@ -532,17 +532,60 @@ class Regions:
             self.peaks = {}
         self.peaks[k] = peaks
         
-    def show_scatter_peaks(self,ts):
+    def show_scatter_peaks(self,ts,timeWindows = None):
         from plotly_express import scatter
-        peaks = self.peaks["%g"%ts]
-        fig = scatter(peaks,
-                      x=peaks.columns[1],
-                      y=peaks.columns[0],
+        peaks = self.peaks["%g"%ts].copy()
+        if timeWindows is None:
+            timeWindows = [[0,np.inf]]
+        peaks["timeWindow"] = [""]*len(peaks)
+        for i,tw in enumerate(timeWindows):
+#                 print (tw)
+            if tw[1]<=tw[0]:continue
+            iis = np.where(peaks["t0"].between(*tw) & (peaks["t0"]+peaks[peaks.columns[1]]).between(*tw))[0]
+            for j in iis:
+                if peaks.loc[j,"timeWindow"]=="":
+                    peaks.loc[j,"timeWindow"] = str(i)
+                else:
+                    j1 = len(peaks)
+                    peaks.loc[j1] = peaks.loc[j]
+                    peaks.loc[j1,"timeWindow"] = str(i)
+#             peaks["timeWindow"][ff] = str(i+1)
+        df = peaks.query("timeWindow!=''")    
+        from plotly.colors import DEFAULT_PLOTLY_COLORS
+        fig = scatter(df,
+                      x=df.columns[1],
+                      y=df.columns[0],
+                      opacity = .2,
+                      labels = ["roi"],
+                      color=[DEFAULT_PLOTLY_COLORS[int(c)] for c in df["timeWindow"]],
+#                       hover_data={k:(k=="roi") for k in df.columns},
+#                       hover_data={"roi":True},
                       hover_data=["roi"],
-                      marginal_x="histogram",
+#                       hoverinfo=df["roi"].astype("str"),
+                      marginal_x="box",
                       log_y=True,
-                      width=450, opacity=.5, height=450,)
-        fig.update_layout({"margin":dict(l=10, r=10, t=20, b=40),})
+                      render_mode = "webgl",
+                      width=450,
+                      height=450,
+                     )
+#         fig.update_traces(hovertemplate='x: %{x} <br>y: %{y} <br>roi: %{roi}') # 
+        fig.update_layout({
+        "plot_bgcolor":"white","margin":dict(l=10, r=10, t=20, b=40),"showlegend":False})
+        fig.update_layout(
+            legend=dict(
+                x=.99,
+                y=.72,
+                traceorder="normal",
+                xanchor="right",
+            )
+        )
+        
+        fig.update_xaxes(showline=True, linewidth=1, linecolor='black', mirror=True, ticks="outside", ticklen=2,
+#                          gridcolor="none"
+                        )
+        fig.update_yaxes(showline=True, linewidth=1, linecolor='black', mirror=True, ticks="outside", ticklen=2,
+#                          gridcolor="none"
+                        )
         return fig
         
         
