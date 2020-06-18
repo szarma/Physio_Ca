@@ -49,12 +49,13 @@ def saveRois(regions,outDir,filename="",movie=None,col=["trace"],formats=["vienn
             print (format)
             if format=="vienna":
                 saving = ['statImages', 'mode', 'image', 'filterSize', 'df', 'trange', "FrameRange", "analysisFolder", "time", "Freq"]
-                if hasattr(regions, "movie"):
+                juggleMovie = hasattr(regions, "movie")
+                if juggleMovie:
                     movie = regions.movie
                     del regions.movie
                 allAttrs = list(regions.__dict__.keys())
                 subRegions = deepcopy(regions)
-                if hasattr(regions, "movie"):
+                if juggleMovie:
                     regions.movie = movie
                     del movie
                 for k in allAttrs:
