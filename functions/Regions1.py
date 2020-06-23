@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 from physio_def_2 import rebin
 
+import plotly.graph_objects as go
 from matplotlib._color_data import TABLEAU_COLORS, CSS4_COLORS
 MYCOLORS = OrderedDict(TABLEAU_COLORS)
 del MYCOLORS["tab:gray"]

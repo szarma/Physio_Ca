@@ -5,6 +5,7 @@ from collections import OrderedDict
 import matplotlib.pyplot as plt
 import networkx as nx
 from .numeric import rebin
+from .utils import multi_map
 import plotly.graph_objects as go
 from matplotlib._color_data import TABLEAU_COLORS, CSS4_COLORS
 MYCOLORS = OrderedDict(TABLEAU_COLORS)
@@ -136,7 +137,7 @@ class Regions:
             tmp += im
         self.statImages[mode] = tmp/tmp.max()
         image0 = tmp/tmp.max()
-        toMin = image0<img_th
+        toMin = image0<=img_th
         if gSig_filt is None:
             image = image0
         else:

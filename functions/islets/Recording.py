@@ -131,7 +131,10 @@ class Recording:
         except: self.rdr = bf.ImageReader(self.path, perform_init=True)
         
         for i in metadata.index:
+#             firstFrame = self.rdr.read(series=i, rescale=False, t=0)
+#             if len(firstFrame.shape)==3:
+                
             offset = metadata.loc[:i-1,"SizeT"].sum()
             for t in range(metadata.loc[i,"SizeT"]):
-                data[t+offset] = self.rdr.read(series=i, rescale=False, t=t)
+                data[t+offset] = self.rdr.read(series=i, rescale=False, t=t,c=0)
         self.Series[Series]["data"] = data

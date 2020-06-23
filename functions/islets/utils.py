@@ -62,7 +62,6 @@ def showMovie(m_show, figsize = (6,6), out="jshtml",fps = 30, saveName=None, NTi
         if n_rebin>1:
             m_show = rebin(m_show, n_rebin)
     if log:
-#         while True:
         for p in range(1,5):
             baseline = np.percentile(m_show,p)
             m_show = np.maximum(m_show, baseline)
@@ -98,6 +97,53 @@ def showMovie(m_show, figsize = (6,6), out="jshtml",fps = 30, saveName=None, NTi
             except:
                 saveName = "video.mp4"
                 anim.save(saveName)
+        return None
+    
+def show_movie(m_show, figScale = 1, out="jshtml",fps = 30, saveName=None, NTimeFrames=100,log=True,additionalPlot=None, dpi=100):
+    import matplotlib.pyplot as plt
+    from matplotlib import animation
+    if NTimeFrames is not None:
+        n_rebin = len(m_show)//NTimeFrames
+        if n_rebin>1:
+            m_show = rebin(m_show, n_rebin)
+    if log:
+        for p in range(1,5):
+            baseline = np.percentile(m_show,p)
+            m_show = np.maximum(m_show, baseline)
+            if np.all(m_show>0): break
+        m_show = np.log(m_show)
+    figsize = np.array(m_show.shape[1:])/dpi*figScale
+    fig = plt.figure(figsize=figsize,dpi=dpi)
+    ax = fig.add_axes([0.01,0.01,.98,.98])
+    im = ax.imshow(m_show[0], cmap="Greys", vmin=m_show.min(), vmax=m_show.max())
+    if additionalPlot is not None:
+        additionalPlot(ax)
+    plt.close(fig)
+    def init():
+        im.set_data(m_show[0])
+        return (im,)
+    def animate(i):
+        im.set_data(m_show[i])
+        return (im,)
+    anim = animation.FuncAnimation(fig, animate, init_func=init,
+                                   frames=len(m_show),
+                                   interval=1000/fps,
+                                   blit=True)
+    if out=="html5":
+        from IPython.display import HTML
+        return HTML(anim.to_html5_video())
+    if out=="jshtml":
+        from IPython.display import HTML
+        return HTML(anim.to_jshtml())
+    if out=="save" or saveName is not None:
+        try:
+            anim.save(saveName, extra_args=['-vcodec', 'libx264'])
+        except:
+            saveName = input("please enter a valid filename. Otherwise, I'll save it as 'video.mp4'.")
+            try: anim.save(saveName, extra_args=['-vcodec', 'libx264'])
+            except:
+                saveName = "video.mp4"
+                anim.save(saveName, extra_args=['-vcodec', 'libx264'])
         return None
     
 def getFigure(w=300,h=300,c="lightgrey"):
