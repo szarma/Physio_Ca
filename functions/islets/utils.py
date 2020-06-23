@@ -276,3 +276,75 @@ def createStaticImage(im,regions,showall=False,color="grey",separate=False, retu
         return bkg_img_file
     
     return PilImage.open(bkg_img_file)
+
+
+def saveRois(regions,outDir,filename="",movie=None,col=["trace"],formats=["vienna","maribor"],add_date=True):
+        feedback = []
+#     try:
+        from copy import deepcopy,copy
+        from datetime import date
+        import pickle
+        import pandas as pd
+        from os.path import isdir
+        from os import makedirs
+#         regions.sortFromCenter()
+        if movie is not None:
+            regions.update(movie)
+        filename = filename.replace(" ","_")
+        if add_date:
+            today = date.today()
+            if len(filename):
+                filename = "_".join([today.strftime("%Y_%m_%d"),filename])
+            else:
+                filename = today.strftime("%Y_%m_%d")
+        if not isdir(outDir):
+            makedirs(outDir)
+            feedback += [f"Output {outDir} directory created."]
+
+        for format in formats:
+            print (format)
+            if format=="vienna":
+                saving = ['statImages', 'mode', 'image', 'filterSize', 'df', 'trange', "FrameRange", "analysisFolder", "time", "Freq"]
+                juggleMovie = hasattr(regions, "movie")
+                if juggleMovie:
+                    movie = regions.movie
+                    del regions.movie
+                allAttrs = list(regions.__dict__.keys())
+                subRegions = deepcopy(regions)
+                if juggleMovie:
+                    regions.movie = movie
+                    del movie
+                for k in allAttrs:
+                    if k not in saving:
+                        del subRegions.__dict__[k]
+                for k in regions.df.columns:
+                    if k not in ["peak", "pixels"]+col:
+                        del subRegions.df[k]
+                        
+                roifile = f"{outDir}/{filename}_rois.pkl"
+                with open(roifile,"wb") as f:
+                    pickle.dump(subRegions,f)
+                feedback += [f"ROI info saved in {roifile}."]
+
+            elif format=="maribor":
+                
+                traces = pd.DataFrame(np.vstack(regions.df[col]).T)
+                try:
+                    traces["time"] = regions.showTime[col.split("_")[-1]]
+                except:
+                    traces["time"] = regions.time
+                traces = traces[["time"]+list(traces.columns[:-1])]
+                tracefile = f"{outDir}/{filename}_trace_for_mb.txt"
+                np.savetxt(tracefile, traces.values)
+                feedback += [f"Traces saved in {tracefile}."]
+                coordFile = f"{outDir}/{filename}_coords_for_mb.txt"
+                coords = np.array([np.mean(pxs,axis=0) for pxs in regions.df["pixels"]])
+                np.savetxt(coordFile, coords)
+                feedback += [f"Coordinates saved in {coordFile}."]
+            else:
+                return "Output format not recognized. Currently, only 'vienna' and 'maribor' are implemented."
+#     except:
+#         from sys import exc_info
+#         feedback += ["ERROR: "+ exc_info().__repr__()]
+        return feedback
+
