@@ -505,7 +505,7 @@ class Regions:
         try:
             self.peaks[k]
         except:
-            self.calc_peaks(timeScale)
+            self.calc_peaks(ts)
         df = self.peaks[k]
         C = self.df
         rr = np.zeros((len(C),npoints))

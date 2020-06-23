@@ -1,12 +1,11 @@
-from general_functions import multi_map
 import numpy as np
 import pandas as pd
 from itertools import product
 from collections import OrderedDict
 import matplotlib.pyplot as plt
 import networkx as nx
-from physio_def_2 import rebin
-
+from .numeric import rebin
+import plotly.graph_objects as go
 from matplotlib._color_data import TABLEAU_COLORS, CSS4_COLORS
 MYCOLORS = OrderedDict(TABLEAU_COLORS)
 del MYCOLORS["tab:gray"]
@@ -45,15 +44,6 @@ def climb(x,blurredWeights,diag=True,min_gradient = 0):
             xs += [x]
     return x[:2]
 
-# def crawlDict(image, th=-np.inf, diag=False, min_gradient=0):
-#     A_ = [(i,j)+climb((i,j),image,diag=diag,min_gradient=min_gradient) for i,j in product(range(image.shape[0]),range(image.shape[1])) if image[i,j]>th]
-#     A_ = [el for el in A_ if el[-1] is not None]
-#     B_ = OrderedDict()
-#     for (i0,j0,i1,j1) in A_:
-#         if (i1,j1) not in B_:
-#             B_[(i1,j1)] = []
-#         B_[(i1,j1)] += [(i0,j0)]
-#     return B_
 
 
 def crawlDict(image, crawl_th=-np.inf, diag=False, min_gradient=0, n_processes=10):
@@ -505,7 +495,7 @@ class Regions:
         try:
             self.peaks[k]
         except:
-            self.calc_peaks(timeScale)
+            self.calc_peaks(ts)
         df = self.peaks[k]
         C = self.df
         rr = np.zeros((len(C),npoints))
@@ -551,7 +541,7 @@ class Regions:
         peaks = []
         for i,z in zip(self.df.index,zScores):
             pp = find_peaks(z,
-                            width=ts/dt/5,
+                            width=ts/dt/10,
                             height=z_th
                               )
             w,h,x0 = peak_widths(z, pp[0], rel_height=.5)[:3]

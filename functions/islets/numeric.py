@@ -4,6 +4,25 @@ from scipy.stats import distributions as dst
 from scipy.optimize import curve_fit#,minimize,basinhopping
 from numba import jit,prange
 
+        
+def rebin(a,n,axis=0,norm=True, dtype="float32"):
+    if type(axis)==int and type(n)==int:
+        ashape = a.shape
+        newShape = ashape[:axis]+(ashape[axis]//n,)+ashape[axis+1:]
+        out = np.zeros(newShape,dtype=dtype)
+        for i in range(newShape[axis]):
+            idx = tuple([slice(None)] * axis + [slice(i*n,(i+1)*n)] + [slice(None)]*(len(ashape)-axis-1))
+            x = a[idx].sum(axis=axis)
+            if norm:
+                x = x/n
+            out[tuple([slice(None)] * axis + [i] + [slice(None)]*(len(ashape)-axis-1))] = x
+        return out
+    
+    assert len(n)==len(axis)
+    out = rebin(a,n[0],axis[0],norm=norm)
+    for i in range(1, len(n)):
+        out = rebin(out,n[i],axis[i],norm=norm)
+    return out
 
 
 def nan_helper(y):
@@ -113,8 +132,12 @@ def mydebleach(x_):
     try:
         out = decayfit(x_)
     except:
-        p = np.polyfit(range(len(x_)),x_,1)
-        out = p[1]+p[0]*np.arange(len(x_))
+        pass
+    if np.isnan(out).any():
+        out = x_ - x_.mean()
+    p = np.polyfit(range(len(x_)),x_,1)
+    out = p[1]+p[0]*np.arange(len(x_))
+    
     return out
 
 def decayfit(x,Ntrials=None, outPars=False):
@@ -149,26 +172,6 @@ def decayfit(x,Ntrials=None, outPars=False):
     else:
         return expDecay
 
-
-# def decayfit(x,Ntrials=None):
-#     if Ntrials is None:
-#         lx = 10
-#     else:
-#         lx = Ntrials
-#     nx = len(x)//10
-#     TT = np.arange(len(x))
-#     tt = TT.copy()
-#     for j_ in range(lx):
-#         try:
-#             p0 = guessDecayPars(x)
-#             ff = np.isfinite(x)
-#             popt = curve_fit(decay,tt[ff],x[ff],p0=p0)[0]
-#             expDecay = decay(TT,*popt)
-#             return expDecay
-#         except:
-#             x = x[:-nx]
-#             tt = tt[:-nx]
-#     return p0
 
 @jit 
 def percFilter(x_,perc,filterSize):
