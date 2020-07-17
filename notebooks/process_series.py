@@ -1,11 +1,13 @@
 #!/opt/tljh/user/envs/physio/bin/python
-
 ## importing stuff
 import os
 import pickle
 from sys import path as syspath
-syspath.append(os.path.expanduser("~/srdjan_functs/"))
-
+fundir = os.path.expanduser("~/srdjan_functs/")
+if os.path.isdir(fundir):
+    syspath.append()
+else:
+    syspath.append("./functions/")
 from general_functions import suppress_stdout, suppress_stderr
 
 import numpy as np
