@@ -3,7 +3,7 @@ import os
 from sys import path as syspath
 syspath.append(os.path.expanduser("~/srdjan_functs/"))
 
-from physio_def_1 import *
+from physio_def_2 import *
 from Regions1 import Regions
 
 

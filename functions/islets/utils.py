@@ -44,13 +44,13 @@ def multi_map(some_function, iterable, processes=1):
         out = map(some_function, iterable)
     elif processes>1:
         from multiprocessing import Pool
-        pool = Pool(processes)
-        out  = pool.map(some_function, iterable)
-        pool.close()
-        pool.join()
+        with Pool(processes) as pool:
+            out  = pool.map(some_function, iterable)
+        # pool.close()
+        # pool.join()
     else:
         print ("invalid number of processes", processes)
-        quit()
+        out = None
     return out
 
 
@@ -99,9 +99,13 @@ def showMovie(m_show, figsize = (6,6), out="jshtml",fps = 30, saveName=None, NTi
                 anim.save(saveName)
         return None
     
-def show_movie(m_show, figScale = 1, out="jshtml",fps = 30, saveName=None, NTimeFrames=100,log=True,additionalPlot=None, dpi=100):
+def show_movie(m_show, figScale = 1, out="jshtml",fps = 30, saveName=None, NTimeFrames=100,log=True,additionalPlot=None, dpi=100, tmax=None):
     import matplotlib.pyplot as plt
     from matplotlib import animation
+    from .numeric import rebin
+    if tmax is not None:
+        import matplotlib.patheffects as path_effects
+        from pandas import Timedelta
     if NTimeFrames is not None:
         n_rebin = len(m_show)//NTimeFrames
         if n_rebin>1:
@@ -112,18 +116,39 @@ def show_movie(m_show, figScale = 1, out="jshtml",fps = 30, saveName=None, NTime
             m_show = np.maximum(m_show, baseline)
             if np.all(m_show>0): break
         m_show = np.log(m_show)
-    figsize = np.array(m_show.shape[1:])/dpi*figScale
+    figsize = np.array(m_show.shape[1:][::-1])/dpi*figScale
     fig = plt.figure(figsize=figsize,dpi=dpi)
     ax = fig.add_axes([0.01,0.01,.98,.98])
     im = ax.imshow(m_show[0], cmap="Greys", vmin=m_show.min(), vmax=m_show.max())
+    tx = ax.text(1,0," \n",transform = ax.transAxes, ha="right", family="Courier",va="center",color="darkgoldenrod")
+#     tx.set_path_effects([
+#         path_effects.Stroke(linewidth=.7, foreground='black'),
+#         path_effects.Normal()
+#     ])
+    ax.set_xticks([])
+    ax.set_yticks([])
+    if tmax is not None:
+        dt = tmax/len(m_show)
     if additionalPlot is not None:
         additionalPlot(ax)
     plt.close(fig)
     def init():
         im.set_data(m_show[0])
+        if tmax is not None:
+            tx.set_text("0:00.0")
+#             tx.set_path_effects([path_effects.Stroke(linewidth=.7, foreground='black'),
+#                            path_effects.Normal()])
         return (im,)
     def animate(i):
         im.set_data(m_show[i])
+        if tmax is not None:
+            time = i*dt
+            mins = int(time/60)
+            sec  = int(time-60*mins)
+            ms   = "%i"%(10*(time-60*mins-sec))
+            tx.set_text(f"{mins}:{sec:02d}.{ms} \n")
+#         tx.set_path_effects([path_effects.Stroke(linewidth=.7, foreground='black'),
+#                        path_effects.Normal()])
         return (im,)
     anim = animation.FuncAnimation(fig, animate, init_func=init,
                                    frames=len(m_show),
@@ -169,26 +194,28 @@ def showRoisOnly(regions, indices=None, im=None, showall=True):
     f = go.Figure()
     for i in indices:
         cl = MYCOLORS[i%len(MYCOLORS)]
-
         bds = regions.df.loc[i,"boundary"]
         bds += [bds[0]]
         y,x = np.array(bds).T
         ypts,xpts = np.array(regions.df.pixels[i]).T
         ln = go.Scatter(x=x,y=y,
-                        line=dict(width=1,color=cl),
+                        line=dict(width=.7,color=cl),
                         #mode="markers+lines",
-                        #mode="lines",
+                        mode="lines",
                         #marker={"size":2},
+                        hoveron = 'points+fills',
                         showlegend = False,
                         name = str(i),
                         hoverinfo='text',
                         hovertext=["%i"%(i)]*len(bds),
                         fill="toself",
-                        opacity = .5,
+                        #opacity = .5,
+                        fillcolor='rgba(255, 0, 0, 0.05)',
                      )
         f.add_trace(ln)
     if len(indices):    
-        y,x = np.vstack([np.mean(regions.df.pixels[i],axis=0) for i in indices]).T
+#         y,x = np.vstack([np.mean(regions.df.pixels[i],axis=0) for i in indices]).T
+        y,x = np.vstack([regions.df.peak[i] for i in indices]).T
         pts = go.Scatter(x=x,y=y,
                     mode="markers",
                     showlegend = False,
@@ -199,16 +226,20 @@ def showRoisOnly(regions, indices=None, im=None, showall=True):
                     hoverinfo="text"
                  )
         f.add_trace(pts)
-    else:
-        f.add_trace(go.Scatter(x=[0],y=[0],
-                    mode="markers",
-                    marker=dict(color="blue",size=3, opacity=0),
-                    hovertext=None,
-                 ))
+#     else:
+#         f.add_trace(go.Scatter(x=[0],y=[0],
+#                     mode="markers",
+#                     marker=dict(color="blue",size=3, opacity=0),
+#                     hovertext=None,
+#                  ))
         
     if im!="none":
         # f.add_heatmap(z=im, hoverinfo='skip',showscale=False,colorscale=plxcolors.sequential.Greys)
-        imgpointer = createStaticImage(im,regions,showall=showall, separate=True)
+        imgpointer = createStaticImage(None,
+                                       regions,
+                                       showall=showall,
+                                       separate=bool(len(MYCOLORS)-1),
+                                       origin="top")
 
         f.add_layout_image(
             dict(
@@ -216,20 +247,28 @@ def showRoisOnly(regions, indices=None, im=None, showall=True):
                 xref="x",
                 yref="y",
                 x=-.5,
-                y=(im.shape[0]-.5),
+#                 y=(im.shape[0]-.5),
+                y=-.5,
                 sizex=im.shape[1],
-                sizey=im.shape[0],
+                sizey=-im.shape[0],
                 sizing="stretch",
                 opacity=1,
                 layer="below")
             )
-    
+    h,w = 360,360*im.shape[1]/im.shape[0]
+    if w>500:
+        h = 500/w*h
+        w = 500
+    h += 70
+    w += 20
     f.update_layout({
         #"title":regions.mode+" (filtered)",
-        "height":400,
-        "width":360*im.shape[1]/im.shape[0],
+        "height":h,
+        "width":w,
         "margin":dict(l=10, r=10, t=50, b=20),
         "xaxis": {
+            "zeroline" : False,
+            "showgrid" : False,
             "linecolor": 'black',
             "linewidth": 1,
             "mirror": True,
@@ -237,31 +276,38 @@ def showRoisOnly(regions, indices=None, im=None, showall=True):
             "range":[-.5,im.shape[1]-.5]
         },
         "yaxis": {
+            "zeroline" : False,
+            "showgrid" : False,
             "linecolor": 'black',
             "linewidth": 1,
             "mirror": True,
             "tickvals": [],
-            "range":[-.5,im.shape[0]-.5]
+#             "range":[-.5,im.shape[0]-.5],
+            "range":[im.shape[0]-.5,-.5],
         },
         'clickmode': 'event+select'
     })
-        
+#     f['layout']['yaxis']['autorange'] = "reversed"
     return f
 
-def createStaticImage(im,regions,showall=False,color="grey",separate=False, returnPath=False):
+def createStaticImage(im,regions,showall=False,color="grey",separate=False, returnPath=False, cmap=None,origin="bottom"):
     if im is None:
-        im = regions.image
+        im = regions.statImages[regions.mode]
     from PIL import Image as PilImage
     import matplotlib.pyplot as plt
+    if cmap is None:
+        cmap = plt.cm.Greys
+        cmap.set_bad("lime")
     bkg_img_file = "/tmp/%i.png"%np.random.randint(int(1e10))
     figsize=np.array(im.shape)[::-1]/30
     fig = plt.figure(figsize=figsize)
     ax = fig.add_axes([0, 0, 1, 1])
+    im[im==0] = np.nan
     try:
         im = np.clip(im, np.percentile(im,.2), np.percentile(im,(1-20/im.size)*100))
     except:
         pass
-    ax.imshow(np.log(im),cmap="Greys",origin="bottom")
+    ax.imshow(np.log(im),cmap=cmap,origin=origin)
     for sp in ax.spines: ax.spines[sp].set_visible(False)
     if showall:
         try:
@@ -270,6 +316,7 @@ def createStaticImage(im,regions,showall=False,color="grey",separate=False, retu
             pass
     plt.xticks([])
     plt.yticks([])
+    plt.ylim(plt.ylim()[::-1])
     plt.savefig(bkg_img_file,dpi=150)
     plt.close(fig)
     if returnPath:
@@ -302,7 +349,6 @@ def saveRois(regions,outDir,filename="",movie=None,col=["trace"],formats=["vienn
             feedback += [f"Output {outDir} directory created."]
 
         for format in formats:
-            print (format)
             if format=="vienna":
                 saving = ['statImages', 'mode', 'image', 'filterSize', 'df', 'trange', "FrameRange", "analysisFolder", "time", "Freq"]
                 juggleMovie = hasattr(regions, "movie")
@@ -347,4 +393,3 @@ def saveRois(regions,outDir,filename="",movie=None,col=["trace"],formats=["vienn
 #         from sys import exc_info
 #         feedback += ["ERROR: "+ exc_info().__repr__()]
         return feedback
-

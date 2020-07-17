@@ -118,6 +118,16 @@ def suppress_stdout():
             yield
         finally:
             sys.stdout = old_stdout
+@contextmanager
+def suppress_stderr():
+    import sys, os
+    with open(os.devnull, "w") as devnull:
+        old_stderr = sys.stderr
+        sys.stderr = devnull
+        try:  
+            yield
+        finally:
+            sys.sterr = old_stderr
 
 
 

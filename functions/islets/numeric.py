@@ -17,12 +17,12 @@ def rebin(a,n,axis=0,norm=True, dtype="float32"):
                 x = x/n
             out[tuple([slice(None)] * axis + [i] + [slice(None)]*(len(ashape)-axis-1))] = x
         return out
-    
-    assert len(n)==len(axis)
-    out = rebin(a,n[0],axis[0],norm=norm)
-    for i in range(1, len(n)):
-        out = rebin(out,n[i],axis[i],norm=norm)
-    return out
+    else:
+        assert len(n)==len(axis)
+        out = rebin(a,n[0],axis[0],norm=norm)
+        for i in range(1, len(n)):
+            out = rebin(out,n[i],axis[i],norm=norm,dtype=dtype)
+        return out
 
 
 def nan_helper(y):
@@ -75,11 +75,13 @@ def power_spectrum(x, fr, mean=True):
     return freq, FA
 
 
-def get_sep_th(x_,ax=None,plot=False,thMax=None):
+def get_sep_th(x_,ax=None,plot=False,thMax=None,log=False):
     from scipy.stats import gaussian_kde
-    from Regions import crawlDict
+    from .Regions import crawlDict
     if ax is None:
         ax = plt.subplot(111)
+    if log:
+        x_=np.log(x_)
     gkde = gaussian_kde(x_)
 #     if plot:
     ax.hist(x_,100,histtype="step",density=True)
@@ -91,7 +93,7 @@ def get_sep_th(x_,ax=None,plot=False,thMax=None):
     bincenters = (edges[:-1]+edges[1:])/2
 #     bincenters = bincenters[:np.argmax(h)]
     gkde_vals = gkde.evaluate(bincenters)
-    peaks = np.array(list(crawlDict(gkde_vals.reshape(-1,1)).keys())).T[0]
+    peaks = np.array(list(crawlDict(gkde_vals.reshape(-1,1), processes=1).keys())).T[0]
     twoHighestPeaks = sorted(np.argsort(-h[peaks])[:2])
     if len(twoHighestPeaks)==1:
         return -np.inf
@@ -103,13 +105,15 @@ def get_sep_th(x_,ax=None,plot=False,thMax=None):
     gkde_vals = gkde.evaluate(bincenters)
 #     if plot:
     ax.plot(bincenters,gkde_vals)
-    sinks = np.array(list(crawlDict(-gkde_vals.reshape(-1,1)+gkde_vals.max()+1,).keys())).T[0]
+    sinks = np.array(list(crawlDict(-gkde_vals.reshape(-1,1)+gkde_vals.max()+1, processes=1).keys())).T[0]
     sinks = sorted(sinks,key=lambda xi: gkde_vals[xi])
     th = bincenters[sinks[0]]
 #     if plot:
         # ax.plot(bincenters,gkde_vals)
     ax.axvline(th,color="r",ls="--")
     if not plot: plt.close()
+    if log:
+        return np.exp(th)
     return th
 
 
@@ -142,7 +146,7 @@ def mydebleach(x_):
 
 def decayfit(x,Ntrials=None, outPars=False):
     if Ntrials is None:
-        lx = 10
+        lx = 1
     else:
         lx = Ntrials
     nx = len(x)//(lx+5)
