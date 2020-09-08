@@ -16,8 +16,11 @@ import pandas as pd
 #     return add
 
 
-def update_protocols():
-    sandras_protocols_url = "https://docs.google.com/spreadsheets/d/1AkF1NzddXQ_ATdCvvqX_eXET6kHRMwcoExxHZBY9Quw/export?gid=0&format=csv"
+def update_protocols(sheet=1):
+    if sheet==1:
+        sandras_protocols_url = "https://docs.google.com/spreadsheets/d/1AkF1NzddXQ_ATdCvvqX_eXET6kHRMwcoExxHZBY9Quw/export?gid=0&format=csv"
+    if sheet==2:
+        sandras_protocols_url = "https://docs.google.com/spreadsheets/d/1AkF1NzddXQ_ATdCvvqX_eXET6kHRMwcoExxHZBY9Quw/export?format=csv&id=1AkF1NzddXQ_ATdCvvqX_eXET6kHRMwcoExxHZBY9Quw&gid=1663512963"
     from urllib.request import urlretrieve
     from os.path import expanduser
     urlretrieve(sandras_protocols_url,expanduser("~/protocols.csv"))

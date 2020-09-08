@@ -1,5 +1,59 @@
 import numpy as np
 
+def get_filterSizes(px, physSize=5.5):
+    base = int(np.ceil(physSize/px))
+    wider = int(np.ceil(base*1.1))
+    if wider==base: wider += 1
+    toComb = int(np.ceil(base*1.3))
+    if toComb <= wider: toComb += 1
+    return [(base,), (wider,), (base,wider), (base,toComb)]
+
+def split_unconnected_rois(B_, image=None):
+    import networkx as nx
+    from scipy.spatial import distance_matrix
+    ######### sort out unconnected pixels
+    ks = list(B_.keys())
+    for k in ks:
+        pxs = list(B_[k])
+        if len(pxs)==1:
+            continue
+        dm = distance_matrix(pxs,pxs)
+        gr = nx.Graph(dm<=1)
+        subsets = list(nx.connected_components(gr))
+        if len(subsets)==1:
+            continue
+        for subset in subsets:
+            tmppxs = [pxs[j] for j in subset]
+            if k in tmppxs:
+                k1 = k
+            else:
+                if image is None:
+                    k1 = tmppxs[0]
+                else:
+                    vs = [image[px] for px in tmppxs]
+                    k1 = tmppxs[np.argmax(vs)]
+            B_[k1] = tmppxs
+    return B_
+
+# def 
+#     ######### sort out "holes" pixels
+#     allTakenPx = sum(B_.values(),[])
+#     dims = self.image.shape
+#     freePx = [(i,j) for i,j in product(range(dims[0]),range(dims[1])) if (i,j) not in allTakenPx]
+#     dm = distance_matrix(freePx,freePx)
+#     gg = nx.Graph(dm==1)
+#     for cc in nx.connected.connected_components(gg):
+#         if len(cc)!=1: continue
+#         px = freePx[min(cc)]
+#         for di in [-1,1]:
+#             pxx = px[0]+di
+#             if pxx<0: continue
+#             if pxx>=dims[0]: continue
+#             nnpeak = climb((px[0]+di,px[1]),self.image, diag=diag)
+#         B_[nnpeak] += [px]
+#     return B_
+
+
 def mode(l):
     from collections import Counter
     return Counter(l).most_common(1)[0][0]
@@ -54,55 +108,59 @@ def multi_map(some_function, iterable, processes=1):
     return out
 
 
-def showMovie(m_show, figsize = (6,6), out="jshtml",fps = 30, saveName=None, NTimeFrames=100,log=True,additionalPlot=None):
-    import matplotlib.pyplot as plt
-    from matplotlib import animation
-    if NTimeFrames is not None:
-        n_rebin = len(m_show)//NTimeFrames
-        if n_rebin>1:
-            m_show = rebin(m_show, n_rebin)
-    if log:
-        for p in range(1,5):
-            baseline = np.percentile(m_show,p)
-            m_show = np.maximum(m_show, baseline)
-            if np.all(m_show>0): break
-        m_show = np.log(m_show)
-    fig, ax = plt.subplots(figsize=figsize,dpi=150)
-    im = ax.imshow(m_show[0].T, cmap="Greys", vmin=0, vmax=m_show.max())
-    if additionalPlot is not None:
-        additionalPlot(ax)
-    plt.close(fig)
-    def init():
-        im.set_data(m_show[0].T)
-        return (im,)
-    def animate(i):
-        im.set_data(m_show[i].T)
-        return (im,)
-    anim = animation.FuncAnimation(fig, animate, init_func=init,
-                                   frames=len(m_show),
-                                   interval=1000/fps,
-                                   blit=True)
-    if out=="html5":
-        from IPython.display import HTML
-        return HTML(anim.to_html5_video())
-    if out=="jshtml":
-        from IPython.display import HTML
-        return HTML(anim.to_jshtml())
-    if out=="save" or saveName is not None:
-        try:
-            anim.save(saveName)
-        except:
-            saveName = input("please enter a valid filename. Otherwise, I'll save it as 'video.mp4'.")
-            try: anim.save(saveName)
-            except:
-                saveName = "video.mp4"
-                anim.save(saveName)
-        return None
+# def showMovie(m_show, figsize = (6,6), out="jshtml",fps = 30, saveName=None, NTimeFrames=100,log=True,additionalPlot=None):
+#     import matplotlib.pyplot as plt
+#     from matplotlib import animation
+#     if NTimeFrames is not None:
+#         n_rebin = len(m_show)//NTimeFrames
+#         if n_rebin>1:
+#             from .numeric import rebin
+#             m_show = rebin(m_show, n_rebin)
+#     if log:
+#         for p in range(1,5):
+#             baseline = np.percentile(m_show,p)
+#             m_show = np.maximum(m_show, baseline)
+#             if np.all(m_show>0): break
+#         m_show = np.log(m_show)
+#     fig, ax = plt.subplots(figsize=figsize,dpi=150)
+#     im = ax.imshow(m_show[0].T, cmap="Greys", vmin=0, vmax=m_show.max())
+#     if additionalPlot is not None:
+#         additionalPlot(ax)
+#     plt.close(fig)
+#     def init():
+#         im.set_data(m_show[0].T)
+#         return (im,)
+#     def animate(i):
+#         im.set_data(m_show[i].T)
+#         return (im,)
+#     anim = animation.FuncAnimation(fig, animate, init_func=init,
+#                                    frames=len(m_show),
+#                                    interval=1000/fps,
+#                                    blit=True)
+#     if out=="html5":
+#         from IPython.display import HTML
+#         return HTML(anim.to_html5_video())
+#     if out=="jshtml":
+#         from IPython.display import HTML
+#         return HTML(anim.to_jshtml())
+#     if out=="save" or saveName is not None:
+#         try:
+#             anim.save(saveName)
+#         except:
+#             saveName = input("please enter a valid filename. Otherwise, I'll save it as 'video.mp4'.")
+#             try: anim.save(saveName)
+#             except:
+#                 saveName = "video.mp4"
+#                 anim.save(saveName)
+#         return None
     
-def show_movie(m_show, figScale = 1, out="jshtml",fps = 30, saveName=None, NTimeFrames=100,log=True,additionalPlot=None, dpi=100, tmax=None):
+def show_movie(m_show, figScale = 1, out="jshtml",fps = 30, saveName=None, NTimeFrames=100,log=True,additionalPlot=None, dpi=100, tmax=None, autoadjust=True,cmapArgs=None):
     import matplotlib.pyplot as plt
     from matplotlib import animation
-    from .numeric import rebin
+    try:
+        from .numeric import rebin
+    except:
+        pass
     if tmax is not None:
         import matplotlib.patheffects as path_effects
         from pandas import Timedelta
@@ -110,17 +168,29 @@ def show_movie(m_show, figScale = 1, out="jshtml",fps = 30, saveName=None, NTime
         n_rebin = len(m_show)//NTimeFrames
         if n_rebin>1:
             m_show = rebin(m_show, n_rebin)
-    if log:
+    if autoadjust:
+        m_show += 1
         for p in range(1,5):
             baseline = np.percentile(m_show,p)
             m_show = np.maximum(m_show, baseline)
             if np.all(m_show>0): break
+    if log:
         m_show = np.log(m_show)
-    figsize = np.array(m_show.shape[1:][::-1])/dpi*figScale
+    figsize = np.array(m_show.shape[1:][::-1])/100*figScale
+    import matplotlib
+    currentBackend = matplotlib.get_backend()
+    plt.switch_backend('agg')
     fig = plt.figure(figsize=figsize,dpi=dpi)
     ax = fig.add_axes([0.01,0.01,.98,.98])
-    im = ax.imshow(m_show[0], cmap="Greys", vmin=m_show.min(), vmax=m_show.max())
-    tx = ax.text(1,0," \n",transform = ax.transAxes, ha="right", family="Courier",va="center",color="darkgoldenrod")
+    if cmapArgs is None:
+        im = ax.imshow(m_show[0], cmap="Greys", vmin=m_show.min(), vmax=m_show.max())
+    else:
+        im = ax.imshow(m_show[0], **cmapArgs)
+    tx = ax.text(1,0," \n",
+                 transform = ax.transAxes,
+                 ha="right",
+                 family="Monospace",
+                 va="center",color="darkgoldenrod")
 #     tx.set_path_effects([
 #         path_effects.Stroke(linewidth=.7, foreground='black'),
 #         path_effects.Normal()
@@ -154,6 +224,8 @@ def show_movie(m_show, figScale = 1, out="jshtml",fps = 30, saveName=None, NTime
                                    frames=len(m_show),
                                    interval=1000/fps,
                                    blit=True)
+    
+    plt.switch_backend(currentBackend)
     if out=="html5":
         from IPython.display import HTML
         return HTML(anim.to_html5_video())
@@ -221,7 +293,7 @@ def showRoisOnly(regions, indices=None, im=None, showall=True):
                     showlegend = False,
                     # opacity=0.5,
                     # name=list(map(str,indices)),
-                    marker=dict(color=[MYCOLORS[i%len(MYCOLORS)] for i in indices],size=3),
+                    marker=dict(color=[MYCOLORS[i%len(MYCOLORS)] for i in indices],size=5),
                     hovertext=list(map(str,indices)),
                     hoverinfo="text"
                  )
@@ -285,16 +357,46 @@ def showRoisOnly(regions, indices=None, im=None, showall=True):
 #             "range":[-.5,im.shape[0]-.5],
             "range":[im.shape[0]-.5,-.5],
         },
-        'clickmode': 'event+select'
+        'clickmode': 'event+select',
+        "dragmode":'lasso'
     })
-#     f['layout']['yaxis']['autorange'] = "reversed"
+    try:
+        lengths = [10,20,50]
+        il = np.searchsorted(lengths,regions.metadata.pxSize*regions.image.shape[1]/10)
+        length=lengths[il]
+        x0,x1,y0,y1 = np.array([0,length,0,length*3/50])/regions.metadata.pxSize + regions.image.shape[0]*.02
+        f.add_shape(
+                    type="rect",
+                    x0=x0,y0=y0,x1=x1,y1=y1,
+                    line=dict(width=0),
+                    fillcolor="black",
+                    xref='x', yref='y'
+                )
+        f.add_trace(go.Scatter(
+            x=[(x0+x1)/2],
+            y=[y1],
+            text=[f"<b>{length}µm</b>"],
+            mode="text",
+            showlegend=False,
+            textposition='bottom center',
+            textfont={"color":"black"},
+            hoverinfo="skip",
+        ))
+    except:
+        pass
+    
     return f
+    
+    
 
 def createStaticImage(im,regions,showall=False,color="grey",separate=False, returnPath=False, cmap=None,origin="bottom"):
     if im is None:
         im = regions.statImages[regions.mode]
     from PIL import Image as PilImage
+    import matplotlib
+    currentBackend = matplotlib.get_backend()
     import matplotlib.pyplot as plt
+    plt.switch_backend('agg')
     if cmap is None:
         cmap = plt.cm.Greys
         cmap.set_bad("lime")
@@ -319,6 +421,7 @@ def createStaticImage(im,regions,showall=False,color="grey",separate=False, retu
     plt.ylim(plt.ylim()[::-1])
     plt.savefig(bkg_img_file,dpi=150)
     plt.close(fig)
+    plt.switch_backend(currentBackend)
     if returnPath:
         return bkg_img_file
     
@@ -350,7 +453,7 @@ def saveRois(regions,outDir,filename="",movie=None,col=["trace"],formats=["vienn
 
         for format in formats:
             if format=="vienna":
-                saving = ['statImages', 'mode', 'image', 'filterSize', 'df', 'trange', "FrameRange", "analysisFolder", "time", "Freq"]
+                saving = ['statImages', 'mode', 'image', 'filterSize', 'df', 'trange', "FrameRange", "analysisFolder", "time", "Freq","metadata"]
                 juggleMovie = hasattr(regions, "movie")
                 if juggleMovie:
                     movie = regions.movie
@@ -364,7 +467,7 @@ def saveRois(regions,outDir,filename="",movie=None,col=["trace"],formats=["vienn
                     if k not in saving:
                         del subRegions.__dict__[k]
                 for k in regions.df.columns:
-                    if k not in ["peak", "pixels"]+col:
+                    if k not in ["peak", "pixels", "peakValue"]+col:
                         del subRegions.df[k]
                         
                 roifile = f"{outDir}/{filename}_rois.pkl"

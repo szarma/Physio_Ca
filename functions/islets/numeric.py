@@ -5,6 +5,12 @@ from scipy.optimize import curve_fit#,minimize,basinhopping
 from numba import jit,prange
 
         
+def robust_max(a,Nlast=10,absolute=True):
+    if absolute:
+        a = np.abs(a)
+    return np.percentile(a,100*(1-Nlast/a.size))
+    
+    
 def rebin(a,n,axis=0,norm=True, dtype="float32"):
     if type(axis)==int and type(n)==int:
         ashape = a.shape
@@ -79,9 +85,11 @@ def get_sep_th(x_,ax=None,plot=False,thMax=None,log=False):
     from scipy.stats import gaussian_kde
     from .Regions import crawlDict
     if ax is None:
+        fig = plt.figure()
         ax = plt.subplot(111)
     if log:
-        x_=np.log(x_)
+        x_=np.log10(x_)
+    x_ = x_[np.isfinite(x_)]
     gkde = gaussian_kde(x_)
 #     if plot:
     ax.hist(x_,100,histtype="step",density=True)
@@ -100,7 +108,7 @@ def get_sep_th(x_,ax=None,plot=False,thMax=None,log=False):
     lowerPeak, higherPeak = peaks[twoHighestPeaks]
     bincenters = bincenters[lowerPeak:higherPeak]
     if len(bincenters)<3:
-        if not plot: plt.close()
+        if not plot: plt.close(fig)
         return x_.min()
     gkde_vals = gkde.evaluate(bincenters)
 #     if plot:
@@ -113,7 +121,7 @@ def get_sep_th(x_,ax=None,plot=False,thMax=None,log=False):
     ax.axvline(th,color="r",ls="--")
     if not plot: plt.close()
     if log:
-        return np.exp(th)
+        return 10**(th)
     return th
 
 
@@ -123,7 +131,8 @@ def decay(time,top,bottom,rate):
 
 def guessDecayPars(y):
     b0 = np.nanpercentile(y,1)
-    y  = np.log(y-b0)
+    with np.errstate(divide='ignore', invalid="ignore"):
+        y  = np.log(y-b0)
 #     r0 = np.diff(y)
 #     r0 = r0[np.isfinite(r0)]
 #     r0 = -np.mean(r0)

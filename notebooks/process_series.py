@@ -5,7 +5,7 @@ import pickle
 from sys import path as syspath
 fundir = os.path.expanduser("~/srdjan_functs/")
 if os.path.isdir(fundir):
-    syspath.append()
+    syspath.append(fundir)
 else:
     syspath.append("./functions/")
 from general_functions import suppress_stdout, suppress_stderr
@@ -63,7 +63,7 @@ def parse_leica(rec, merge=True, skipTags = ["crop","split","frame", "every","ha
 #         if len(serlist)==len(rec.metadata):
 #             ser="all"
 #         else:
-        serrange = [int(el.replace("Series","").lstrip("0")) for el in serlist]
+        serrange = [int(el.replace("Series","")) for el in serlist]
         if len(serrange)>1:
             ser = "Series%03i-%i"%(serrange[0],serrange[-1])
         else:
@@ -191,16 +191,21 @@ if __name__=="__main__":
             movieFilename = os.path.join(saveDir, ".".join(rec.Experiment.split(".")[:-1]+["mp4"]))
         else:
             movieFilename = os.path.join(saveDir, rec.Experiment+"_"+ser+".mp4")
+        if len(rec.metadata)==1:
+            protocolFilename = os.path.join(saveDir, ".".join(rec.Experiment.split(".")[:-1]+["_protocol","txt"]))
+        else:
+            protocolFilename = os.path.join(saveDir, rec.Experiment+"_"+ser+"_protocol.txt")
 
         if (not os.path.isfile(movieFilename)) or (not args.leave_movie):
             print("Writing the movie...")
             saveMovie(movie,movieFilename)
-
+        if not os.path.isfile(protocolFilename):
+            pd.DataFrame([[None]*4],columns=["compound","concentration","begin","end"]).to_csv(protocolFilename,index=False)
         # anull saturated above threshold
         Nsatur = (movie==movie.max()).sum(0)
         toAnull = np.where(Nsatur>len(movie)*fracSaturTh)
         movie[(slice(None), )+toAnull] = 0
-
+        
         # go thorugh filter sizes
         regions = Regions(movie, full=False, diag=True, debleach=False, processes=5)
         filtSizes = get_filterSizes(metadata.pxSize)

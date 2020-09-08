@@ -3,7 +3,7 @@ import os
 import bioformats as bf
 import pandas as pd
 
-def saveMovie(movie, filename, maxFreq = 5, frameRate=60):
+def saveMovie(movie, filename, maxFreq=5, frameRate=60,dpi=100):
     from .utils import show_movie
     from .numeric import rebin
     if maxFreq<movie.fr:
@@ -22,7 +22,8 @@ def saveMovie(movie, filename, maxFreq = 5, frameRate=60):
                NTimeFrames=len(showMovie),
                # out="save",
                # saveName=filename,
-               tmax=len(showMovie)/movie.fr
+               tmax=len(showMovie)/showMovie.fr,
+               dpi=dpi
               )
     else:
         show_movie(showMovie, 
@@ -30,7 +31,8 @@ def saveMovie(movie, filename, maxFreq = 5, frameRate=60):
                NTimeFrames=len(showMovie),
                out="save",
                saveName=filename,
-               tmax=len(showMovie)/movie.fr
+               tmax=len(showMovie)/showMovie.fr,
+               dpi=dpi
               )
         return 0
 
@@ -79,7 +81,7 @@ class Recording:
 #                 serrange = range(serrange[0],serrange[-1]+1)
 #                 SeriesList = ["Series%03i"%i for i in serrange]
 #         self.Series = Series
-        metadata = pd.DataFrame(columns=["Name","SizeT","SizeX","SizeY","pxSize","pxUnit",
+        metadata = pd.DataFrame(columns=["Name","SizeT","SizeX","SizeY","SizeZ","pxSize","pxUnit",
                                          "bit depth", "Frequency", "Start time", "End time", "Duration"])
         for i in range(self.nSeries):
             try:
@@ -97,9 +99,11 @@ class Recording:
                 if metadata.loc[i,"SizeT"]>1:
     #             metadata.loc[i,"Frequency"] = 1/np.diff([im.Pixels.Plane(i).DeltaT for i in range(max(metadata.loc[i,"SizeT"],100))]).mean()
                     metadata.loc[i,"Frequency"] = (metadata.loc[i,"SizeT"]-1)/im.Pixels.Plane(metadata.loc[i,"SizeT"]-1).DeltaT
+                if metadata.loc[i,"SizeZ"]>1:
+                    metadata.loc[i,"Z-stack height"] = im.Pixels.get_PhysicalSizeZ()
             except:
                 pass
-        for c,t in list(zip(metadata.columns,["str"]+["int"]*3+["float","str","str","float"])):
+        for c,t in list(zip(metadata.columns,["str"]+["int"]*4+["float","str","str","float"])):
             metadata[c] = metadata[c].astype(t)
         metadata["Start time"] = pd.to_datetime(metadata["Start time"])
         metadata["Duration"] = pd.to_timedelta(metadata["SizeT"]/metadata["Frequency"], unit="s")
@@ -115,7 +119,7 @@ class Recording:
     def save_metadata(self):
         self.metadata.to_csv(self.metafile, float_format = "%#.3g")
         
-    def import_series(self,Series, onlyMeta=False,isLineScan=False,restrict=None):
+    def import_series(self,Series, onlyMeta=False,isLineScan=False,restrict=None,memmap=False):
         if Series=="all":
             SeriesList = self.allSeries
         elif Series in self.metadata.Name.values:
@@ -164,6 +168,9 @@ class Recording:
             frame_end   = np.where(time<=t_end)[0][-1]
             metadata1["frame_range"] = frame_begin, frame_end
             metadata1['SizeT'] = frame_end-frame_begin
+        else:
+            frame_begin, frame_end = 0, metadata1['SizeT']
+            metadata1["frame_range"] = frame_begin, frame_end
         metadata1["individual Series"] = tsum
         metadata1["Name"] = Series
         self.Series[Series]["metadata"] = metadata1
@@ -178,21 +185,30 @@ class Recording:
         
         if onlyMeta:
             return None
-        data = np.zeros((tsum["SizeT"].sum(), metadata1.SizeY, metadata1.SizeX), dtype=metadata1["bit depth"])
+#         data = np.zeros((tsum["SizeT"].sum(), metadata1.SizeY, metadata1.SizeX), dtype=metadata1["bit depth"])
+        data = np.zeros((metadata1.SizeT, metadata1.SizeY, metadata1.SizeX), dtype=metadata1["bit depth"])
         
         try: self.rdr
         except: self.rdr = bf.ImageReader(self.path, perform_init=True)
         
+        assert metadata.SizeT.iloc[0]>frame_begin
+        
         for i in metadata.index:
 #             firstFrame = self.rdr.read(series=i, rescale=False, t=0)
 #             if len(firstFrame.shape)==3:
+            if metadata.index[0]==i:
+                dt = frame_begin
+            else:
+                dt = 0
                 
-            offset = metadata.loc[:i-1,"SizeT"].sum()
-            for t in range(metadata.loc[i,"SizeT"]):
+            offset = metadata.loc[:i-1,"SizeT"].sum()-frame_begin
+            for t in range(dt,metadata.loc[i,"SizeT"]):
+#                 print (t, t+offset)
+                if t+offset>=len(data):break
                 data[t+offset] = self.rdr.read(series=i, rescale=False, t=t, c=0)
         
         if isLineScan:
             data = data.reshape((np.prod(data.shape[:2]),1,data.shape[-1]))
-        if restrict is not None:
-            data = data[frame_begin:frame_end]
+#         if restrict is not None:
+#             data = data[frame_begin:frame_end]
         self.Series[Series]["data"] = data

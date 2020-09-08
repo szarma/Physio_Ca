@@ -8,18 +8,19 @@ from .numeric import rebin
 from .utils import multi_map
 import plotly.graph_objects as go
 from matplotlib._color_data import TABLEAU_COLORS, CSS4_COLORS
-MYCOLORS = OrderedDict(TABLEAU_COLORS)
-del MYCOLORS["tab:gray"]
-ks = ["lime",
-    "orangered",
-    "yellowgreen",
-      "lawngreen",
-    # "mediumspringgreen",
-    "aquamarine"]#+list(MYCOLORS.values())
-MYCOLORS.update({k:CSS4_COLORS[k] for k in ks})
-MYCOLORS = list(MYCOLORS.values())
-
-MYCOLORS = ["darkred"]
+# MYCOLORS = OrderedDict(TABLEAU_COLORS)
+# del MYCOLORS["tab:gray"]
+# ks = ["lime",
+#     "orangered",
+#     "yellowgreen",
+#       "lawngreen",
+#     # "mediumspringgreen",
+#     "aquamarine"]#+list(MYCOLORS.values())
+# MYCOLORS.update({k:CSS4_COLORS[k] for k in ks})
+# MYCOLORS = list(MYCOLORS.values())
+from plotly_express import colors as plc
+MYCOLORS = plc.qualitative.Plotly
+# MYCOLORS = ["darkred"]
 
 class Regions:
     def __init__(self, movie_, diag=False, min_gradient=0, debleach=False, gSig_filt=None, mode="diff_std", full=True, img_th=-np.inf, FrameRange=None, processes=10):
@@ -219,7 +220,6 @@ class Regions:
             im += .05
             ax.imshow(im,norm=LogNorm(),**imkw_args)
         if separate:
-            print ("going in")
             for i in ix:
                 c = MYCOLORS[i%len(MYCOLORS)]
                 y,x = np.array(self.df.loc[i,"boundary"]).T
@@ -301,12 +301,23 @@ class Regions:
         time = np.arange(len(movie_))/movie_.fr
         self.time = time[i0:ie]
         
-    def detrend_traces(self,processes=10):
-        from .numeric import mydebleach
-        traces = np.vstack(self.df.trace.values)
-        trend = multi_map( mydebleach, traces, processes=processes)
-        self.df["trend"] = trend
-        self.df["detrended"] = list(traces - np.array(trend))
+    def detrend_traces(self,fast=True, timescale=200):
+#         from .numeric import mydebleach
+#         traces = np.vstack(self.df.trace.values)
+#         trend = multi_map( mydebleach, traces, processes=processes)
+#         self.df["trend"] = trend
+#         self.df["detrended"] = list(traces - np.array(trend))
+#         traces = np.vstack(self.df.trace.values)
+#         print ("Deprecated method. I used to think it makes sense, now I don't think so. The method is still here, not to break your scripts, but it only subtracts mean from the trace.")
+        if fast:
+            trend = self.df.trace.apply(np.mean)
+            self.df["trend"] = trend
+            self.df["detrended"] = [self.df.trace[i] - self.df.trend[i] for i in self.df.index]
+        else:
+            self.slow_filter_traces(timescale,percentile=[5.])
+            self.df["detrended"] = self.df["faster_%g"%timescale]
+            self.df["trend"]     = self.df["slower_%g"%timescale]
+            del self.df["faster_%g"%timescale], self.df["slower_%g"%timescale]
 
     def sortFromCenter(self):
         center = np.array(self.image.shape)/2
@@ -320,7 +331,7 @@ class Regions:
         freq = 1/minDt
 #         ts = min(50/freq,10)
         ts = 30/freq
-        absSlow, absFast = self.fast_filter_traces(ts,write=False)
+        absSlow, absFast, _ = self.fast_filter_traces(ts,write=False, normalize=False,z_sp=0)
         di = 30
         slow_est, fast_vars = [],[]
         for i in range(absFast.shape[0]):
@@ -349,89 +360,136 @@ class Regions:
             ax.plot(x,x*gain)
         self.gain = gain
     
-    def fast_filter_traces(self, ironTimeScale, z_sp = 2, order=5, Npoints = None, meanSlow2Var=None, write=True):
+    def slow_filter_traces(self,ironScale, n_processes=10, percentile = [10.], calcStd=False,avg=True):
+        from .numeric import lowPass
+        from .utils import multi_map
+        global iterf
+        try:
+            freq = self.movie.fr
+        except:
+            freq = 1./np.diff(self.time).mean()
+        wIron = int(ironScale*freq)
+        if wIron%2==0:
+            wIron += 1
+        print(f"The movie frequency is {freq:.2f}, so the filter size is {wIron}. This may take some time.")
+        if avg:
+            def iterf(x_): 
+                out = lowPass(x_,wIron,wIron,percentile)
+                return out
+        else:
+            def iterf(x_): 
+                out = lowPass(x_,wIron,perc=percentile)
+                return out
+            
+        self.df["slower_%g_"%ironScale] = multi_map(iterf,self.df["trace"].values,processes=n_processes)
+        self.df["faster_%g_"%ironScale] = [self.df.loc[i,"trace"] - \
+                                          self.df.loc[i,"slower_%g_"%ironScale] for i in self.df.index]
+            
+        def iterf(x_):
+            mad2std = 1.4826
+            out = mad2std*lowPass(np.abs(x_),wIron,wIron*2+1,50.)
+            return out
+        if calcStd:
+            self.df["faster_%g_std"%ironScale] = multi_map(iterf,self.df["faster_%g"%ironScale].values,processes=n_processes)
+    
+    
+    
+    def fast_filter_traces(self,
+                           ironTimeScale,
+                           z_sp=3,
+                           order=5,
+                           Npoints=None,
+                           write=True,
+                           verbose=False,
+                           usecol="trace",
+                           normalize=True
+#                            meanSlow2Var=None
+                          ):
         from numeric import sosFilter
         if Npoints is None: Npoints = 15
         minDt = np.diff(self.time).mean()
         freq = 1/minDt
         try:
             self.movie
-            if np.abs(freq/self.movie.fr-1)<1e-5:
+            if np.abs(freq/self.movie.fr-1)>1e-2:
                 print (f"movie frame rate ({self.movie.fr}) and inferred frame ({freq}) rate are different!")
         except:
             pass
         N_dt = ironTimeScale/minDt
         Nrebin = max(1,int(np.round(N_dt/Npoints)))
-        print (f"Nrebin = {Nrebin}")
+        if verbose:
+            print (f"Nrebin = {Nrebin}")
         C = self.df
-        useDetrended = "detrended" in C.columns
-        if useDetrended:
-            data = np.vstack([C.loc[i,"detrended"] for i in C.index])
-            trend = np.vstack(C.trend)
-        else:
+        if "trace" in usecol:
             data = np.vstack([C.loc[i,"trace"] for i in C.index])
+            trend = np.zeros(len(C))
+        else:
+            data = np.vstack([C.loc[i,"detrended"] for i in C.index])
+            trend = C.trend.values
+            
         if Nrebin>1:
             freq = freq/Nrebin
             data = rebin(data, Nrebin, axis=1)
+            if len(trend.shape)>1:
+                trend = rebin(trend, Nrebin, axis=1)
             try: self.showTime
             except: self.showTime = {}
             self.showTime["%g"%ironTimeScale] = rebin(self.time, Nrebin)
-            trend = rebin(trend,Nrebin, axis=1)
         cutFreq = .5/ironTimeScale
         self.sosFilter = sosFilter(cutFreq, freq, order=order)
         dataFilt = self.sosFilter.run(data)
-        if write:
-            slowk, fastk = "slower_%g"%ironTimeScale, "faster_%g"%ironTimeScale
-        else:
-            slowk, fastk = "_slower_%g"%ironTimeScale, "_faster_%g"%ironTimeScale
-            
-        if useDetrended:
-            self.df[slowk] = list(trend+dataFilt)
-        else:
-            self.df[slowk] = list(dataFilt)
-        self.df[fastk] = list(data - dataFilt)
+#         if write:
+#             slowk, fastk = "slower_%g"%ironTimeScale, "faster_%g"%ironTimeScale
+#         else:
+#             slowk, fastk = "_slower_%g"%ironTimeScale, "_faster_%g"%ironTimeScale
 
-        absFast = np.vstack([C.loc[i,fastk]*C.loc[i,"size"] for i in C.index])*Nrebin
-        absSlow = np.vstack([C.loc[i,slowk]*C.loc[i,"size"] for i in C.index])*Nrebin
+        absSlow = np.vstack([dataFilt[i]*C.loc[ix,"size"] for i,ix in enumerate(C.index)])*Nrebin
+        absFast = np.vstack([(data[i]-dataFilt[i])*C.loc[ix,"size"] for i,ix in enumerate(C.index)])*Nrebin
 
-        if not write:
-            del C[slowk], C[fastk]
-            return absSlow, absFast
-        if z_sp==0:
-            return None
-        from cv2 import dilate
-        from numeric import nan_helper
-        if meanSlow2Var is None:
+        if z_sp>0:
+            from cv2 import dilate
+            from numeric import nan_helper
             var = absSlow
-        else:
-            var = meanSlow2Var(absSlow)
-#         print (hasattr(self,"gain"))
+            if hasattr(self,"gain"):
+                var = var*self.gain    
+            std = var**.5
+            ff = (absFast > z_sp*std).astype("uint8")
+            if ff.any():
+                dilateKernelSize = int(ironTimeScale/minDt/Nrebin*.2)#*.03)
+                if dilateKernelSize%2==0:
+                    dilateKernelSize+=1
+                if dilateKernelSize>=3:
+                    if verbose:
+                        print ("dilating by", dilateKernelSize)
+                    ff = dilate(ff, np.ones(dilateKernelSize, dtype = np.uint8).reshape(1,-1)).astype("bool")
+                absFast_tmp = absFast.copy()
+                absFast_tmp[ff] = np.nan
+                for j in range(C.shape[0]):
+                    y = absFast_tmp[j]
+                    nans, x= nan_helper(y)
+                    if nans.any(): 
+                        y[nans]= np.interp( x(nans), x(~nans), y[~nans] )
+#                         y[nans]= np.interp( x(nans), x(~nans), absSlow[j][~nans] )
+                dFast = self.sosFilter.run(absFast_tmp)
+                absSlow = absSlow + dFast
+                absFast = absFast - dFast
+        var = absSlow
         if hasattr(self,"gain"):
             var = var*self.gain    
         std = var**.5
-        ff = (absFast > z_sp*std).astype("uint8")
-        if ff.any():
-            dilateKernelSize = int(ironTimeScale/minDt/Nrebin*.3)#*.03)
-            if dilateKernelSize%2==0:
-                dilateKernelSize+=1
-            print (dilateKernelSize)
-            if dilateKernelSize>=3:
-                ff = dilate(ff, np.ones(dilateKernelSize, dtype = np.uint8).reshape(1,-1)).astype("bool")
-            absFast_tmp = absFast.copy()
-            absFast_tmp[ff] = np.nan
-            for j in range(C.shape[0]):
-                y = absFast_tmp[j]
-                nans, x= nan_helper(y)
-                if nans.any(): 
-                    y[nans]= np.interp(x(nans), x(~nans), y[~nans])
-            dFast = self.sosFilter.run(absFast_tmp)
-            absSlow = absSlow + dFast
-            absFast = absFast - dFast
-        std = absSlow**.5
         zScore = absFast/std
-        C["zScore_%g"%ironTimeScale] = list(zScore)
-        C["slower_%g"%ironTimeScale] = [absSlow[i]/C["size"].iloc[i]/Nrebin for i in range(len(C))]
-        C["faster_%g"%ironTimeScale] = [absFast[i]/C["size"].iloc[i]/Nrebin for i in range(len(C))]
+        if normalize:
+            slower = [absSlow[i]/C["size"].iloc[i]/Nrebin for i in range(len(C))]
+            faster = [absFast[i]/C["size"].iloc[i]/Nrebin for i in range(len(C))]
+        else:
+            slower = absSlow
+            faster = absFast
+        if write:
+            C["slower_%g"%ironTimeScale] = slower
+            C["faster_%g"%ironTimeScale] = faster
+            C["zScore_%g"%ironTimeScale] = list(zScore)
+        else:
+            return np.array(slower), np.array(faster), zScore
 
     def calc_raster(self, ts, z_th = 3, Npoints=None, smooth = 0):
         from numeric import runningAverage
@@ -480,43 +538,52 @@ class Regions:
             # fig.update_xaxes(showticklabels=False)
         return rr, fig
         
-    def calc_peaks(self, ts, z_th = 3, Npoints=None, smooth=None, tWindow = (None,None)):
+    def calc_peaks(self, ts, z_th=3, Npoints=None, smooth=None, verbose=False, save=True, t=None, zScores=None):
         from numeric import runningAverage
         from scipy.signal import find_peaks, peak_widths
-        if "zScore_%g"%ts not in self.df.columns:
-            self.fast_filter_traces(ts,Npoints=Npoints)
-        zScores = np.vstack(self.df["zScore_%g"%ts])
-        try:
-            t = self.showTime["%g"%ts]
-        except:
-            t = self.time
+        if zScores is None:
+            if "zScore_%g"%ts not in self.df.columns:
+                if verbose:
+                    print ("filtering...")
+                self.fast_filter_traces(ts,Npoints=Npoints)
+            zScores = np.vstack(self.df["zScore_%g"%ts])
+        if t is None:
+            try:
+                t = self.showTime["%g"%ts]
+            except:
+                t = self.time
         dt = np.diff(t).mean()
         if smooth is None:
-            smooth = int(ts/np.diff(t).mean()/5)
+            smooth = int(ts/dt/5)
             if smooth%2==0: smooth += 1
         if smooth>0:
+            if verbose:
+                print ("smoothing with kernel", smooth)
             zScores = runningAverage(zScores.T,smooth).T
         peaks = []
         for i,z in zip(self.df.index,zScores):
             pp = find_peaks(z,
-                            width=ts/dt/5,
+                            width=ts/dt/8,
                             height=z_th
                               )
             w,h,x0 = peak_widths(z, pp[0], rel_height=.5)[:3]
-            w = w*(t[1]-t[0])
-            x0 = x0*(t[1]-t[0])
+            w = w*dt
+            x0 = x0*dt + t[0]
             df = pd.DataFrame({"peak height [z-score]":z[pp[0]],"peak half-width [s]":w, "t0":x0})
             df["roi"] = i
             peaks += [df]
         peaks = pd.concat(peaks,ignore_index=True)
-        k = "%g"%(ts)
-        try:
-            self.peaks
-        except:
-            self.peaks = {}
-        self.peaks[k] = peaks
+        if save:
+            k = "%g"%(ts)
+            try:
+                self.peaks
+            except:
+                self.peaks = {}
+            self.peaks[k] = peaks
+        else:
+            return peaks
         
-    def show_scatter_peaks(self,ts,timeWindows = None):
+    def show_scatter_peaks(self,ts,timeWindows=None):
         from plotly_express import scatter
         peaks = self.peaks["%g"%ts].copy()
         if timeWindows is None:
@@ -597,441 +664,23 @@ class Regions:
 
     def import_protocol(self,pathToProtocol):
         self.protocol = pd.read_csv(pathToProtocol)
+        self.protocol.dropna(how='all', inplace=True)
+        if self.protocol.empty:
+            raise ValueError('protocol file contains nothing ')
         self.protocol["t_begin"] = pd.to_timedelta(["00:"+el if type(el)==str else "00:00:00" \
                                                        for el in self.protocol["begin"]]).total_seconds()
-        self.protocol["t_end"] = pd.to_timedelta(["00:"+el if type(el)==str else len(self.time)/self.Freq*1e9 \
+        self.protocol["t_end"] = pd.to_timedelta(["00:"+el if type(el)==str else (self.time[0]+len(self.time)/self.Freq)*1e9 \
                                                      for el in self.protocol["end"]]).total_seconds()
 
-    def examine_old(self):
-        # return self.examine_new()
-        from .utils import showRoisOnly
-        outputStyle = {
-            "color":"navy",
-            "font-family":"Courier New",
-            "font-size":"80%",
-            }
-        infoStyle = {
-            "font-size":"80%",
-            "color":"grey",
-            }
-        from jupyter_plotly_dash import JupyterDash
-        from dash.dependencies import Input, Output, State
-        import dash_core_components as dcc
-        import dash_html_components as html
-        import plotly.graph_objects as go
-        from dash import no_update
-        roisImage = showRoisOnly(self,indices=self.df.index, im=self.statImages[self.mode])
-        roisImage.update_layout({"dragmode":'lasso'},)
-        SelectedRois = html.Div([
-            html.Div([
-                   "Selected ROIs:",
-                    dcc.Input(id="selected-rois",
-                        type="text",
-                        debounce=False,
-                        size=6,
-                        value="",
-                     ), 
-                ],style={"display": "inline-box"}),
-
-                html.Button('Discard unselected', id='discard-button', style={"display":"inline-box"},
-                            n_clicks=1),
-                html.Div(id="discard-feedback",children="",
-                     style={"display":"inline-box",**outputStyle,}
-                    )])
-
-        FilterBox = html.Div([
-            html.Div([
-               "Filter Timescale",
-                dcc.Input(id="filter-input",
-                    type="str",
-                    debounce=True,
-                    size=6,
-                    value="30",
-                 ),
-                html.Button("Filter",id="filter-button",n_clicks=1),
-                html.Div("[it will accept also 'trace' or 'detrended']",style={"display": "inline-box",**infoStyle})
-                ],style={"display": "inline-box"}),
-
-            html.Div(id="filter-feedback",children="",
-                 style={"display":"inline-box",**outputStyle,}),
-            html.Div([
-               "rebin",
-                dcc.Input(id="rebin-input",
-#                     type="int",
-                    debounce=True,
-                    size=3,
-                    value=max(1,int(self.Freq/2)),
-                    style={"display":"inline-box"}
-                 ),
-                html.Div([""],style={"margin-left":"20px"}),
-                dcc.Checklist(id="sum-checklist",
-                    options = [{"label":"sum","value":"sum"}],
-                    value=[],)
-            ]),
-                 
-        ])
-
-        APP_LAYOUT = [html.Div([
-                html.Div([
-                    dcc.Graph(id="roi-selector",figure = roisImage),
-                    SelectedRois
-                ],style={"max-width":"550px","max-height":"550px","border":"thin grey solid"}),
-                html.Div([
-                    dcc.Graph(id="trace-show",),
-                    FilterBox
-                ],style={"max-width":"550px","max-height":"800px","border":"thin grey solid"})
-            ],
-                style={"display":"flex", "flex-wrap":"wrap","align-items":"top","flex-shrink":3}
-            ) for ks in [["roi-selector","range-pickers",
-        #                   "roi-hover"
-                         ]]]
-        app = JupyterDash(__name__,
-                          width=1000,
-        #                   height=3000,
-                         )
-        @app.callback(
-            Output("selected-rois", "value"),
-            [Input("roi-selector", "selectedData")],
-            )
-        def showSelected(selData):
-            if selData is None:
-                return "all"
-            ix = np.array( [p["hovertext"] for p in selData["points"]]).astype(int)
-            ix = np.unique(ix)
-            return ",".join(ix.astype(str))
-
-        @app.callback(
-            [Output("discard-feedback", "children"),
-             Output("roi-selector","figure")],
-            [Input("discard-button",   "n_clicks")],
-            [State("selected-rois", "value")]
-                     )
-        def discard_callback(n_clicks,selected):
-            if n_clicks <= 0:
-                return no_update
-            if selected == "":
-                out = ""
-            else:
-                try:
-                    selectedIndices = np.unique(list(eval(selected)))
-                    nremoved = len(self.df)-len(selectedIndices)
-                    self.df = self.df.loc[selectedIndices]
-                    out = "%i rois removed."%(nremoved)
-                    fig = showRoisOnly(self,indices=self.df.index, im=self.statImages[self.mode])
-                    fig.update_layout({"dragmode":'lasso'},)
-                except:
-                    out = "something's off."
-                    fig = go.Figure()
-            return out, fig
-        
-        @app.callback(
-            [Output("filter-feedback", "children"),
-             Output("trace-show","figure")],
-            [Input("selected-rois", "value"),
-             Input("filter-button","n_clicks"),
-             Input("rebin-input","value"),
-             Input("sum-checklist","value")],
-            [State("filter-input","value"),
-             State("trace-show","relayoutData"),
-            ]
-                     )
-        def filter_and_plot_callback(selected,n_clicks,nRebin,checklist,filtTs,rlod):
-            if n_clicks <= 0:
-                return no_update
-            if selected in ["all",""]:
-                selectedIndices = list(self.df.index)
-            else:
-                selectedIndices = list(eval(selected+","))
-            nRebin=int(nRebin)
-#             import json
-#             out = json.dumps(rlod)
-#             {"xaxis.range[0]": 322.98541153852864, "xaxis.range[1]": 528.4209918884629, "yaxis.range[0]": -9.125982292630475, "yaxis.range[1]": 34.41639176490383}
-            out = ""#+" | ".join([str(nRebin),str(type(nRebin)),str(nRebin>1)])
-#             out = "start with "+str(selected)
-#             out += "| "+str(selectedIndices)
-            try:
-                filtTs = float(filtTs)
-                k = "faster_%g"%filtTs
-                if k not in self.df:
-                    self.fast_filter_traces(filtTs,Npoints=np.inf)
-                    out += "filtering for features shorter than ~%gs done."%filtTs 
-                y = np.sum([self.df.loc[ix,k]*self.df.loc[ix,"size"] for ix in selectedIndices],0)/self.df.loc[selectedIndices,"size"].sum()
-            except:
-                y = np.sum(self.df.loc[selectedIndices,filtTs],0)
-            try:
-                t = self.showTime["%g"%filtTs]
-            except:
-                t = self.time
-            if nRebin>1:
-                try:
-                    y = rebin(y,nRebin)
-                    t = rebin(t,nRebin)
-                except:
-                    out+= "rebinning didnt work"
-#             from plotly.subplots import make_subplots
-#             fig = make_subplots(rows = 2, shared_xaxis=True, row_heights = [.9,.1])
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=t,
-                y=y,
-                line_width=.7,
-                line_color="darkred")
-                         )
-            try:
-                fig.update_xaxes(range=[rlod["xaxis.range[0]"], rlod["xaxis.range[1]"]])
-                fig.update_yaxes(range=[rlod["yaxis.range[0]"], rlod["yaxis.range[1]"]])
-            except:
-                pass
-            fig.update_layout({
-                "width":700,
-                "margin":{"t":50,"b":20,}
-                              })
-            return out, fig
+    def examine(self, test=False, max_rois=10, imagemode=None, debug=False, startShow=''):
+        from .examine2 import examine
+        if imagemode is None:
+            imagemode = self.mode
+        return examine(self, test=test, max_rois=max_rois, imagemode=imagemode, debug=debug, startShow=startShow)
     
-        app.layout = html.Div(children=APP_LAYOUT,
-                              style={"family":"Arial"}
-                             )
-        return app
+    
 
-    def examine(self):
-        from .utils import showRoisOnly
-        outputStyle = {
-            "color":"navy",
-            "font-family":"Courier New",
-            "font-size":"80%",
-            }
-        infoStyle = {
-            "font-size":"80%",
-            "color":"grey",
-            }
-        from jupyter_plotly_dash import JupyterDash
-        from dash.dependencies import Input, Output, State
-        import dash_core_components as dcc
-        import dash_html_components as html
-        import plotly.graph_objects as go
-        from dash import no_update
-        roisImage = showRoisOnly(self,indices=self.df.index, im=self.statImages[self.mode])
-        roisImage.update_layout({"dragmode":'lasso'},)
-        SelectedRois = html.Div([
-            html.Div([
-                   "Selected ROIs:",
-                    dcc.Input(id="selected-rois",
-                        type="text",
-                        debounce=False,
-                        size=6,
-                        value="",
-                     ),
-                ],style={"display": "inline-box"}),
-
-                html.Button('Discard unselected', id='discard-button', style={"display":"inline-box"},
-                            n_clicks=1),
-                html.Div(id="discard-feedback",children="",
-                     style={"display":"inline-box",**outputStyle,}
-                    )])
-
-        FilterBox = html.Div([
-            html.Div([
-               "Filter Timescale",
-                dcc.Input(id="filter-input",
-                    type="str",
-                    debounce=True,
-                    size=6,
-                    value="30",
-                 ),
-                html.Button("Filter",id="filter-button",n_clicks=1),
-                html.Div("[it will accept also 'trace' or 'detrended']",style={"display": "inline-box",**infoStyle})
-                ],style={"display": "inline-box"}),
-
-            html.Div(id="filter-feedback",children="",
-                 style={"display":"inline-box",**outputStyle,}),
-            html.Div([
-               "rebin",
-                dcc.Input(id="rebin-input",
-#                     type="int",
-                    debounce=True,
-                    size=3,
-                    value=max(1,int(self.Freq/2)),
-                    style={"display":"inline-box"}
-                 ),
-                html.Div([""],style={"margin-left":"20px"}),
-                dcc.Checklist(id="sum-checklist",
-                    options = [{"label":"sum","value":"sum"}],
-                    value=[],)
-            ]),
-
-        ])
-
-        APP_LAYOUT = [html.Div([
-                html.Div([
-                    dcc.Graph(id="roi-selector",figure = roisImage),
-                    SelectedRois
-                ],style={"max-width":"550px","max-height":"550px","border":"thin grey solid"}),
-                html.Div([
-                    dcc.Graph(id="trace-show",),
-                    FilterBox
-                ],style={"max-width":"550px","max-height":"800px","border":"thin grey solid"})
-            ],
-                style={"display":"flex", "flex-wrap":"wrap","align-items":"top","flex-shrink":3}
-            ) for ks in [["roi-selector","range-pickers",
-        #                   "roi-hover"
-                         ]]]
-        app = JupyterDash(__name__,
-                          width=1000,
-        #                   height=3000,
-                         )
-        @app.callback(
-            Output("selected-rois", "value"),
-            [Input("roi-selector", "selectedData")],
-            )
-        def showSelected(selData):
-            if selData is None:
-                return "all"
-            ix = np.array( [p["hovertext"] for p in selData["points"]]).astype(int)
-            ix = np.unique(ix)
-            return ",".join(ix.astype(str))
-
-        @app.callback(
-            [Output("discard-feedback", "children"),
-             Output("roi-selector","figure")],
-            [Input("discard-button",   "n_clicks")],
-            [State("selected-rois", "value")]
-                     )
-        def discard_callback(n_clicks,selected):
-            if n_clicks <= 0:
-                return no_update
-            if selected == "":
-                out = ""
-            else:
-                try:
-                    selectedIndices = np.unique(list(eval(selected)))
-                    nremoved = len(self.df)-len(selectedIndices)
-                    self.df = self.df.loc[selectedIndices]
-                    out = "%i rois removed."%(nremoved)
-                    fig = showRoisOnly(self,indices=self.df.index, im=self.statImages[self.mode])
-                    fig.update_layout({"dragmode":'lasso'},)
-                except:
-                    out = "something's off."
-                    fig = go.Figure()
-            return out, fig
-
-        @app.callback(
-            [Output("filter-feedback", "children"),
-             Output("trace-show","figure")],
-            [Input("selected-rois", "value"),
-             Input("filter-button","n_clicks"),
-             Input("rebin-input","value"),
-             Input("sum-checklist","value")],
-            [State("filter-input","value"),
-             State("trace-show","relayoutData"),
-            ]
-                     )
-        def filter_and_plot_callback(selected,n_clicks,nRebin,checklist,filtTs,rlod):
-            if n_clicks <= 0:
-                return no_update
-            if selected in ["all",""]:
-                selectedIndices = list(self.df.index)
-            else:
-                selectedIndices = list(eval(selected+","))
-            nRebin=int(nRebin)
-#             import json
-#             out = json.dumps(rlod)
-#             {"xaxis.range[0]": 322.98541153852864, "xaxis.range[1]": 528.4209918884629, "yaxis.range[0]": -9.125982292630475, "yaxis.range[1]": 34.41639176490383}
-            out = ""#+" | ".join([str(nRebin),str(type(nRebin)),str(nRebin>1)])
-#             out = "start with "+str(selected)
-#             out += "| "+str(selectedIndices)
-            try:
-                filtTs = float(filtTs)
-                k = "faster_%g"%filtTs
-                if k not in self.df:
-                    self.fast_filter_traces(filtTs,Npoints=np.inf)
-                    out += "filtering for features shorter than ~%gs done."%filtTs
-                y = np.sum([self.df.loc[ix,k]*self.df.loc[ix,"size"] for ix in selectedIndices],0)/self.df.loc[selectedIndices,"size"].sum()
-            except:
-                y = np.sum(self.df.loc[selectedIndices,filtTs],0)
-            try:
-                t = self.showTime["%g"%filtTs]
-            except:
-                t = self.time
-            if nRebin>1:
-                try:
-                    y = rebin(y,nRebin)
-                    t = rebin(t,nRebin)
-                except:
-                    out+= "rebinning didnt work"
-            from plotly.subplots import make_subplots
-            try:
-                treatments = self.protocol["compound"].unique()
-            except:
-                treatments = []
-            h,w = 370+20*len(treatments),600
-            margin = dict(zip("tblr",[30,10,20,20]))
-            fg = make_subplots(rows = 2, shared_xaxes=True, row_heights = [1-.05*len(treatments)-.01,.05*len(treatments)],
-                               vertical_spacing=0,
-                               start_cell="bottom-left"
-
-                              )
-            fg.add_trace(go.Scatter(
-                x=t,
-                y=y,
-                line_width=.7,
-                line_color="darkred"),row=1,col=1
-                         )
-            it = 0
-            for treat in treatments:
-                fg.add_trace(go.Scatter(
-                    x = [self.time[0]],
-                    y = [0.4+it],
-                    mode="text",
-                    text=[treat[:3]+" "],
-                    textposition="middle left",
-                    showlegend=False,
-                            ),row=2,col=1)
-                for _,row in self.protocol.query(f"compound=='{treat}'").iterrows():
-                    t1,t2 = row.t_begin,row.t_end
-                    fg.add_trace(go.Scatter(
-                        x = [t1,t2,t2,t1,t1],
-                        y = np.array([0,0,1,1,0])*.8+it,
-                        mode="lines",
-                        line_color="grey",
-                        showlegend=False,
-                        fill="toself",
-                        opacity = .4),row=2,col=1)
-                    fg.add_trace(go.Scatter(
-                        x = [t1],
-                        y = [0.4+it],
-                        mode="text",
-                        text=[" "+row.concentration],
-                        textposition="middle right",
-                        showlegend=False,
-                                ),row=2,col=1)
-                    fg.update_yaxes({"tickvals":[]},row=2,col=1)
-
-                it += 1
-            fg.update_layout({
-                "height":h+margin["t"]+margin["b"],
-                "margin":margin,
-                "width":w,
-                "xaxis":{"title":"time [s]"},
-                "plot_bgcolor":"white",
-                "showlegend":False
-            })
-
-            fg.update_xaxes(showline=True, linewidth=1, linecolor='black', mirror=True, ticks="outside", ticklen=2,row=1,col=1)
-            fg.update_yaxes(showline=True, linewidth=1, linecolor='black', mirror=True, ticks="outside", ticklen=2,row=1,col=1)
-            try:
-                fg.update_xaxes(range=[rlod["xaxis.range[0]"], rlod["xaxis.range[1]"]])
-                fg.update_yaxes(range=[rlod["yaxis.range[0]"], rlod["yaxis.range[1]"]])
-            except:
-                pass
-            return out, fg
-
-
-        app.layout = html.Div(children=APP_LAYOUT,
-                              style={"family":"Arial"}
-                             )
-        return app
-
-def getGraph_of_ROIs_to_Merge(df,rreg, plot=False, ax=None,lw=.5):
+def getGraph_of_ROIs_to_Merge(df,rreg, plot=False, ax=None,lw=.5,arrow_width=.5):
     C = rreg.df
     Gph = nx.DiGraph()
     ixs = np.unique(df.values.flatten())
@@ -1047,7 +696,7 @@ def getGraph_of_ROIs_to_Merge(df,rreg, plot=False, ax=None,lw=.5):
         l = list(df.query(f"i=={j}")["j"])
         if i in l:
             c="darkgoldenrod"
-            iaccept = C.loc[[i,j],"peakValue"].idxmax()
+            iaccept = C.loc[sorted([i,j]),"peakValue"].idxmax()
             if j!=iaccept:
                 continue
         else:
@@ -1058,7 +707,7 @@ def getGraph_of_ROIs_to_Merge(df,rreg, plot=False, ax=None,lw=.5):
             x1,y1 = C.loc[j,"peak"]
             dx = x1-x0
             dy = y1-y0
-            ax.arrow(y0,x0,dy,dx,width = .5,
+            ax.arrow(y0,x0,dy,dx,width = arrow_width,
                      linewidth = lw,
                      color="r",
                      zorder=10,
@@ -1086,7 +735,10 @@ def plotRoi_to_be_connected(Gph, rreg, nplot=35):
         cl = list(cl)
         gph = Gph.subgraph(nodes=cl)
         pos = np.array([el[::-1] for el in C.loc[cl,"peak"]])
-        nx.draw_networkx(gph,ax=ax,node_size=30,node_color="w",
+        nx.draw_networkx(gph,
+                         ax=ax,
+                         node_size=30,
+                         node_color="w",
                          pos=dict(zip(cl,pos)),
                          font_size=6
                         )
@@ -1109,10 +761,12 @@ def mergeBasedOnGraph(Gph,rreg):
         cl = list(cl)
         gph = Gph.subgraph(nodes=cl)
         attr = sum(list(map(list,nx.attracting_components(gph))),[])
-        if len(attr)>1:
+        if len(attr)>2:
             # print ("more than two attractors, not implemented yet, will skip")
             continue
-        attr = attr[0]
+        if len(attr)==2 and len(cl)>2:
+            continue
+        attr = C.loc[attr,"peakValue"].sort_values().index[-1]
         other = [j for j in cl if j!=attr]
         C.loc[[attr],"pixels"] = [sum(C.loc[cl,"pixels"],[])]
         toDrop += other
@@ -1260,9 +914,9 @@ def edges2nodes(x,start=0,direction=1):
                 nodes += [tuple(cand)]
     return nodes
 
-def getStatImages(movie_, debleach=True, downsampleFreq=10):
+def getStatImages(movie_, debleach=False, downsampleFreq=5):
     if movie_.fr>downsampleFreq:
-        n_rebin = int(movie_.fr/downsampleFreq)
+        n_rebin = int(np.round(movie_.fr/downsampleFreq))
         if n_rebin>=2:
             m_for_image = rebin(movie_,n_rebin)
         else:
@@ -1276,9 +930,11 @@ def getStatImages(movie_, debleach=True, downsampleFreq=10):
 
     for f in [np.mean,np.std]:
         statImages[f.__name__] = f(m_for_image,axis=0)
-
+    statImages["highperc"] = np.percentile(m_for_image,100*(1-10/len(m_for_image)), axis=0)
+    
     m_for_image = np.diff(m_for_image,axis=0)
     for f in [np.mean,np.std]:
         statImages["diff_"+f.__name__] = f(m_for_image,axis=0)
-
+    statImages["diff_highperc"] = np.percentile(m_for_image,100*(1-10/len(m_for_image)), axis=0)
+    
     return statImages
