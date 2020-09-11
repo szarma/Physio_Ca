@@ -3,6 +3,45 @@ import os
 import bioformats as bf
 import pandas as pd
 
+def parse_leica(rec, merge=True, skipTags = ["crop","split","frame", "every","half", "snapshot","-"], index=False):
+    from pandas import Timedelta
+    toDrop = [i for i,row in rec.metadata.iterrows() if "Series" not in row["Name"] or row["SizeY"]*row["SizeT"]<2000]
+    for tag in skipTags:
+        toDrop += [i for i,row in rec.metadata.iterrows() if tag in row["Name"].lower()]
+    rec.metadata.drop(index=np.unique(toDrop), inplace=True)
+    if not merge:
+        if index:
+            return  list(zip(rec.metadata.index,rec.metadata.Name.values))
+        else:
+            return  list(rec.metadata.Name.values)
+    if len(rec.metadata)>1:
+        rec.calc_gaps()
+        ff = np.any(
+                [rec.metadata["gap"]>5]+
+                [rec.metadata["gap"]<-5]+
+                [rec.metadata[c].diff().abs()>0 for c in ["pxSize", "SizeX", "SizeY"]],
+            axis=0)
+        sers = np.split(rec.metadata.Name.values, np.where(ff)[0])
+        idxs = np.split(list(rec.metadata.index), np.where(ff)[0])
+    else:
+        sers = [rec.metadata.Name.values]
+        idxs = [list(rec.metadata.index)]
+    
+    outSer = []
+    for serlist in sers:
+#         if len(serlist)==len(rec.metadata):
+#             ser="all"
+#         else:
+        serrange = [int(el.replace("Series","")) for el in serlist]
+        if len(serrange)>1:
+            ser = "Series%03i-%i"%(serrange[0],serrange[-1])
+        else:
+            ser = "Series%03i"%(serrange[0])
+        outSer += [ser]
+    if index:
+        return list(zip(idxs,outSer))
+    return outSer
+
 def saveMovie(movie, filename, maxFreq=5, frameRate=60,dpi=100):
     from .utils import show_movie
     from .numeric import rebin
@@ -47,6 +86,8 @@ class Recording:
                 self.metadata[c] = pd.to_datetime(self.metadata[c])
             for c in ["Duration"]:
                 self.metadata[c] = pd.to_timedelta(self.metadata[c])
+            from general_functions import td_nanfloor
+            self.metadata["End time"] = self.metadata["End time"].apply(td_nanfloor)
             # print (f"metadata imported from {self.metafile}.")
         except:
             print (f"Recording {pathToExperiment} not yet preprocessed. Preprocessing takes a few seconds and will speed up the usage later...", end=" ")

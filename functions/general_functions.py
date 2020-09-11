@@ -19,7 +19,30 @@ def mode(l):
     from collections import Counter
     return Counter(l).most_common(1)[0][0]
 
+def td2str(x):
+    try:
+        ts = x.total_seconds()
+        hours, remainder = divmod(ts, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        out = ('{}:{:02d}:{:02d}').format(int(hours), int(minutes), int(seconds)) 
+        return out.lstrip(":0")
+    except:
+        return "N/A"
 
+def td2secs(x):
+    try:
+        ts = x.total_seconds()
+        return ts
+    except:
+        from numpy import nan
+        return nan
+
+def td_nanfloor(x, dt=1):
+    from pandas import Timedelta
+    try:
+        return x.floor(Timedelta(dt,unit="s"))
+    except:
+        return x
 # def autocorr(sett, dtrange):
 #     from numpy import zeros, corrcoef
 #     ret = zeros(len(dtrange))
