@@ -1,4 +1,13 @@
 import numpy as np
+import os
+
+def get_series_dir(pathToExp, series):
+    folder = pathToExp+f"_analysis/"
+    if not os.path.isdir(folder):
+        return []
+    
+    relevantsubdirs = [sd for sd in os.listdir(folder) if series == sd or series == "_".join(sd.split("_")[:-1])]
+    return relevantsubdirs
 
 def get_filterSizes(px, physSize=5.5):
     base = int(np.ceil(physSize/px))
@@ -98,10 +107,14 @@ def multi_map(some_function, iterable, processes=1):
         out = map(some_function, iterable)
     elif processes>1:
         from multiprocessing import Pool
-        with Pool(processes) as pool:
-            out  = pool.map(some_function, iterable)
-        # pool.close()
-        # pool.join()
+#         with Pool(processes) as pool:
+#             out = pool.map(some_function, iterable)
+        try:
+            pool = Pool(processes)
+            out = pool.map(some_function, iterable)
+        finally:
+            pool.close()
+            pool.join()
     else:
         print ("invalid number of processes", processes)
         out = None

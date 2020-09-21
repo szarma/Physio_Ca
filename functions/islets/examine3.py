@@ -423,7 +423,7 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all"):
             k = "faster_%g"%filtTs
 
             if k not in self.df:
-                self.fast_filter_traces(filtTs)
+                self.fast_filter_traces(filtTs,Npoints=1000)
                 out += f"filtering for features shorter than ~{filtTs}s done."
             else:
                 out += f"Traces filtered at {filtTs}s already exist"

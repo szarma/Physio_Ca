@@ -90,7 +90,9 @@ app.layout = html.Div(children=[
             "width":"80%",
             "height":"100px",
             'overflowX': 'scroll',
-            'overflowY': 'scroll',}),
+            'overflowY': 'scroll',
+            'display':'none',
+    }),
     
     html.Div(id="video", children="nothing yet", style={"font-family":"Courier New",}),
     html.Div(

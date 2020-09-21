@@ -110,7 +110,8 @@ class Regions:
             ok = dilate((image>0).astype(np.uint8), np.ones((dks,)*2))
             ok = ok*(self.statImages[self.mode]>0).astype(np.uint8)
             ok = ok.astype(bool)
-            excludePixels = list(map(tuple, np.array(np.where(~ok)).T))
+            if excludePixels is None:
+                excludePixels = list(map(tuple, np.array(np.where(~ok)).T))
             # image[toMin] = image.min()
             #
         self.filterSize = gSig_filt
@@ -689,14 +690,19 @@ class Regions:
         C.loc[indices,"intraCCs"] = intraCCs
 
     def import_protocol(self,pathToProtocol):
-        self.protocol = pd.read_csv(pathToProtocol)
-        self.protocol.dropna(how='all', inplace=True)
-        if self.protocol.empty:
+        protocol = pd.read_csv(pathToProtocol)
+        protocol.dropna(how='all', inplace=True)
+        if protocol.empty:
             raise ValueError('protocol file contains nothing ')
-        self.protocol["t_begin"] = pd.to_timedelta(["00:"+el if type(el)==str else "00:00:00" \
-                                                       for el in self.protocol["begin"]]).total_seconds()
-        self.protocol["t_end"] = pd.to_timedelta(["00:"+el if type(el)==str else (self.time[0]+len(self.time)/self.Freq)*1e9 \
-                                                     for el in self.protocol["end"]]).total_seconds()
+        try:
+            protocol["t_begin"] = pd.to_timedelta(["00:"+el if type(el)==str else "00:00:00" \
+                                                           for el in protocol["begin"]]).total_seconds()
+            protocol["t_end"] = pd.to_timedelta(["00:"+el if type(el)==str else (self.time[0]+len(self.time)/self.Freq)*1e9 \
+                                                         for el in protocol["end"]]).total_seconds()
+            self.protocol = protocol
+        except:
+            pass
+        return protocol
 
     def examine(self, test=False, max_rois=10, imagemode=None, debug=False, startShow=''):
         from .examine2 import examine

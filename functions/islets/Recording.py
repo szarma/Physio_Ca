@@ -3,12 +3,20 @@ import os
 import bioformats as bf
 import pandas as pd
 
-def parse_leica(rec, merge=True, skipTags = ["crop","split","frame", "every","half", "snapshot","-"], index=False):
+def parse_leica(rec,
+                merge=True,
+                skipTags = ["crop","split","frame", "every","half", "snapshot","-","proj","max"],
+                index=False,
+                verbose=False,
+               ):
     from pandas import Timedelta
-    toDrop = [i for i,row in rec.metadata.iterrows() if "Series" not in row["Name"] or row["SizeY"]*row["SizeT"]<2000]
+    toDrop = [i for i,row in rec.metadata.iterrows() if "Series" not in row["Name"] or row["SizeY"]*row["SizeT"]<2000 or row["SizeT"]/row["Frequency"]<2]
     for tag in skipTags:
         toDrop += [i for i,row in rec.metadata.iterrows() if tag in row["Name"].lower()]
     rec.metadata.drop(index=np.unique(toDrop), inplace=True)
+    if len(rec.metadata)==0:
+        print ("Can not parse any series.")
+        return []
     if not merge:
         if index:
             return  list(zip(rec.metadata.index,rec.metadata.Name.values))
@@ -19,14 +27,16 @@ def parse_leica(rec, merge=True, skipTags = ["crop","split","frame", "every","ha
         ff = np.any(
                 [rec.metadata["gap"]>5]+
                 [rec.metadata["gap"]<-5]+
+                [~np.isfinite(rec.metadata["gap"])]+
                 [rec.metadata[c].diff().abs()>0 for c in ["pxSize", "SizeX", "SizeY"]],
             axis=0)
-        sers = np.split(rec.metadata.Name.values, np.where(ff)[0])
-        idxs = np.split(list(rec.metadata.index), np.where(ff)[0])
+        sers = np.split(rec.metadata.Name.values, np.where(ff)[0])[1:]
+        idxs = np.split(list(rec.metadata.index), np.where(ff)[0])[1:]
     else:
         sers = [rec.metadata.Name.values]
         idxs = [list(rec.metadata.index)]
-    
+    if verbose:
+        print ("series grouped as following:", sers)
     outSer = []
     for serlist in sers:
 #         if len(serlist)==len(rec.metadata):
@@ -42,7 +52,7 @@ def parse_leica(rec, merge=True, skipTags = ["crop","split","frame", "every","ha
         return list(zip(idxs,outSer))
     return outSer
 
-def saveMovie(movie, filename, maxFreq=5, frameRate=60,dpi=100):
+def saveMovie(movie, filename, maxFreq=2, frameRate=60,dpi=100):
     from .utils import show_movie
     from .numeric import rebin
     if maxFreq<movie.fr:
@@ -104,7 +114,7 @@ class Recording:
 #         import javabridge
 #         javabridge.kill_vm()
         
-    def parse_metadata(self,Series=None):
+    def parse_metadata(self,verbose=False):
         md = bf.get_omexml_metadata(self.path)
         self.xml = bf.OMEXML(md)
         self.nSeries = self.xml.get_image_count()
@@ -125,11 +135,12 @@ class Recording:
         metadata = pd.DataFrame(columns=["Name","SizeT","SizeX","SizeY","SizeZ","pxSize","pxUnit",
                                          "bit depth", "Frequency", "Start time", "End time", "Duration"])
         for i in range(self.nSeries):
-            try:
+#             try:
                 im = self.xml.image(i)
                 for c in metadata.columns:
                     try:
                         metadata.loc[i,c] = getattr(im.Pixels, c)
+                        metadata.loc[i,c] = int(metadata.loc[i,c])
                     except:
                         pass
                 metadata.loc[i,"Name"] = im.Name
@@ -137,13 +148,17 @@ class Recording:
                 metadata.loc[i,"pxUnit"] = im.Pixels.get_PhysicalSizeXUnit()
                 metadata.loc[i,"bit depth"] = im.Pixels.get_PixelType()
                 metadata.loc[i,"Start time"] = im.get_AcquisitionDate()
-                if metadata.loc[i,"SizeT"]>1:
-    #             metadata.loc[i,"Frequency"] = 1/np.diff([im.Pixels.Plane(i).DeltaT for i in range(max(metadata.loc[i,"SizeT"],100))]).mean()
-                    metadata.loc[i,"Frequency"] = (metadata.loc[i,"SizeT"]-1)/im.Pixels.Plane(metadata.loc[i,"SizeT"]-1).DeltaT
+                if metadata.loc[i,"SizeT"]>10:
+                    if verbose:
+                        print (im.Name, metadata.loc[i,"SizeT"], type(metadata.loc[i,"SizeT"]))
+                    lastT = im.Pixels.Plane(int(metadata.loc[i,"SizeT"]-1)).DeltaT
+                    metadata.loc[i,"Frequency"] = (metadata.loc[i,"SizeT"]-1)/lastT
+#                     metadata.loc[i,"Frequency"] = 1./np.diff([im.Pixels.Plane(i).DeltaT for i in range(min(metadata.loc[i,"SizeT"],100))]).mean()
                 if metadata.loc[i,"SizeZ"]>1:
                     metadata.loc[i,"Z-stack height"] = im.Pixels.get_PhysicalSizeZ()
-            except:
-                pass
+#             except:
+#                 print (str(exc_info()))
+#                 pass
         for c,t in list(zip(metadata.columns,["str"]+["int"]*4+["float","str","str","float"])):
             metadata[c] = metadata[c].astype(t)
         metadata["Start time"] = pd.to_datetime(metadata["Start time"])
@@ -190,8 +205,8 @@ class Recording:
         metadata = self.metadata.copy()
         toDrop = [i for i,r in metadata.iterrows() if r.Name not in SeriesList]
         metadata.drop(index=toDrop, inplace=True)
-        
-        assert (np.abs(metadata["Frequency"]/metadata["Frequency"].mean()-1)<1e-1).all()
+        if len(metadata)>1:
+            assert (np.abs(metadata["Frequency"]/metadata["Frequency"].mean()-1)<1e-1).all()
 
         for c in ["SizeX","SizeY","pxSize","pxUnit","bit depth"]:
             assert all([x==metadata[c].iloc[0] for x in metadata[c]])
@@ -205,6 +220,9 @@ class Recording:
             time = np.arange(metadata1['SizeT'])/metadata1["Frequency"]
             if t_end<0:
                 t_end = time.max()+t_end
+            if t_end<t_begin:
+                t_end = time.max()
+            
             frame_begin = np.where(time>=t_begin)[0][0]
             frame_end   = np.where(time<=t_end)[0][-1]
             metadata1["frame_range"] = frame_begin, frame_end
