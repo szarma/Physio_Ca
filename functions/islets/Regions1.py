@@ -9,6 +9,10 @@ from .utils import multi_map
 import plotly.graph_objects as go
 from .Regions import Regions as Regions0
 from matplotlib._color_data import TABLEAU_COLORS, CSS4_COLORS
+from general_functions import getCircularKernel
+import pickle
+from matplotlib.colors import LogNorm
+import os
 # MYCOLORS = OrderedDict(TABLEAU_COLORS)
 # del MYCOLORS["tab:gray"]
 # ks = ["lime",
@@ -23,6 +27,126 @@ from plotly_express import colors as plc
 MYCOLORS = plc.qualitative.Plotly
 # MYCOLORS = ["darkred"]
 
+def load_regions(path,
+                 mergeDist=1,
+                 mergeSizeTh=10,
+                 plot=False,
+                 verbose=False
+                ):
+    with open(path,"rb") as f:
+        regions = pickle.load(f)
+    regions.update()
+    regions.detrend_traces()
+    regions.infer_gain(plot=plot)
+    pickleDir = os.path.split(path)[0]
+    if "examine3" not in dir(regions):
+        regions = Regions(regions)
+    try:
+        protocolFile = os.path.join(pickleDir, [f for f in os.listdir(pickleDir) if "protocol" in f][0])
+        regions.import_protocol(protocolFile)
+    except:
+        pass
+    regions.pathToPickle = path
+    
+    if plot:
+        plt.figure(figsize=(7*20,6))
+        
+    ia = 1
+    while True:
+        size_th = np.percentile(regions.df["size"].values, mergeSizeTh)
+        df = getPeak2BoundaryDF(regions.df)
+        df = df.query(f"dist<={mergeDist} and size_from<={size_th}")
+        if len(df):
+            if plot:
+                ax = plt.subplot(1,20,ia)
+                ax.imshow(regions.statImages[regions.mode], cmap="Greys", norm=LogNorm())
+                xl = ax.get_xlim()
+                yl = ax.get_ylim()
+            else:
+                ax = None
+            suggestGraph = getGraph_of_ROIs_to_Merge(df.iloc[:,:2], regions, plot=plot,ax=ax)
+            if plot:
+                ax.set_xlim(xl)
+                ax.set_ylim(yl)
+            mergeBasedOnGraph(suggestGraph, regions, verbose=verbose)
+        else:
+            # print ("No more suggestions.")
+            break
+        ia += 1
+    if plot:
+        plt.tight_layout()
+    
+    return regions
+
+def crawlDict_restr(image, pixels, diag=False, processes=10, verbose=False):
+    global iterf
+    def iterf(ij):
+        return climb((ij[0],ij[1]), image, diag=diag,)
+    R_ = multi_map(iterf,pixels, processes=processes)
+    A_ = [ij+r for ij,r in zip(pixels,R_) if r in pixels]
+    A_ = [el for el in A_ if el[-1] is not None]
+    B_ = OrderedDict()
+    for (i0,j0,i1,j1) in A_:
+        if (i1,j1) not in B_:
+            B_[(i1,j1)] = []
+        B_[(i1,j1)] += [(i0,j0)]
+    return B_
+
+def climb(x,blurredWeights,
+          diag=True,
+          excludePixels=[]
+         ):
+    dims = blurredWeights.shape
+    # x = (60,60)
+    x = x+(blurredWeights[x[0],x[1]],)
+    xs = [x]
+    for i in range(1000):
+        vs = []
+        for di,dj in product([-1,0,1],[-1,0,1]):
+            if not diag:
+                if di*dj!=0: continue
+            i,j = x[0]+di,x[1]+dj
+            if i<0 or i>=dims[0] or j<0 or j>=dims[1]:
+                continue
+            if (i,j) in excludePixels:
+                continue
+            vs += [(i,j,blurredWeights[i,j])]
+        x1 = vs[np.argmax(vs,axis=0)[-1]]
+        dx = x1[-1]-x[-1]
+        if dx<=0:
+            break
+        else:
+            x = x1
+            xs += [x]
+    return x[:2]
+
+def crawlDict(image, crawl_th=0, diag=False, processes=10, excludePixels=None, verbose=False):
+    global iterf
+    if excludePixels is None:
+        excludePixels = []
+    if verbose:
+        print (f"entering crawling dict with {len(excludePixels)} pixels excluded.")
+    if np.isfinite(crawl_th):
+        excludePixels += list(map(tuple,np.array(np.where(image<crawl_th)).T))
+    if verbose:
+        print (f"Crawling the image with {len(excludePixels)} pixels excluded.")
+        
+    ijs_ = [(i,j) for i,j in product(range(image.shape[0]),range(image.shape[1])) if (i,j) not in excludePixels]
+    def iterf(ij):
+        return climb((ij[0],ij[1]), image, diag=diag,
+                     #excludePixels=excludePixels
+                    )
+    R_ = multi_map(iterf,ijs_, processes=processes)
+    A_ = [ij+r for ij,r in zip(ijs_,R_) if r not in excludePixels]
+    A_ = [el for el in A_ if el[-1] is not None]
+    B_ = OrderedDict()
+    for (i0,j0,i1,j1) in A_:
+        if (i1,j1) not in B_:
+            B_[(i1,j1)] = []
+        B_[(i1,j1)] += [(i0,j0)]
+    return B_
+
+
 class Regions:
     def __init__(self, movie_,
                  diag=True,
@@ -30,22 +154,29 @@ class Regions:
                  gSig_filt=None,
                  mode="highperc+mean",
                  full=True,
-                 img_th=-np.inf,
+                 img_th=0.01,
                  FrameRange=None,
-                 processes=10,
-                 min_gradient=0,
-                 excludePixels=[],
+                 processes=7,
+                 excludePixels=None,
+                 verbose=False,
+                 use_restricted=None
                 ):
         if isinstance(movie_, Regions0) or isinstance(movie_, Regions):
             for k in movie_.__dict__.keys():
+                if verbose:
+                    print ("Initiating from another Regions object.")
                 setattr(self, k, movie_.__dict__[k])
             return None
             
         self.mode = mode
         if isinstance(movie_, (np.ndarray,)):
             if len(movie_.shape)==2:
+                if verbose:
+                    print ("Initiating from an image, with a mode", mode)
                 self.statImages = {mode:movie_}
             if len(movie_.shape)==3:
+                if verbose:
+                    print ("Initiating from a movie.")
                 self.movie = movie_
                 time = np.arange(len(movie_))/movie_.fr
                 if FrameRange is None:
@@ -59,12 +190,16 @@ class Regions:
         elif isinstance(movie_, dict):
             akey = next(iter(movie_))
             if isinstance(akey,tuple):
+                if verbose:
+                    print ("Initiating from a crawling dictionary.")
                 self.df = pd.DataFrame(OrderedDict([
                     ("peak",  list(movie_.keys())),
                     ("pixels",list(movie_.values()))
                 ]))
                 del self.mode
             elif isinstance(akey,str):
+                if verbose:
+                    print ("Initiating from a dictionary assumed to be a dictionary of image stats.")
                 self.statImages = movie_
             else:
                 raise ValueError("Initializing Regions from a dictionary is only supported for a dictionary of images representing movie statistics, or a pixel crawling dictionary.")
@@ -72,32 +207,34 @@ class Regions:
             raise ValueError("Regions can initialize either from a movie, or an image, or a dictionary.")
         
         if full and not hasattr(self,"df"):
-            self.constructRois(mode=mode, img_th=img_th, diag=diag, min_gradient=min_gradient, gSig_filt=gSig_filt, processes=processes, excludePixels=excludePixels)
+            self.constructRois(mode=mode, img_th=img_th, diag=diag, gSig_filt=gSig_filt, processes=processes, excludePixels=excludePixels, verbose=verbose, use_restricted=use_restricted)
             
-    def constructRois(self, mode="diff_std", img_th=-np.inf, diag=False, min_gradient=0, gSig_filt=None, processes=5,excludePixels=None):
-        
+    def constructRois(self, mode, img_th=0, diag=True, gSig_filt=None, processes=5,excludePixels=None, verbose=False,use_restricted=False):
         from .numeric import robust_max
         if mode=="custom":
             image0=self.statImages[mode]
         else:
             k0 = next(iter(self.statImages))
             tmp = np.zeros_like(self.statImages[k0])
+            norm = []
             for submode in mode.split("+"):
                 im = self.statImages[submode].copy()
-                im = im/robust_max(im)
+                norm += [robust_max(im)]
+                im = im/norm[-1]
                 tmp += im
-            image0 = tmp/robust_max(tmp)
+            image0 = tmp/len(norm)*np.mean(norm)
             self.statImages[mode] = image0
 #             toMin=image0<img_th
             
+        from cv2 import GaussianBlur,dilate
         if gSig_filt is None:
             image = image0
 #             excludePixels = None
+            dks = 3
         else:
             if type(gSig_filt)==int:
                 gSig_filt = [gSig_filt]
-#             from caiman.motion_correction import high_pass_filter_space
-            from cv2 import GaussianBlur,dilate
+            dks = max(3,(max(gSig_filt))//2*2+1)
             image = []
             for gSf in gSig_filt:
 #                 tmp = high_pass_filter_space(image0,(gSf,)*2)
@@ -106,23 +243,39 @@ class Regions:
                 tmp *= gSf
                 image += [tmp/robust_max(tmp)]
             image = np.mean(image,axis=0)
-            dks = max(3,(max(gSig_filt)-1)//2*2+1)
-            ok = dilate((image>0).astype(np.uint8), np.ones((dks,)*2))
-            ok = ok*(self.statImages[self.mode]>0).astype(np.uint8)
-            ok = ok.astype(bool)
+        if not use_restricted:
             if excludePixels is None:
-                excludePixels = list(map(tuple, np.array(np.where(~ok)).T))
-            # image[toMin] = image.min()
-            #
+                excludePixels = []
+        
+        if verbose:
+            print ("dilating valid pixels by", dks)
+        kernel = getCircularKernel(dks)
+        ok = dilate((image>img_th).astype(np.uint8), kernel)
+        # ok = ok*(self.statImages[self.mode]>0).astype(np.uint8)
+        ok = ok.astype(bool)
         self.filterSize = gSig_filt
         self.image = image
-        B_ = crawlDict(image,
-                       crawl_th=img_th,
-                       diag=diag,
-                       min_gradient=min_gradient,
-                       processes=processes,
-                       excludePixels=excludePixels
-                      )
+        if use_restricted:
+            includePixels = list(map(tuple, np.array(np.where(ok)).T))
+            if verbose:
+                print(f"initiating the cralwing dict on {len(includePixels)} (%.1f%%) pixels only."%(100*len(includePixels)/ok.size))
+            B_ = crawlDict_restr(image,
+                           includePixels,
+                           diag=diag,
+                           processes=processes,
+                           verbose=verbose
+                          )
+        else:
+            excludePixels += list(map(tuple, np.array(np.where(~ok)).T))
+            if verbose:
+                print(f"initiating the cralwing dict with {len(excludePixels)} pixels excluded.")
+            B_ = crawlDict(image,
+                           crawl_th=-np.inf,
+                           diag=diag,
+                           processes=processes,
+                           excludePixels=excludePixels,
+                           verbose=verbose
+                          )
         if diag:
 #             try:
                 from .utils import split_unconnected_rois
@@ -144,6 +297,7 @@ class Regions:
 #             self.reassign_peaks(slightly_blurred_image+self.statImages[self.mode])
 #         except:
         self.df["peakValue"] = [image[p] for p in B_]
+        self.ExcludePixels = excludePixels
         self.update()
     
     def reassign_peaks(self, image, write=True):
@@ -197,6 +351,11 @@ class Regions:
             self.calcTraces(movie_)
             self.movie = movie_
             self.Freq  = movie_.fr
+        else:
+            try:
+                self.calcTraces()
+            except:
+                pass
     
     def calcEdgeIds(self):
         dround = np.vstack([(-1,-1),(-1, 1),( 1, 1),( 1,-1),(-1,-1)])
@@ -241,19 +400,23 @@ class Regions:
         return out
     
     def plotEdges(self, ix=None, ax=None, image=True, imkw_args = {}, separate=False, color="k", lw=None,alpha = 1):
-        from matplotlib.colors import LogNorm
         if ix is None:
             ix = self.df.index
         if ax is None:
             ax = plt.subplot(111)
         if lw is None:
             lw=.8
+        if "cmap" not in imkw_args:
+            imkw_args["cmap"] = "Greys"
         if image:
             im = self.statImages[self.mode]
             ax.imshow(im,norm=LogNorm(),**imkw_args)
         if separate:
             for i in ix:
-                c = MYCOLORS[i%len(MYCOLORS)]
+                try:
+                    c = self.df.loc[i,"color"]
+                except:
+                    c = MYCOLORS[i%len(MYCOLORS)]
                 y,x = np.array(self.df.loc[i,"boundary"]+self.df.loc[i,"boundary"][:1]).T
                 ax.plot(x,y,"-",lw=lw,c=c,alpha=alpha)
         else:
@@ -266,25 +429,38 @@ class Regions:
             y,x = np.array(tmp).T
             ax.plot(x,y,color,lw=lw,alpha=alpha)
             
+            
+        if hasattr(self, "metadata") and "pxSize" in self.metadata:
+            lengths = [10,20,50]
+            il = np.searchsorted(lengths,self.metadata.pxSize*self.image.shape[1]/10)
+            length=lengths[il]
+            x0,x1,y0,y1 = np.array([0,length,0,length*3/50])/self.metadata.pxSize + self.image.shape[0]*.02
+            ax.fill_between([x0,x1],[y1]*2,[y0]*2, color="k")
+            txt = str(length)
+            if "pxUnit" in self.metadata:
+                txt += self.metadata["pxUnit"]
+            ax.text((x0+x1)/2, y1, txt, va="top", ha="center")
+            
     def plotPeaks(self, ix=None, ax=None, image=False, ms=1, labels=False,color=None, imkw_args={},absMarker=True):
         if ax is None:
             ax = plt.subplot(111)
         if image:
             im = self.statImages[self.mode]
-            from matplotlib.colors import LogNorm
             ax.imshow(im,norm=LogNorm(),**imkw_args)
         if ix is None:
             ix = self.df.index
 
-        peaks = self.df.loc[ix,"peak"]
         if absMarker:
             sizes = [ms]*len(self.df)
         else:
             sizes = ms * self.df.loc[ix,"size"]**.5
-        for ms,p in zip(sizes,peaks):
-            i = self.peak2idx[p]
+        for i,ms in zip(ix,sizes):
+            p = self.df.loc[i,"peak"]
             if color is None:
-                c = MYCOLORS[i%len(MYCOLORS)]
+                try:
+                    c = self.df.loc[i,"color"]
+                except:
+                    c = MYCOLORS[i%len(MYCOLORS)]
             else:
                 c = color
             ax.plot(*p[::-1],marker="o",mfc="none",ms=ms,c=c)
@@ -357,7 +533,7 @@ class Regions:
         self.df.index = np.arange(len(self.df))
         self.calcNNmap()
     
-    def infer_gain(self, plot=False):
+    def infer_gain(self, plot=False, verbose=False):
         minDt = np.diff(self.time).mean()
         freq = 1/minDt
 #         ts = min(50/freq,10)
@@ -371,50 +547,81 @@ class Regions:
                 fast_vars += [absFast[i,j-di:j+di].var()]
         fast_vars = np.array(fast_vars)
         slow_est = np.array(slow_est)
-        
         logbs = np.log(np.logspace(np.log10(np.percentile(slow_est,2)),np.log10(np.percentile(slow_est,98))))
         d = np.digitize(np.log(slow_est), logbs)
         x = np.array([slow_est[d==i].mean() for i in np.unique(d)])
         y = np.array([np.median(fast_vars[d==i]) for i in np.unique(d)])
+#         x[x<=0] = np.nan
         gain = np.mean(y/x)
-        gain = np.exp(np.mean(np.log(y)-np.log(x)))
-        
+#         gain = np.exp(np.mean(np.log(y)-np.log(x)))
+        slow_est[slow_est==0] = np.nan
         if plot:
             ax = plt.subplot(111)
             ax.hexbin(slow_est, fast_vars, bins="log",
                       xscale="log",
                       yscale="log",
-                      cmap="hot",
+                      cmap="Greys",
                       mincnt=1
                      )
-            ax.plot(x,y,"C0o",mfc="none")
-            ax.plot(x,x*gain)
+            c = ax.plot(x,y,"o",mfc="none")[0].get_color()
+            ax.plot(x,x*gain,c=c)
+            
+        if verbose: print ("initial estimate of the gain is", gain)
+        
+        for _ in range(5):    
+            fast_vars[fast_vars>10*gain*slow_est] = np.nan
+            if np.isnan(fast_vars).any():
+                y = np.array([np.nanmedian(fast_vars[d==i]) for i in np.unique(d)])
+                y[y<=0] = y[y>0].min()
+                gain = np.nanmean(y/x)
+                if verbose: print ("revised estimate of the gain", gain)
+                if plot:
+                    c = ax.plot(x,y,"o",mfc="none")[0].get_color()
+                    ax.plot(x,x*gain,c=c)
+        if plot:
+            ax.set_title("gain inference")
+            ax.set_xlabel("window means")
+            ax.set_ylabel("window variances")
+            
         self.gain = gain
     
-    def slow_filter_traces(self,ironScale, n_processes=10, percentile = [10.], calcStd=False,avg=True):
+    def slow_filter_traces(self,ironScale, n_processes=10, percentile = [10.], calcStd=False,
+                           avg=True, verbose=False, write=True):
         from .numeric import lowPass
         from .utils import multi_map
         global iterf
         try:
-            freq = self.movie.fr
+            freq = self.Freq
         except:
             freq = 1./np.diff(self.time).mean()
         wIron = int(ironScale*freq)
         if wIron%2==0:
             wIron += 1
-        print(f"The movie frequency is {freq:.2f}, so the filter size is {wIron}. This may take some time.")
+        if verbose:
+            print(f"The movie frequency is {freq:.2f}, so the filter size is {wIron}. This may take some time.")
         if avg:
             def iterf(x_): 
-                out = lowPass(x_,wIron,wIron,percentile)
+                out = lowPass(x_, wIron, wIron, percentile)
                 return out
         else:
             def iterf(x_): 
-                out = lowPass(x_,wIron,perc=percentile)
+                out = lowPass(x_, wIron, perc=percentile)
                 return out
+        slow = np.array(multi_map(iterf,self.df["trace"].values,processes=n_processes))
+        fast = np.array([self.df["trace"].iloc[i] - slow[i] for i in range(len(self.df))])
+        absFast = np.array([ fast[i]*self.df["size"].iloc[i] for i in range(len(self.df)) ])
+        absSlow = np.array([ slow[i]*self.df["size"].iloc[i] for i in range(len(self.df)) ])
+        if not hasattr(self,"gain") or self.gain<=0:
+            raise ValueError("Regions need gain to work. Please infer_gain before running this function.")
+        zScore = absFast/(self.gain*absSlow)**.5
+        if write:
+            self.df["slower_%g_"%ironScale] = list(fast)
+            self.df["faster_%g_"%ironScale] = list(slow)
+            self.df["zScore_%g_"%ironScale] = list(zScore)
             
-        self.df["slower_%g_"%ironScale] = multi_map(iterf,self.df["trace"].values,processes=n_processes)
-        self.df["faster_%g_"%ironScale] = [self.df.loc[i,"trace"] - \
-                                          self.df.loc[i,"slower_%g_"%ironScale] for i in self.df.index]
+        else:
+            return fast, slow, zScore
+            
             
         def iterf(x_):
             mad2std = 1.4826
@@ -494,7 +701,7 @@ class Regions:
                 for j in range(C.shape[0]):
                     y = absFast_tmp[j]
                     nans, x= nan_helper(y)
-                    if nans.any(): 
+                    if nans.any() and nans.mean()<.5: 
                         y[nans]= np.interp( x(nans), x(~nans), y[~nans] )
 #                         y[nans]= np.interp( x(nans), x(~nans), absSlow[j][~nans] )
                 dFast = self.sosFilter.run(absFast_tmp)
@@ -709,11 +916,11 @@ class Regions:
         if imagemode is None:
             imagemode = self.mode
         return examine(self, test=test, max_rois=max_rois, imagemode=imagemode, debug=debug, startShow=startShow)
-    def examine3(self, max_rois=10, imagemode=None, debug=False, startShow=''):
+    def examine3(self, max_rois=10, imagemode=None, debug=False, startShow='',mode="jupyter",name=None):
         from .examine3 import examine
         if imagemode is None:
             imagemode = self.mode
-        return examine(self, max_rois=max_rois, imagemode=imagemode, debug=debug, startShow=startShow)
+        return examine(self, max_rois=max_rois, imagemode=imagemode, debug=debug, startShow=startShow,mode=mode,name=name)
     
     
 
@@ -754,7 +961,11 @@ def getGraph_of_ROIs_to_Merge(df,rreg, plot=False, ax=None,lw=.5,arrow_width=.5)
             
     if plot:
         plt.gca().set_aspect("equal")
-        
+        attractors = np.squeeze([
+            list(map(list,nx.attracting_components(Gph.subgraph(el)))) \
+                for el in nx.connected_components(Gph.to_undirected())
+        ])
+        rreg.plotPeaks(ax=ax,ix=attractors,color="c",ms=6)
     return Gph
 
 def plotRoi_to_be_connected(Gph, rreg, nplot=35):
@@ -855,9 +1066,9 @@ def getPeak2BoundaryDF(C):
             dists[j] = x.min()
         if len(dists):
             jmin = pd.Series(dists).idxmin()
-            peak2bnd += [(i,jmin,dists[jmin])]
+            peak2bnd += [(i,jmin,dists[jmin],C.loc[i,"size"],C.loc[jmin,"size"])]
 
-    peak2bnd = pd.DataFrame(peak2bnd, columns=["i","j","dist"])
+    peak2bnd = pd.DataFrame(peak2bnd, columns=["i","j","dist","size_from","size_to"])
     return peak2bnd
 
 def getPeak2EdgesDF(C, regions):
@@ -902,52 +1113,6 @@ def getPeak2EdgesDF(C, regions):
     peak2bnd = pd.DataFrame(peak2bnd, columns=["i","j","dist","barrier"])
     return peak2bnd
 
-def climb(x,blurredWeights,diag=True,min_gradient=0,excludePixels=[]):
-    dims = blurredWeights.shape
-    # x = (60,60)
-    x = x+(blurredWeights[x[0],x[1]],)
-    xs = [x]
-    for i in range(100):
-        vs = []
-        for di,dj in product([-1,0,1],[-1,0,1]):
-            if not diag:
-                if di*dj!=0: continue
-            i,j = x[0]+di,x[1]+dj
-            if i<0 or i>=dims[0] or j<0 or j>=dims[1]:
-                continue
-            if (i,j) in excludePixels:
-                continue
-            vs += [(i,j,blurredWeights[i,j])]
-        x1 = vs[np.argmax(vs,axis=0)[-1]]
-        dx = x1[-1]-x[-1]
-        if dx<=0:
-            break
-        elif dx<=min_gradient:
-            return (None,)
-        else:
-            x = x1
-            xs += [x]
-    return x[:2]
-
-def crawlDict(image, crawl_th=-np.inf, diag=False, min_gradient=0, processes=10, excludePixels=None):
-    global iterf
-    if excludePixels is None:
-        if np.isfinite(crawl_th):
-            excludePixels = list(map(tuple,np.array(np.where(image<crawl_th)).T))
-        else:
-            excludePixels = []
-    ijs_ = [(i,j) for i,j in product(range(image.shape[0]),range(image.shape[1])) if (i,j) not in excludePixels]
-    def iterf(ij):
-        return climb((ij[0],ij[1]), image, diag=diag, min_gradient=min_gradient, excludePixels=excludePixels)
-    R_ = multi_map(iterf,ijs_, processes=processes)
-    A_ = [ij+r for ij,r in zip(ijs_,R_)]
-    A_ = [el for el in A_ if el[-1] is not None]
-    B_ = OrderedDict()
-    for (i0,j0,i1,j1) in A_:
-        if (i1,j1) not in B_:
-            B_[(i1,j1)] = []
-        B_[(i1,j1)] += [(i0,j0)]
-    return B_
 
 def edges2nodes(x,start=0,direction=1):
     if np.array(x[0]).shape != (2,2):

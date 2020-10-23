@@ -4,30 +4,98 @@ from scipy.stats import distributions as dst
 from scipy.optimize import curve_fit#,minimize,basinhopping
 from numba import jit,prange
 
-        
+
+
+def fast_filter(absdata,
+                ironTimeScale,
+                gain=1,
+                freq=1,
+                z_sp=3,
+                order=5,
+                verbose=False,
+                npass=1,
+                nreflect="auto",
+                dilation=True,
+#                 debugAx=None
+              ):
+    if dilation:
+        from cv2 import dilate
+    cutFreq = .5/ironTimeScale
+    sosFilter_ = sosFilter(cutFreq, freq, order=order)
+    if isinstance(nreflect,str):
+        if nreflect=="auto":
+            nreflect = int(ironTimeScale*freq)
+        if nreflect=="half":
+            nreflect = absdata.shape[1]//2
+    # assuming nreflect is integer
+    if verbose: print (f"introducing reflecting boundary {nreflect} points wide.")
+    x = np.hstack([absdata[:,:nreflect][:,::-1], absdata, absdata[:,absdata.shape[1]-nreflect:][:,::-1]])
+    if verbose: print (f"this changed the shape of the input array to", x.shape)
+    absSlow = sosFilter_.run(x)[:,nreflect:x.shape[1]-nreflect]
+    absFast = absdata-absSlow
+#     if debugAx is not None:
+#         plot=True
+#         axs,n = debugAx
+#         axs[0].plot(absdata[0,:n])
+#         axs[0].plot(absSlow[0,:n],"k--")
+#         axs[1].plot(absFast[0,:n],lw=.5)
+    var = (absSlow*gain)+1
+    if z_sp!=0:
+        for ipass in range(npass):
+            th = z_sp*(var**.5)
+#             if plot: axs[0].plot(th[0,:n]+absSlow[0,:n],"k--")
+            ff = (absFast > th).astype("uint8")
+#             if plot: axs[1].plot(th[0,:n],"k--")
+            ii = np.arange(ff.shape[1])
+            if ff.any():
+                if dilation:
+                    dilateKernelSize = int(ironTimeScale*freq*.2)
+                    if dilateKernelSize%2==0:
+                        dilateKernelSize+=1
+                    if dilateKernelSize>=3:
+                        if verbose:
+                            print ("dilating by", dilateKernelSize)
+                        ff = dilate(ff, np.ones((1,dilateKernelSize), dtype = np.uint8)).astype("bool")
+#                         plt.plot(ff[0]*10)
+#                         plt.imshow(ff, aspect="auto")
+#                         plt.show()
+#                 dFast = np.zeros_like(absFast)
+                for j in range(absdata.shape[0]):
+                    if not ff[j].any(): continue
+#                     plt.plot(ff[j]*100)
+                    y = absdata[j].copy()
+                    y[ff[j]] = np.interp( ii[ff[j]], ii[~ff[j]], absdata[j][~ff[j]])
+#                     absSlow[j] = np.maximum(0, sosFilter_.run(y))
+                    absSlow[j] = sosFilter_.run(y)
+#                 absSlow = absSlow + dFast
+#                 absSlow[absSlow==0] = absSlow[absSlow>0].min()
+                assert (absSlow>=0).all()
+                absFast = absdata - absSlow
+            var = absSlow*gain+1
+    zScore = absFast/(var)**.5
+    return absSlow, absFast, zScore
+
 def robust_max(a,Nlast=10,absolute=True):
     if absolute:
         a = np.abs(a)
     return np.percentile(a,100*(1-Nlast/a.size))
     
     
-def rebin(a,n,axis=0,norm=True, dtype="float32"):
+def rebin(a,n,axis=0, dtype="float32", func=np.mean):
     if type(axis)==int and type(n)==int:
         ashape = a.shape
         newShape = ashape[:axis]+(ashape[axis]//n,)+ashape[axis+1:]
         out = np.zeros(newShape,dtype=dtype)
         for i in range(newShape[axis]):
             idx = tuple([slice(None)] * axis + [slice(i*n,(i+1)*n)] + [slice(None)]*(len(ashape)-axis-1))
-            x = a[idx].sum(axis=axis)
-            if norm:
-                x = x/n
-            out[tuple([slice(None)] * axis + [i] + [slice(None)]*(len(ashape)-axis-1))] = x
+            x = func(a[idx],axis=axis)
+            out[tuple([slice(None)] * axis + [i] + [slice(None)]*(len(ashape)-axis-1))] = x.astype(dtype)
         return out
     else:
         assert len(n)==len(axis)
-        out = rebin(a,n[0],axis[0],norm=norm)
+        out = rebin(a,n[0],axis[0],func=func)
         for i in range(1, len(n)):
-            out = rebin(out,n[i],axis[i],norm=norm,dtype=dtype)
+            out = rebin(out,n[i],axis[i],func=func,dtype=dtype)
         return out
 
 
@@ -141,15 +209,26 @@ def guessDecayPars(y):
     p0 = (np.exp(t0)+b0,b0,r0)
     return p0
 
-def mydebleach(x_):
+def mydebleach(x_, points=None, func=None):
+    N = len(x_) 
+    t_ = np.arange(len(x_))
+    if points!=None:
+        nrebin = int(len(x_)//points)
+        if nrebin>1:
+            if func is None:
+                func = np.mean
+            x_ = rebin(x_, nrebin, func=func)
+            t_ = rebin(t_, nrebin, func=np.mean)
+        else:
+            nrebin = 1
     try:
         out = decayfit(x_)
     except:
         pass
     if np.isnan(out).any():
         out = x_ - x_.mean()
-    p = np.polyfit(range(len(x_)),x_,1)
-    out = p[1]+p[0]*np.arange(len(x_))
+    p = np.polyfit(t_,x_,1)
+    out = p[1]+p[0]*np.arange(N)
     
     return out
 
@@ -499,7 +578,7 @@ def clusterCutAndPlot(Xdata,
     axs[0].set_xticklabels(["%3.1f"%n for n in 1-xt])
 
     ax = axs[1]
-    ax.imshow((Xdata)[dnd["leaves"]], origin="bottom", **imshow_kw)
+    ax.imshow((Xdata)[dnd["leaves"]], origin="lower", **imshow_kw, interpolation="nearest")
     ax.set_aspect("auto")
     axs[0].axvline(threshold,color="red",ls="--")
     if showClusterBoundaries:
@@ -508,25 +587,27 @@ def clusterCutAndPlot(Xdata,
     axs[1].set_yticks(np.arange(len(labels)))
     axs[1].set_yticklabels(labels[dnd["leaves"]]);
 
-    try:
-        for c in color_classes.keys():
-            for jEvent in color_classes[c]:
-                x,y = eventDF["indices"][jEvent]
-                axs[2].plot(y,x,"s",c=c,ms=.7*500/subdims[0],alpha = .5)
-                axs[2].text(y.mean(),x.mean(),jEvent,color=c,
-                        va="center",ha="center",
-                        # bbox=dict(facecolor='w', alpha=0.7,edgecolor="none")
-                       )
+#     try:
+#         for c in color_classes.keys():
+#             for jEvent in color_classes[c]:
+#                 x,y = eventDF["indices"][jEvent]
+#                 axs[2].plot(y,x,"s",c=c,ms=.7*500/subdims[0],alpha = .5)
+#                 axs[2].text(y.mean(),x.mean(),jEvent,color=c,
+#                         va="center",ha="center",
+#                         # bbox=dict(facecolor='w', alpha=0.7,edgecolor="none")
+#                        )
 
-        axs[2].set_aspect("equal")
-        axs[2].set_xlim(-.5,subdims[1]-.5)
-        axs[2].set_ylim(subdims[0]-.5,-.5)
-    except:
-        axs[2].remove()
+#         axs[2].set_aspect("equal")
+#         axs[2].set_xlim(-.5,subdims[1]-.5)
+#         axs[2].set_ylim(subdims[0]-.5,-.5)
+#     except:
+#         axs[2].remove()
     
     return {"dendrogram":dnd,
             "clusters":color_classes,
-            "labels":labels}
+            "labels":labels,
+            "axes": axs
+           }
 
 
 @jit

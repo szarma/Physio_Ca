@@ -18,9 +18,11 @@ import pandas as pd
 from dash import no_update
 
 from islets.Recording import Recording
-from islets.Regions1 import Regions
+from islets.Regions1 import Regions,load_regions
+from islets.LineScan import LineScan
 from islets.utils import getFigure, showRoisOnly
 from islets.numeric import rebin
+
 
 from collections import OrderedDict
 outputStyle = {
@@ -34,11 +36,11 @@ infoStyle = {
     }
 bodyStyle = {
     }
-
+global regions
 regions = None
 
-def PicklePicker(pathToRec="",appWidth=800,debug=False):
-    allRecs = sorted([os.path.join(cur,f) for cur,ds,fs in os.walk("/data") for f in fs if f.endswith(".lif") or f.endswith(".nd2")])
+def PicklePicker(pathToRec=None,series=None,appWidth=1500,debug=False,appHeight=1200,showExamine=True):
+    allRecs = sorted([os.path.join(cur,f) for cur,ds,fs in os.walk("/data") for f in fs if f.endswith(".lif") or f.endswith(".nd2") or f.endswith(".tif")])
     allRecs = [f for f in allRecs if os.path.isfile(f.replace(os.path.split(f)[1],"."+os.path.split(f)[1]+".meta"))]
 #     if pathToRec is not None and pathToRec in allRec and ser is not None:
 #         initOpts = [
@@ -46,9 +48,11 @@ def PicklePicker(pathToRec="",appWidth=800,debug=False):
 #             for el in os.listdir(pathToRec+"_analysis") if ser in el
 #                    ]
 #     else:
-    initOpts = [{"value":None,"label":None}]
+#     initOpts = [{"value":None,"label":None}]
+    initOpts = [{"value":"","label":""}]
     app = JupyterDash(__name__,
                   width=appWidth,
+                  height=appHeight,
 #                   height=1000,
                  )
     APP_LAYOUT = [
@@ -70,15 +74,15 @@ def PicklePicker(pathToRec="",appWidth=800,debug=False):
             options = initOpts,
             id="series-dropdown",
             value=initOpts[0]["value"],
-#             options=[{"value":"","label":""}],
             style={**bodyStyle,"width":"70%"}),
+        html.Div(id="series-feedback", children="-----",style=outputStyle),
         html.Div([
             html.Div([
-                'Select filer size',
+                html.Div(id="frase-container"),
                 dcc.RadioItems(
                     options = [{"value":None,"label":None}],
                     id="pickle-radio",
-                    labelStyle={"display":"block"}
+                    labelStyle={"display":"inline-block"}
                 )
                 ],style={**bodyStyle,
                          "display":"inline-block",
@@ -95,6 +99,7 @@ def PicklePicker(pathToRec="",appWidth=800,debug=False):
                 }),
         ],style={"padding-top":"20px"}),
         html.Div(id="pickle-feedback",style={**outputStyle}, children=""),
+        html.Iframe(id="examiner", width="99%", height="700px", style={"display": "inline-block" if showExamine else "none"})
     ]
     app.layout = html.Div(children=APP_LAYOUT,
                       style={"family":"Arial"}
@@ -103,28 +108,57 @@ def PicklePicker(pathToRec="",appWidth=800,debug=False):
     @app.callback(
         [Output("series-dropdown","value"),
          Output("series-dropdown","options"),
-#          Output("pickle-feedback","children"),
+         Output("series-feedback","children"),
         ],
         [Input("filepath-dropdown","value"),]
     )
     def serve_series(pathToRec_):
+        feedback = []
+        opts = initOpts
+        val = ""
         try:
-            if pathToRec is None:
-                return no_update
-            if len(pathToRec)==0:
-                return no_update
-            analysisFolder = pathToRec+"_analysis"
-            opts = [{"value":os.path.join(analysisFolder,el), "label":el} for el in sorted(os.listdir(analysisFolder))[::-1] if os.path.isdir(os.path.join(analysisFolder,el)) and el[0]!="."]
-            pathToSer = (opts[0]["value"] if len(opts) else None)
-            return pathToSer, opts#, ""
+            if pathToRec_ is not None and len(pathToRec_)!=0:
+                analysisFolder = pathToRec_+"_analysis"
+                if  os.path.isdir(analysisFolder):
+                    subdirs = sorted(os.listdir(analysisFolder))[::-1]
+                    series_ = [el for el in subdirs if os.path.isdir(os.path.join(analysisFolder,el)) and el[0]!="."]
+                    opts = [{"value":os.path.join(analysisFolder,el), "label":el} for el in series_]
+                    try:
+                        rec = Recording(pathToRec_)
+#                         feedback += [str(rec.metadata), str("rec" in locals())]
+                    except:
+                        feedback += ["Could not load recording metadata."]
+                    if "rec" in locals():
+                        try:
+                            rec.metadata = rec.metadata.set_index("Name")
+                            for opt in opts:
+                                lbl = opt["label"]
+                                lbl = lbl.split("-")[0]
+                                if lbl not in rec.metadata.index: continue
+                                if rec.metadata.loc[lbl,"line scan"] != "none":
+                                    opt["label"] += "*"
+                        except:
+                            feedback += [ str(rec.metadata.index), str(exc_info())]
+#                     val = opts[0]["value"]
+                    val = [opt for opt in opts if series in opt["label"]]
+                    if len(val)>=1:
+                        val = val[0]["value"]
+                    else:
+                        val = opts[0]["value"]
+                    # feedback += ["options: "+str(opts)]
+                else:
+                    feedback += [f"directory {analysisFolder} apparently does not exist."]
+            
         except:
-            return no_update#, no_update, str(exc_info())
+            feedback += [str(exc_info())]
+        return val,opts,feedback
         
         
     @app.callback(
         [Output("pickle-radio","value"),
          Output("pickle-radio","options"),
-         Output("pickle-previews","children")
+         Output("pickle-previews","children"),
+         Output("frase-container","children")
         ],
         [Input("series-dropdown","value")]
     )
@@ -137,6 +171,7 @@ def PicklePicker(pathToRec="",appWidth=800,debug=False):
             return no_update
         preview = OrderedDict()
         options = []
+        frase = ""
         for f in sorted(os.listdir(pathToSer))[::-1]:
             if f.endswith("pkl"):
                 k = f.split("_")[0].replace(".","+")
@@ -146,7 +181,19 @@ def PicklePicker(pathToRec="",appWidth=800,debug=False):
                 if os.path.isfile(previewFile):
                     encoded_image = base64.b64encode(open(previewFile, 'rb').read())
                     preview[k] = html.Img(src='data:image/png;base64,{}'.format(encoded_image.decode()), width="%ipx"%(width*.9),height="%ipx"%(height*.8+20))
-
+        if len(options)>0:
+            frase = 'Select filer size'
+        else:
+            for f in sorted(os.listdir(pathToSer))[::-1]:
+                if not f.endswith("png"): continue
+                k = f.split("_")[-1].split(".")[0]
+                options += [{ "label": k, "value":  os.path.join(pathToSer, k)}]
+                previewFile = os.path.join(pathToSer, f)
+                encoded_image = base64.b64encode(open(previewFile, 'rb').read())
+                preview[k] = html.Img(src='data:image/png;base64,{}'.format(encoded_image.decode()), width="%ipx"%(width*.7),height="%ipx"%(height*.8+20))
+            if len(options):
+                frase = "Select series"
+            
         if len(options):
             val = options[0]["value"]
         else:
@@ -157,15 +204,20 @@ def PicklePicker(pathToRec="",appWidth=800,debug=False):
             display="inline-block",
             border='thin lightgrey solid' 
         )) for k in preview]
-        return val, options, html.Div(previews,style={"width":"%ipx"%(width*2.1)})
+        return val, options, html.Div(previews,style={"width":"%ipx"%(width*4.1)}), frase
 
 
 
     @app.callback(
-        Output("pickle-feedback","children"),
+        [Output("pickle-feedback","children"),
+         Output("examiner","src")
+        ],
         [Input("pickle-radio","value")]
     )
     def import_pickle(path):
+        global regions, linescan
+        link2app = ""
+        feedback = []
         try:
             if debug:
                 globpath = path
@@ -173,37 +225,47 @@ def PicklePicker(pathToRec="",appWidth=800,debug=False):
                 return no_update
             if len(path)==0:
                 return no_update
-            global regions
-#             from islets.numeric import mydebleach
-            from islets.utils import multi_map
-            with open(path,"rb") as f:
-                regions = pickle.load(f)
-            regions.update()
-            regions.detrend_traces()
-            regions.infer_gain()
-            pickleDir = os.path.split(path)[0]
-            try:
-                protocolFile = os.path.join(pickleDir, [f for f in os.listdir(pickleDir) if "protocol" in f][0])
-                regions.import_protocol(protocolFile)
-            except:
-                pass
-            feedback = [
-                "Regions imported successfully.",
-                "Original movie:",
-                html.Div(children=[
-                    "dimension (T,X,Y): (%i, %i, %i)"%((len(regions.time), )+regions.image.shape),
-                    html.Br(),
-                    "duration (h:m:s): "+str(pd.Timedelta(regions.time.max(), unit="s")).split()[-1].split(".")[0],
-                    html.Br(),
-                    "frequency (Hz): %.3g"%regions.Freq,
-                ],style={'padding-left': '30px'}),
-                "Number of ROIs: %i"%len(regions.df),
-            ]
-        #     feedback = sum([[el, html.Br()] for el in feedback],[])
-        #     roisImage = showRoisOnly(regions,indices=regions.df.index, im=regions.statImages[regions.mode])
-        #     return feedback,roisImage,1
+            if path.endswith("pkl"): ####### pickles ################
+                regions = load_regions(path)
+                feedback += [
+                    "Regions imported successfully.",
+                    "Original movie:",
+                    html.Div(children=[
+                        "dimension (T,X,Y): (%i, %i, %i)"%((len(regions.time), )+regions.image.shape),
+                        html.Br(),
+                        "duration (h:m:s): "+str(pd.Timedelta(regions.time.max(), unit="s")).split()[-1].split(".")[0],
+                        html.Br(),
+                        "frequency (Hz): %.3g"%regions.Freq,
+                    ],style={'padding-left': '30px'}),
+                    "Number of ROIs: %i"%len(regions.df),
+                ]
+                if showExamine:
+                    japp = regions.examine3()
+                    japp._repr_html_() 
+                    link2app = "https://ctn.physiologie.meduniwien.ac.at"+japp.get_app_root_url()
+            else: ####### line scan ################
+                pathToRec, ser = os.path.split(path)
+                pathToRec = os.path.split(pathToRec)[0].split("_analysis")[0]
+                feedback += [f"Loading the line scan {ser} from {pathToRec}"]
+                rec = Recording(pathToRec)
+                md = rec.metadata.set_index("Name")
+#                 feedback += [str(md.index)]
+                line_scan = md.loc[ser,"line scan"]
+#                 feedback += [line_scan]
+                rec.import_series(ser, isLineScan=(line_scan=="single"))
+#                 feedback += [html.Br(),"data imported"]
+                data = rec.Series[ser]["data"].sum(1)
+#                 feedback += [html.Br(),str(data.shape)]
+                linescan = LineScan(
+                    data = data.T,
+                    metadata = rec.Series[ser]["metadata"],
+                    name = "%s: %s"%(rec.Experiment[:-4], ser),
+                )
+                japp = linescan.examine()
+                japp._repr_html_() 
+                link2app = "https://ctn.physiologie.meduniwien.ac.at"+japp.get_app_root_url()
         except:
-            feedback = str(exc_info())
-        return feedback
+            feedback += [str(exc_info())]
+        return feedback, link2app 
     
     return app

@@ -277,8 +277,16 @@ def showRoisOnly(regions, indices=None, im=None, showall=True):
     if indices is None:
         indices = regions.df.sort_values("size",ascending=False).index[:10]
     f = go.Figure()
+    try:
+        colors = regions.df.loc[indices,"color"]
+    except:
+        colors = [MYCOLORS[i%len(MYCOLORS)] for i in indices]
+    
     for i in indices:
-        cl = MYCOLORS[i%len(MYCOLORS)]
+        try:
+            cl = regions.df.loc[i, "color"]
+        except:
+            cl = MYCOLORS[i%len(MYCOLORS)]
         bds = regions.df.loc[i,"boundary"]
         bds += [bds[0]]
         y,x = np.array(bds).T
@@ -306,7 +314,7 @@ def showRoisOnly(regions, indices=None, im=None, showall=True):
                     showlegend = False,
                     # opacity=0.5,
                     # name=list(map(str,indices)),
-                    marker=dict(color=[MYCOLORS[i%len(MYCOLORS)] for i in indices],size=5),
+                    marker=dict(color=colors,size=5),
                     hovertext=list(map(str,indices)),
                     hoverinfo="text"
                  )
@@ -324,7 +332,7 @@ def showRoisOnly(regions, indices=None, im=None, showall=True):
                                        regions,
                                        showall=showall,
                                        separate=bool(len(MYCOLORS)-1),
-                                       origin="top")
+                                       origin="lower")
 
         f.add_layout_image(
             dict(
@@ -373,6 +381,10 @@ def showRoisOnly(regions, indices=None, im=None, showall=True):
         'clickmode': 'event+select',
         "dragmode":'lasso'
     })
+    f.update_yaxes(
+        scaleanchor = "x",
+        scaleratio = 1,
+      )
     try:
         lengths = [10,20,50]
         il = np.searchsorted(lengths,regions.metadata.pxSize*regions.image.shape[1]/10)
@@ -411,7 +423,8 @@ def createStaticImage(im,regions,showall=False,color="grey",separate=False, retu
     import matplotlib.pyplot as plt
     plt.switch_backend('agg')
     if cmap is None:
-        cmap = plt.cm.Greys
+        from copy import copy
+        cmap = copy(plt.cm.Greys)
         cmap.set_bad("lime")
     bkg_img_file = "/tmp/%i.png"%np.random.randint(int(1e10))
     figsize=np.array(im.shape)[::-1]/30

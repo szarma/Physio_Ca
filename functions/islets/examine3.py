@@ -9,7 +9,9 @@ import json
 # from dash import callback_context as ctx
 
 
-def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all"):
+def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode="jupyter",name=None):
+    if name is None:
+        name = __name__
     if type(startShow)!=str:
         startShow = str(list(startShow))
     if imagemode is None:
@@ -24,7 +26,12 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all"):
         "font-size":"80%",
         "color":"grey",
         }
-    from jupyter_plotly_dash import JupyterDash
+    if mode=="jupyter":
+        from jupyter_plotly_dash import JupyterDash as Dash
+    if mode=="dash":
+        from dash import Dash
+    if mode=="jupyter-dash":
+        from jupyter_dash import JupyterDash as Dash
     from dash.dependencies import Input, Output, State
     import dash_core_components as dcc
     import dash_html_components as html
@@ -153,12 +160,18 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all"):
                      
                     ]
     ]
-    app = JupyterDash(__name__,
-                      width=1200,
-                      height=700,
-                     )
+    if mode=="jupyter":
+        app = Dash(name,
+                  width=1200,
+                  height=700,
+                 )
+    else:
+        app = Dash(name)
 
 
+    app.layout = html.Div(children=APP_LAYOUT,
+                          style={"family":"Arial"}
+                         )
     @app.callback(
         Output("selected-rois", "value"),
         [Input("roi-selector", "selectedData"),],
@@ -328,12 +341,15 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all"):
                     t = rebin(t,nrb)
                 for iy,y,ix in zip(np.arange(len(ys)),ys, ixlbl):
                     if toSum:
-                        cl="navy"
+                        cl="black"
                     else:
-                        cl = MYCOLORS[ix%len(MYCOLORS)]
+                        try:
+                            cl = self.df.loc[ix,"color"]
+                        except:
+                            cl = MYCOLORS[ix%len(MYCOLORS)]
                     fg.add_trace(go.Scatter(x=t,y=y+iy*offset,line_width=.7,line_color=cl,hovertext=f"{col} [ix={ix}]",hoverinfo="text", ),row=1,col=1)
             it = 0
-            treatments = [tr for tr in treatments if tr[:3]!="glu"] + [tr for tr in treatments if tr[:3]=="glu"]
+            treatments = [tr for tr in treatments if tr[:3].lower()!="glu"] + [tr for tr in treatments if tr.lower()[:3]=="glu"]
             for treat in treatments:
                 fg.add_trace(go.Scatter(
                     x = [self.protocol.t_begin.min()],
@@ -396,7 +412,7 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all"):
                     y = [0],
                     mode="text",
                     text=[out],
-                    textposition="top right",
+                    textposition="upper right",
                     showlegend=False,))
             return fg
 
@@ -438,8 +454,5 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all"):
         return out, options
 
 
-    app.layout = html.Div(children=APP_LAYOUT,
-                          style={"family":"Arial"}
-                         )
     return app
 

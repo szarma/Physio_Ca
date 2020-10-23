@@ -1,3 +1,28 @@
+from contextlib import contextmanager
+
+
+@contextmanager
+def suppress_stdout():
+    import os, sys
+    with open(os.devnull, "w") as devnull:
+        old_stdout = sys.stdout
+        sys.stdout = devnull
+        try:  
+            yield
+        finally:
+            sys.stdout = old_stdout
+            
+
+def getCircularKernel(n, dtype="uint8"):
+    from numpy import zeros
+    a = zeros((n,n), dtype)
+    for i in range(n):
+        for j in range(n):
+            x = i-n//2
+            y = j-n//2
+            if x**2+y**2<=(n//2)**2:
+                a[i,j] = 1
+    return a
 
 # find positions of elements in the list
 def pozicija(testlist,cond):
@@ -21,7 +46,10 @@ def mode(l):
 
 def td2str(x):
     try:
-        ts = x.total_seconds()
+        if isinstance(x,float):
+            ts = x
+        else:
+            ts = x.total_seconds()
         hours, remainder = divmod(ts, 3600)
         minutes, seconds = divmod(remainder, 60)
         out = ('{}:{:02d}:{:02d}').format(int(hours), int(minutes), int(seconds)) 
@@ -65,6 +93,16 @@ def moving_sum(a, n=3) :
     ret = cumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
     return ret[n - 1:]
+
+def autocorr2d(sett, dxrange, dyrange):
+    from numpy import zeros, corrcoef, array, mean, std
+    Nx, Ny = sett.shape
+    ret = zeros((len(dxrange), len(dyrange)))
+    for kx,dx in enumerate(dxrange):
+        for ky,dy in enumerate(dyrange):
+            ret[kx,ky] = corrcoef(sett[  :Nx-dx,   :Ny-dy].flatten(),
+                                  sett[dx:     , dy:     ].flatten())[0,1]
+    return ret
 
 def autocorr(sett, dtrange, nsplits = 1):
     from numpy import zeros, corrcoef, array, mean, std
@@ -164,6 +202,7 @@ def stochasticMaximize(fun,x0,steps = 10000, temp = 1., step = .1):
     from os.path import expanduser
     nPars = len(x0)
     exponent = fun
+    import numpy as np
     mcmc=MCMC(x0, Nsave=10*nPars, filename=expanduser('~/tmp/mcmc'), step = step, temp = temp, exclude=np.array([],dtype=int))
     mcmc.cycle(steps,adjust=True)
     outPars = np.loadtxt(mcmc.filename+".out", skiprows=steps//10//nPars*9//10)[:,1:-1].mean(axis=0)
