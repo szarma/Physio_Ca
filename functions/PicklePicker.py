@@ -264,6 +264,16 @@ def PicklePicker(pathToRec=None,series=None,appWidth=1500,debug=False,appHeight=
                 japp = linescan.examine()
                 japp._repr_html_() 
                 link2app = "https://ctn.physiologie.meduniwien.ac.at"+japp.get_app_root_url()
+#         except ImportError as err:
+#             feedback += [str(exc_info())+f" in {err.path}"]
+#             feedback += [f" in {dir(err)}"]
+#             tb = err.__traceback__
+#             feedback += [f" in {dir(tb)}"]
+#             tb = tb.__dict__
+#             for kk in ['tb_frame', 'tb_lasti', 'tb_lineno', 'tb_next']:
+#                 feedback += [f"{kk}: {getattr(tb,kk)}"]
+#             feedback += [f"{err.msg}"]
+    
         except:
             feedback += [str(exc_info())]
         return feedback, link2app 
