@@ -91,8 +91,6 @@ pathToCorrected = args.corrected
 recFile = args.recording
 ser = args.series
 
-rec = Recording(recFile)
-isNikon = recFile.endswith(".nd2")
 
 
 if args.debug:
@@ -110,6 +108,10 @@ if len(pathToCorrected)==0:
 #         args=["-Dlog4j.configuration=file:{}".format(log_config),],
     )
 #     bf.init_logger()
+
+
+rec = Recording(recFile)
+isNikon = recFile.endswith(".nd2")
 
 restrict = tuple([int(t) for t in args.restrict.split("_")]) if len(args.restrict) else None
 if args.verbose:
