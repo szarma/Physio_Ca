@@ -101,20 +101,27 @@ def tally(mylist):
     import numpy as np
     return sorted(Counter(mylist).most_common(),key=lambda duple: duple[0])
 
-def multi_map(some_function, iterable, processes=1):
-    assert type(processes) == int
+def multi_map(some_function, iterable, processes=1, library="threading"):
+    assert processes==int(processes)
+    processes = int(processes)
     if processes==1:
         out = map(some_function, iterable)
     elif processes>1:
-        from multiprocessing import Pool
-#         with Pool(processes) as pool:
-#             out = pool.map(some_function, iterable)
-        try:
-            pool = Pool(processes)
-            out = pool.map(some_function, iterable)
-        finally:
-            pool.close()
-            pool.join()
+        if library=="threading":
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=processes) as executor:
+                out = executor.map(some_function, iterable)
+        elif library=="multiprocessing":
+            from multiprocessing import Pool
+            try:
+                pool = Pool(processes)
+                out = pool.map(some_function, iterable)
+            finally:
+                pool.close()
+                pool.join()
+        else:
+            print(f"Libraries can only be 'multiprocessing' and 'threading'. '{library}' is not known/implemented.")
+            out=None
     else:
         print ("invalid number of processes", processes)
         out = None

@@ -152,20 +152,20 @@ def tally(mylist):
     return sorted(Counter(mylist).most_common(),key=lambda duple: duple[0])
 
 
-def multi_map(some_function, iterable, processes=1):
-    assert type(processes) == int
-    if processes==1:
-        out = map(some_function, iterable)
-    elif processes>1:
-        from multiprocessing import Pool
-        pool = Pool(processes)
-        out  = pool.map(some_function, iterable)
-        pool.close()
-        pool.join()
-    else:
-        print ("invalid number of processes", processes)
-        quit()
-    return out
+# def multi_map(some_function, iterable, processes=1):
+#     assert type(processes) == int
+#     if processes==1:
+#         out = map(some_function, iterable)
+#     elif processes>1:
+#         from multiprocessing import Pool
+#         pool = Pool(processes)
+#         out  = pool.map(some_function, iterable)
+#         pool.close()
+#         pool.join()
+#     else:
+#         print ("invalid number of processes", processes)
+#         quit()
+#     return out
 
 
 from contextlib import contextmanager
