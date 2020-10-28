@@ -130,7 +130,7 @@ class Recording:
                 print (f"Finished.")
                 stdout.flush()
             except:
-                warn("Could not parse metadata.", exc_info())
+                warn(f"Could not parse metadata. {exc_info()}")
         if hasattr(self, "metadata"):
             self.nSeries = len(self.metadata)
             if "Name" in self.metadata:
@@ -394,10 +394,10 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
         for series in sers:
             subdirs = get_series_dir(pathToRecording, series)
             if verbose>=2:
-                print (series, subdirs)
+                print ("series=",series,", with subdirs:", subdirs)
             for ser in subdirs:
                 if verbose>=2:
-                    print (ser)
+                    print ("ser=",ser)
                 md = pd.Series()
                 md["path to exp"] = pathToRecording
                 md["experiment"] = os.path.split(pathToRecording)[-1]
@@ -427,7 +427,10 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
                     md["Time Range"] = "all"
                     md["Duration [s]"] = md["SizeT"]/md["Frequency"]
                 fs = get_filterSizes(md.pxSize)
-                movieFilename = os.path.join(saveDir, rec.Experiment+"_"+series+".mp4")
+                if recType=="Nikon":
+                    movieFilename = os.path.join(saveDir, os.path.splitext(rec.Experiment)[0]+".mp4")
+                else:
+                    movieFilename = os.path.join(saveDir, rec.Experiment+"_"+series+".mp4")
                 md["path to movie"] = movieFilename
                 md["movie done"] = os.path.isfile(movieFilename)
                 if md["movie done"]:
