@@ -95,7 +95,7 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode
             dcc.Input(id="filter-input",
                 type="str",
                 debounce=True,
-                size=6,
+                size=10,
                 placeholder="30",
 #                 value="30",
               style={"width":"20px","margin-right":"5px","margin-left":"3px"},
