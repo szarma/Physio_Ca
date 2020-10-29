@@ -9,7 +9,7 @@ import json
 # from dash import callback_context as ctx
 
 
-def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode="jupyter",name=None):
+def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode="jupyter",name=None,lw=None):
     if name is None:
         name = __name__
     if type(startShow)!=str:
@@ -44,7 +44,7 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode
     getGraph_of_ROIs_to_Merge = getattr(module, "getGraph_of_ROIs_to_Merge")
     mergeBasedOnGraph = getattr(module, "mergeBasedOnGraph")
     
-    roisImage = showRoisOnly(self,indices=self.df.index, im=self.statImages[imagemode])
+    roisImage = getFigure()#showRoisOnly(self,indices=self.df.index, im=self.statImages[imagemode], lw=lw)
     roisImage.update_layout({"dragmode":'lasso'},)
     if not hasattr(self,"gain"):
         self.infer_gain()
@@ -234,7 +234,7 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode
                 out = "%i rois removed."%(nremoved)
             if mode in ["discard","plot"]:
                 seeIndices = np.intersect1d(seeIndices, selectedIndices)
-                fig = showRoisOnly(self, indices=seeIndices, im=self.statImages[imagemode], showall=False)
+                fig = showRoisOnly(self, indices=seeIndices, im=self.statImages[imagemode], showall=False, lw=lw)
             ##########
 #             if mode=="plot":
 #                 fig = showRoisOnly(self, indices=self.df.index, im=self.statImages[imagemode], showall=False)
@@ -246,7 +246,7 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode
             if mode=="mark":
                 A = adjacency_matrix(gph, nodelist=range(len(self.df)))
                 out = "If you now merge, this is how rois will be merged"
-                fig = showRoisOnly(self, indices=selectedIndices, im=self.statImages[imagemode], showall=True)
+                fig = showRoisOnly(self, indices=selectedIndices, im=self.statImages[imagemode], showall=True, lw=lw)
                 for j,i in zip(*A.nonzero()):
                     fig.add_annotation(
                       x=self.df.loc[i,"peak"][1],  # arrows' head
@@ -269,7 +269,7 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode
                 dn = mergeBasedOnGraph(self.mergeGraph, self)
                 del self.mergeGraph
                 out = f"{dn} rois merged into existing roi(s)"
-                fig = showRoisOnly(self, indices=self.df.index, im=self.statImages[imagemode], showall=True)
+                fig = showRoisOnly(self, indices=self.df.index, im=self.statImages[imagemode], showall=True, lw=lw)
             
 
         except:
@@ -416,7 +416,6 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode
                     showlegend=False,))
             return fg
 
-#         return out, fg
 
     @app.callback(
         [Output("filter-feedback", "children"),

@@ -1,6 +1,16 @@
 import numpy as np
 import os
 
+def hex_to_rgb(value):
+    """Return (red, green, blue) for the color given as #rrggbb."""
+    value = value.lstrip('#')
+    lv = len(value)
+    return tuple(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
+
+def rgb_to_hex(red, green, blue):
+    """Return color as #rrggbb for the given color values."""
+    return '#%02x%02x%02x' % (red, green, blue)
+
 def get_series_dir(pathToExp, series):
     folder = pathToExp+f"_analysis/"
     if not os.path.isdir(folder):
@@ -278,7 +288,7 @@ def getFigure(w=300,h=300,c="lightgrey"):
     return fig
 
 
-def showRoisOnly(regions, indices=None, im=None, showall=True):
+def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None):
     import plotly.graph_objects as go
     from .Regions import MYCOLORS
     if indices is None:
@@ -289,30 +299,30 @@ def showRoisOnly(regions, indices=None, im=None, showall=True):
     except:
         colors = [MYCOLORS[i%len(MYCOLORS)] for i in indices]
     
-    for i in indices:
-        try:
-            cl = regions.df.loc[i, "color"]
-        except:
-            cl = MYCOLORS[i%len(MYCOLORS)]
-        bds = regions.df.loc[i,"boundary"]
-        bds += [bds[0]]
-        y,x = np.array(bds).T
-        ypts,xpts = np.array(regions.df.pixels[i]).T
-        ln = go.Scatter(x=x,y=y,
-                        line=dict(width=.7,color=cl),
-                        #mode="markers+lines",
-                        mode="lines",
-                        #marker={"size":2},
-                        hoveron = 'points+fills',
-                        showlegend = False,
-                        name = str(i),
-                        hoverinfo='text',
-                        hovertext=["%i"%(i)]*len(bds),
-                        fill="toself",
-                        #opacity = .5,
-                        fillcolor='rgba(255, 0, 0, 0.05)',
-                     )
-        f.add_trace(ln)
+#     for i in indices:
+#         try:
+#             cl = regions.df.loc[i, "color"]
+#         except:
+#             cl = MYCOLORS[i%len(MYCOLORS)]
+#         bds = regions.df.loc[i,"boundary"]
+#         bds += [bds[0]]
+#         y,x = np.array(bds).T
+#         ypts,xpts = np.array(regions.df.pixels[i]).T
+#         ln = go.Scatter(x=x,y=y,
+#                         line=dict(width=.7,color=cl),
+#                         #mode="markers+lines",
+#                         mode="lines",
+#                         #marker={"size":2},
+#                         hoveron = 'points+fills',
+#                         showlegend = False,
+#                         name = str(i),
+#                         hoverinfo='text',
+#                         hovertext=["%i"%(i)]*len(bds),
+#                         fill="toself",
+#                         #opacity = .5,
+#                         fillcolor='rgba(255, 0, 0, 0.05)',
+#                      )
+#         f.add_trace(ln)
     if len(indices):    
 #         y,x = np.vstack([np.mean(regions.df.pixels[i],axis=0) for i in indices]).T
         y,x = np.vstack([regions.df.peak[i] for i in indices]).T
@@ -337,9 +347,11 @@ def showRoisOnly(regions, indices=None, im=None, showall=True):
         # f.add_heatmap(z=im, hoverinfo='skip',showscale=False,colorscale=plxcolors.sequential.Greys)
         imgpointer = createStaticImage(None,
                                        regions,
-                                       showall=showall,
-                                       separate=bool(len(MYCOLORS)-1),
-                                       origin="lower")
+#                                        showall=showall,
+#                                        separate=bool(len(MYCOLORS)-1),
+#                                        origin="lower",
+                                       lw=lw
+                                      )
 
         f.add_layout_image(
             dict(
@@ -421,9 +433,11 @@ def showRoisOnly(regions, indices=None, im=None, showall=True):
     
     
 
-def createStaticImage(im,regions,showall=False,color="grey",separate=False, returnPath=False, cmap=None,origin="bottom"):
+def createStaticImage(im,regions,showall=True,color="grey",separate=True, returnPath=False, cmap=None,origin="lower",lw=None):
     if im is None:
         im = regions.statImages[regions.mode]
+    if lw is None:
+        lw = .1
     from PIL import Image as PilImage
     import matplotlib
     currentBackend = matplotlib.get_backend()
@@ -446,7 +460,7 @@ def createStaticImage(im,regions,showall=False,color="grey",separate=False, retu
     for sp in ax.spines: ax.spines[sp].set_visible(False)
     if showall:
         try:
-            regions.plotEdges(ax=ax,color=color,image=False,lw=figsize[0]*.15,separate=separate)
+            regions.plotEdges(ax=ax,color=color,image=False,lw=figsize[0]*lw,separate=separate)
         except:
             pass
     plt.xticks([])

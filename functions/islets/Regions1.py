@@ -204,7 +204,7 @@ class Regions:
             else:
                 raise ValueError("Initializing Regions from a dictionary is only supported for a dictionary of images representing movie statistics, or a pixel crawling dictionary.")
         else:
-            raise ValueError("Regions can initialize either from a movie, or an image, or a dictionary.")
+            raise ValueError("Regions can initialize either from a movie, or an image, or a dictionary. You supplied %s"%str(type(movie_)))
         
         if full and not hasattr(self,"df"):
             self.constructRois(mode=mode, img_th=img_th, diag=diag, gSig_filt=gSig_filt, processes=processes, excludePixels=excludePixels, verbose=verbose, use_restricted=use_restricted)
@@ -916,7 +916,7 @@ class Regions:
         if imagemode is None:
             imagemode = self.mode
         return examine(self, test=test, max_rois=max_rois, imagemode=imagemode, debug=debug, startShow=startShow)
-    def examine3(self, max_rois=10, imagemode=None, debug=False, startShow='',mode="jupyter",name=None):
+    def examine3(self, max_rois=10, imagemode=None, debug=False, startShow='',mode="jupyter",name=None,lw=None):
         from .examine3 import examine
         if imagemode is None:
             imagemode = self.mode
