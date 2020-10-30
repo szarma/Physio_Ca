@@ -399,7 +399,7 @@ class Regions:
         out = np.unique(out,axis=0)
         return out
     
-    def plotEdges(self, ix=None, ax=None, image=True, imkw_args = {}, separate=False, color="k", lw=None,alpha = 1):
+    def plotEdges(self, ix=None, ax=None, image=True, imkw_args = {}, separate=False, color="k", lw=None,alpha = 1,fill=False):
         if ix is None:
             ix = self.df.index
         if ax is None:
@@ -419,6 +419,8 @@ class Regions:
                     c = MYCOLORS[i%len(MYCOLORS)]
                 y,x = np.array(self.df.loc[i,"boundary"]+self.df.loc[i,"boundary"][:1]).T
                 ax.plot(x,y,"-",lw=lw,c=c,alpha=alpha)
+                if fill:
+                    ax.fill(x,y,c=c,alpha=alpha*.8)
         else:
             tmp = []
             for el in self.df.loc[ix,"boundary"]:
@@ -586,19 +588,29 @@ class Regions:
         self.gain = gain
     
     def slow_filter_traces(self,ironScale, n_processes=10, percentile = [10.], calcStd=False,
-                           avg=True, verbose=False, write=True):
+                           avg=True, verbose=False, write=True, indices=None, autorebin=True):
         from .numeric import lowPass
         from .utils import multi_map
         global iterf
-        try:
+        if hasattr(self,"Freq"):
             freq = self.Freq
-        except:
+        else:
             freq = 1./np.diff(self.time).mean()
         wIron = int(ironScale*freq)
+        if verbose:
+            print(f"The movie frequency is {freq:.2f}, so the filter size is {wIron}.")
+        nr = 1
+        if autorebin:
+            if wIron>200:
+                nr = int(np.round(wIron/200))
+                if nr<1:
+                    nr=1
+                if nr>1:
+                    wIron = wIron//nr
+                    if verbose:
+                        print (f"Rebinning by {nr}, so the filter size is now {wIron}")
         if wIron%2==0:
             wIron += 1
-        if verbose:
-            print(f"The movie frequency is {freq:.2f}, so the filter size is {wIron}. This may take some time.")
         if avg:
             def iterf(x_): 
                 out = lowPass(x_, wIron, wIron, percentile)
@@ -607,28 +619,43 @@ class Regions:
             def iterf(x_): 
                 out = lowPass(x_, wIron, perc=percentile)
                 return out
-        slow = np.array(multi_map(iterf,self.df["trace"].values,processes=n_processes))
-        fast = np.array([self.df["trace"].iloc[i] - slow[i] for i in range(len(self.df))])
-        absFast = np.array([ fast[i]*self.df["size"].iloc[i] for i in range(len(self.df)) ])
-        absSlow = np.array([ slow[i]*self.df["size"].iloc[i] for i in range(len(self.df)) ])
+        if indices is None:
+            indices = self.df.index
+        assert len(indices)==len(np.unique(indices))
         if not hasattr(self,"gain") or self.gain<=0:
             raise ValueError("Regions need gain to work. Please infer_gain before running this function.")
-        zScore = absFast/(self.gain*absSlow)**.5
+        traces = np.vstack(self.df.loc[indices,"trace"].values)
+        if nr>1:
+            traces_ = rebin(traces,nr,1)
+        else:
+            traces_ = traces
+        slow   = np.array(multi_map(iterf,traces_,processes=n_processes,))
+        if nr>1:
+            from scipy.interpolate import interp1d
+            tr = rebin(self.time,nr)
+            slow = np.array([interp1d(tr,s, kind="quadratic",fill_value="extrapolate")(self.time) for s in slow])
+        fast    = traces-slow
+        absFast = np.array([ fast[i]*self.df.loc[ix,"size"] for i,ix in enumerate(indices) ])
+        absSlow = np.array([ slow[i]*self.df.loc[ix,"size"] for i,ix in enumerate(indices) ])
+        zScore  = absFast/(self.gain*absSlow/nr)**.5
+        print(zScore.shape)
         if write:
-            self.df["slower_%g_"%ironScale] = list(fast)
-            self.df["faster_%g_"%ironScale] = list(slow)
-            self.df["zScore_%g_"%ironScale] = list(zScore)
-            
+            for k,v in zip(
+                ["slower_%g_"%ironScale, "faster_%g_"%ironScale, "zScore_%g_"%ironScale],
+                [slow, fast, zScore]):
+                tmp = np.ones((len(self.df),len(self.time)))*np.nan
+                tmp[self.df.index.isin(indices)] = v
+                self.df[k] = list(tmp)
         else:
             return fast, slow, zScore
             
             
-        def iterf(x_):
-            mad2std = 1.4826
-            out = mad2std*lowPass(np.abs(x_),wIron,wIron*2+1,50.)
-            return out
-        if calcStd:
-            self.df["faster_%g_std"%ironScale] = multi_map(iterf,self.df["faster_%g"%ironScale].values,processes=n_processes)
+#         def iterf(x_):
+#             mad2std = 1.4826
+#             out = mad2std*lowPass(np.abs(x_),wIron,wIron*2+1,50.)
+#             return out
+#         if calcStd:
+#             self.df["faster_%g_std"%ironScale] = multi_map(iterf,self.df["faster_%g"%ironScale].values,processes=n_processes)
     
     
     
