@@ -60,7 +60,7 @@ def parse_leica(rec,
         return list(zip(idxs,outSer))
     return outSer
 
-def saveMovie(movie, filename, maxFreq=2, frameRate=60, dpi=100):
+def saveMovie(movie, filename, maxFreq=2, frameRate=60, dpi=100,figScale=1):
     from .utils import show_movie
     from .numeric import rebin
     if maxFreq<movie.fr:
@@ -80,7 +80,8 @@ def saveMovie(movie, filename, maxFreq=2, frameRate=60, dpi=100):
                # out="save",
                # saveName=filename,
                tmax=len(showMovie)/showMovie.fr,
-               dpi=dpi
+               dpi=dpi,
+               figScale=figScale
               )
     else:
         show_movie(showMovie, 
@@ -89,7 +90,8 @@ def saveMovie(movie, filename, maxFreq=2, frameRate=60, dpi=100):
                out="save",
                saveName=filename,
                tmax=len(showMovie)/showMovie.fr,
-               dpi=dpi
+               dpi=dpi,
+               figScale=figScale
               )
         return 0
 
