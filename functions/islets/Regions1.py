@@ -949,7 +949,64 @@ class Regions:
             imagemode = self.mode
         return examine(self, max_rois=max_rois, imagemode=imagemode, debug=debug, startShow=startShow,mode=mode,name=name)
     
-    
+    def plotTraces(regions, indices, axratios = [1,2], figsize=5, freqShow=2, col="detrended",Offset=5):
+        xratios = np.array([.1,axratios[0],.1,axratios[1],.1])
+        yratios = xratios[:3]
+        xr = xratios/sum(xratios)
+        yr = yratios/sum(yratios)
+
+        fig = plt.figure(figsize=(xratios.sum()*figsize,yratios.sum()*figsize))
+        axs = [
+            fig.add_axes([xr[0],yr[0],xr[1],yr[1]]),
+            fig.add_axes([xr[:3].sum(),yr[0],xr[3],yr[1]]),
+        ]
+        regions.plotEdges(ax=axs[0],lw=.5,)
+        regions.plotEdges(ax=axs[0],ix=indices, separate=True, fill=True, alpha=.5, image=False)
+        regions.plotPeaks(ax=axs[0],ix=indices, labels=True)
+        nr = int(np.round(regions.Freq/freqShow))
+        if nr==0:
+            nr=1
+        xs = np.vstack(regions.df.loc[indices,col].values)
+        if nr>1:
+            t = rebin(regions.time, nr)
+            xs = rebin(xs,nr,1)
+        else:
+            t = regions.time
+
+        for i in range(len(xs)):
+            xs[i] = xs[i]-np.median(xs[i])
+        offset = 0
+        if "color" in regions.df.columns:
+            colors = regions.df.loc[indices,"color"]
+        else:
+            colors = [MYCOLORS[ix%len(MYCOLORS)] for ix in indices]
+        for x,ix,c in zip(xs, indices, colors):
+            axs[1].plot(t,x+offset,lw=.5,color=c)
+            axs[1].text(0,offset,str(ix)+" ",color=c,ha="right")
+            offset += xs.std()*Offset
+        axs[1].set_yticks([])
+        axs[1].set_xlabel("time [s]")
+        axs[0].set_yticks([])
+        axs[0].set_xticks([])
+        for sp in ["left","right","top"]: axs[1].spines[sp].set_visible(False)
+        if not hasattr(regions,"protocol"):
+            return None
+        yl = axs[1].get_ylim()[1]
+        offset = 2
+
+        for comp, df in regions.protocol.groupby("compound"):
+            for ii in df.index:
+                t0,t1 = df.loc[ii].iloc[-2:]
+                conc = df.loc[ii,"concentration"]
+                x,y = [t0,t1,t1,t0,t0],[-1,-1,-2,-2,-1]
+                y = np.array(y)-offset
+                y = y*yl/20
+                plt.fill(x,y,color="grey",alpha =.3)
+                plt.text(t0,y[:-1].mean(), " "+conc,va="center", ha="left")
+                plt.plot(x,y,color="grey",)
+
+            plt.text(df.t_begin.min(),y[:-1].mean(),comp+" ",va="center", ha="right")
+            offset += -1.3    
 
 def getGraph_of_ROIs_to_Merge(df,rreg, plot=False, ax=None,lw=.5,arrow_width=.5):
     C = rreg.df
