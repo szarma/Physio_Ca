@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 from .utils import getFigure
 import dash
 import json
+from .utils import saveRois
 
 
 def examine(self, 
@@ -56,26 +57,47 @@ def examine(self,
     if not hasattr(self,"gain"):
         self.infer_gain()
     SelectedRois = html.Div([
-            html.Div([
-                   "Selected ROIs:",
-                    dcc.Input(id="selected-rois",
-                        type="text",
-                        debounce=False,
-                        size=16,
-                        value="",#.join(list(map(str,self.df.index[:max_rois]))),
-                        ),
-                ],style={"visibility":"visible" if debug else "hidden"}),
-            html.Button('Discard unselected', id='discard-button', style={"display":"inline-block"},
+        html.Div([
+               "Selected ROIs:",
+                dcc.Input(id="selected-rois",
+                    type="text",
+                    debounce=False,
+                    size=16,
+                    value="",#.join(list(map(str,self.df.index[:max_rois]))),
+                    ),
+            ],style={"display":"block" if debug else "none"}),
+        html.Div([
+            html.Button('Discard unselected',
+                        id='discard-button',
                         n_clicks=0),
-            html.Button('Discard selected', id='discard-button-selected', style={"display":"inline-block"},
-                        n_clicks=0),
-            html.Pre(id="discard-feedback",children="_",
-                 style={"display":"block",**outputStyle,}
-                ),
-            html.Button('Mark for merging', id='mark-button', style={"display":"inline-block"},
-                        n_clicks=0),
-            html.Button('Merge', id='merge-button', style={"display":"inline-block"},
-                        n_clicks=0),
+            html.Button('Discard selected',
+                        id='discard-button-selected',
+                        n_clicks=0),],
+            style={"display":"inline-block","width":"200px"},
+        ),
+        html.Div([
+            html.Button('Mark for merging', id='mark-button', n_clicks=0),
+            html.Button('Merge', id='merge-button', n_clicks=0),], 
+            style={"display":"inline-block","width":"200px"},
+        ),
+        html.Pre(id="discard-feedback",children="_",
+             style={"display":"block",**outputStyle,}
+            ),
+        html.Div([
+            html.Button(id="tag-button", children="Tag cells",
+                    n_clicks=0,style={"display":"inline-block"}),
+            dcc.Dropdown(id="tag-drop", multi=True,value=[],options = [
+                {"label":opt,"value":opt} for opt in [
+                    "islet","non-islet","ductal","beta","non-beta","interesting"
+                ]],style={"width":"200px",}),
+        ],style={'align-items': 'center', 'display': 'flex'}),
+        html.Pre(id="tag-feedback",children="_",
+             style={**outputStyle}
+            ),
+        html.Button(id="save-button", children="Save", n_clicks=0),
+        html.Pre(id="save-feedback",children="_",
+             style={"display":"inline-block",**outputStyle,"padding":"5px"}
+            ),
     ])
     if not "detrended" in self.df.columns:
         try:
@@ -87,8 +109,6 @@ def examine(self,
         html.Div([
            "Choose columns",
             dcc.Dropdown(id="cols-input",
-#                 debounce=False,
-#                 size=6,
                 value=["detrended" if "detrended" in self.df.columns else "trace"],
                  options=[{"value":c,"label":c} for c in self.df.columns if \
                           hasattr(self.df[c].iloc[0],"shape") \
@@ -97,7 +117,6 @@ def examine(self,
                  multi=True
              ),
             ],
-#             style={"display": "inline-block"}
         ),
         html.Div([
            "Filter Timescale",
@@ -148,7 +167,7 @@ def examine(self,
                             ),
                     ],),
                 html.Pre(id="hidden",children=json.dumps(initNcs, indent=2),
-                     style={"display":"block",**outputStyle,"visibility":"visible" if debug else "hidden"}
+                     style={"display":"block" if debug else "none",**outputStyle}
                     ),
                 dcc.Graph(id="roi-selector",figure = roisImage),
                 SelectedRois
@@ -181,6 +200,40 @@ def examine(self,
     app.layout = html.Div(children=APP_LAYOUT,
                           style={"family":"Arial"}
                          )
+    @app.callback(
+        Output("tag-feedback","children"),
+        [Input("tag-button", "n_clicks"),],
+        [State("tag-drop", "value"),
+         State("selected-rois", "value")
+        ],
+        )
+    def tag(n_clicks,tags,selectedData):
+        try:
+            if n_clicks>0:
+                if "tag" not in self.df.columns:
+                    self.df["tag"] = [""]*len(self.df)
+                selected = list(eval(selectedData))
+                for i in selected:
+                    self.df.loc[i,"tag"] = "|".join([self.df.loc[i,"tag"]]+tags).strip("|")
+                return f"Successfully applied tags for {len(selected)} rois."
+        except:
+            return str(exc_info())
+        
+        
+        
+    @app.callback(
+        Output("save-feedback","children"),
+        [Input("save-button", "n_clicks"),],
+        )
+    def save(n_clicks):
+        from os.path import split
+        try:
+            if n_clicks>0:
+                folder, fname = split(self.pathToPickle)
+                return saveRois(self,folder,fname.replace("_rois.pkl",""),formats=["vienna"])
+        except:
+            return str(exc_info())
+            
     @app.callback(
         Output("selected-rois", "value"),
         [Input("roi-selector", "selectedData"),],
