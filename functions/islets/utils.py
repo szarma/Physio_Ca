@@ -111,7 +111,7 @@ def tally(mylist):
     import numpy as np
     return sorted(Counter(mylist).most_common(),key=lambda duple: duple[0])
 
-def multi_map(some_function, iterable, processes=1, library="threading"):
+def multi_map(some_function, iterable, processes=1, library="multiprocessing"):
     assert processes==int(processes)
     processes = int(processes)
     if processes==1:
