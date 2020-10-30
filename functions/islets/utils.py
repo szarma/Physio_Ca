@@ -292,11 +292,11 @@ def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None):
     import plotly.graph_objects as go
     from .Regions import MYCOLORS
     if indices is None:
-        indices = regions.df.sort_values("size",ascending=False).index[:10]
+        indices = regions.df.sort_values("size",ascending=False).index
     f = go.Figure()
-    try:
+    if hasattr(regions, "color"):
         colors = regions.df.loc[indices,"color"]
-    except:
+    else:
         colors = [MYCOLORS[i%len(MYCOLORS)] for i in indices]
     
 #     for i in indices:
