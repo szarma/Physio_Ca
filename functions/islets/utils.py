@@ -292,9 +292,10 @@ def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None):
     import plotly.graph_objects as go
     from .Regions import MYCOLORS
     if indices is None:
-        indices = regions.df.sort_values("size",ascending=False).index
+#         indices = regions.df.sort_values("size",ascending=False).index
+        indices = regions.df.index
     f = go.Figure()
-    if hasattr(regions, "color"):
+    if hasattr(regions.df, "color"):
         colors = regions.df.loc[indices,"color"]
     else:
         colors = [MYCOLORS[i%len(MYCOLORS)] for i in indices]
@@ -325,13 +326,13 @@ def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None):
 #         f.add_trace(ln)
     if len(indices):    
 #         y,x = np.vstack([np.mean(regions.df.pixels[i],axis=0) for i in indices]).T
-        y,x = np.vstack([regions.df.peak[i] for i in indices]).T
+        y,x = np.vstack([regions.df.loc[i,"peak"] for i in indices]).T
         pts = go.Scatter(x=x,y=y,
                     mode="markers",
                     showlegend = False,
                     # opacity=0.5,
                     # name=list(map(str,indices)),
-                    marker=dict(color=colors,size=5),
+                    marker=dict(color=colors,size=4),
                     hovertext=list(map(str,indices)),
                     hoverinfo="text"
                  )
@@ -418,7 +419,7 @@ def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None):
                 )
         f.add_trace(go.Scatter(
             x=[(x0+x1)/2],
-            y=[y1],
+            y=[y1*1.2],
             text=[f"<b>{length}µm</b>"],
             mode="text",
             showlegend=False,

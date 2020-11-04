@@ -13,6 +13,7 @@ from general_functions import getCircularKernel
 import pickle
 from matplotlib.colors import LogNorm
 import os
+from sys import exc_info
 # MYCOLORS = OrderedDict(TABLEAU_COLORS)
 # del MYCOLORS["tab:gray"]
 # ks = ["lime",
@@ -35,46 +36,49 @@ def load_regions(path,
                 ):
     with open(path,"rb") as f:
         regions = pickle.load(f)
-    regions.update()
-    regions.detrend_traces()
-    regions.infer_gain(plot=plot)
-    pickleDir = os.path.split(path)[0]
-    if "examine3" not in dir(regions):
-        regions = Regions(regions)
     try:
-        protocolFile = os.path.join(pickleDir, [f for f in os.listdir(pickleDir) if "protocol" in f][0])
-        regions.import_protocol(protocolFile)
-    except:
-        pass
-    regions.pathToPickle = path
-    
-    if plot:
-        plt.figure(figsize=(7*20,6))
-        
-    ia = 1
-    while True:
-        size_th = np.percentile(regions.df["size"].values, mergeSizeTh)
-        df = getPeak2BoundaryDF(regions.df)
-        df = df.query(f"dist<={mergeDist} and size_from<={size_th}")
-        if len(df):
-            if plot:
-                ax = plt.subplot(1,20,ia)
-                ax.imshow(regions.statImages[regions.mode], cmap="Greys", norm=LogNorm())
-                xl = ax.get_xlim()
-                yl = ax.get_ylim()
+        regions.update()
+        regions.detrend_traces()
+        regions.infer_gain(plot=plot)
+        pickleDir = os.path.split(path)[0]
+        if "examine3" not in dir(regions):
+            regions = Regions(regions)
+        try:
+            protocolFile = os.path.join(pickleDir, [f for f in os.listdir(pickleDir) if "protocol" in f][0])
+            regions.import_protocol(protocolFile)
+        except:
+            pass
+        regions.pathToPickle = path
+
+        if plot:
+            plt.figure(figsize=(7*20,6))
+
+        ia = 1
+        while True:
+            size_th = np.percentile(regions.df["size"].values, mergeSizeTh)
+            df = getPeak2BoundaryDF(regions.df)
+            df = df.query(f"dist<={mergeDist} and size_from<={size_th}")
+            if len(df):
+                if plot:
+                    ax = plt.subplot(1,20,ia)
+                    ax.imshow(regions.statImages[regions.mode], cmap="Greys", norm=LogNorm())
+                    xl = ax.get_xlim()
+                    yl = ax.get_ylim()
+                else:
+                    ax = None
+                suggestGraph = getGraph_of_ROIs_to_Merge(df.iloc[:,:2], regions, plot=plot,ax=ax)
+                if plot:
+                    ax.set_xlim(xl)
+                    ax.set_ylim(yl)
+                mergeBasedOnGraph(suggestGraph, regions, verbose=verbose)
             else:
-                ax = None
-            suggestGraph = getGraph_of_ROIs_to_Merge(df.iloc[:,:2], regions, plot=plot,ax=ax)
-            if plot:
-                ax.set_xlim(xl)
-                ax.set_ylim(yl)
-            mergeBasedOnGraph(suggestGraph, regions, verbose=verbose)
-        else:
-            # print ("No more suggestions.")
-            break
-        ia += 1
-    if plot:
-        plt.tight_layout()
+                # print ("No more suggestions.")
+                break
+            ia += 1
+        if plot:
+            plt.tight_layout()
+    except:
+        print ("encountered error:", exc_info())
     
     return regions
 
@@ -553,10 +557,8 @@ class Regions:
         d = np.digitize(np.log(slow_est), logbs)
         x = np.array([slow_est[d==i].mean() for i in np.unique(d)])
         y = np.array([np.median(fast_vars[d==i]) for i in np.unique(d)])
-#         x[x<=0] = np.nan
         gain = np.mean(y/x)
-#         gain = np.exp(np.mean(np.log(y)-np.log(x)))
-        slow_est[slow_est==0] = np.nan
+        slow_est[slow_est<=0] = np.nan
         if plot:
             ax = plt.subplot(111)
             ax.hexbin(slow_est, fast_vars, bins="log",
@@ -950,7 +952,7 @@ class Regions:
             imagemode = self.mode
         return examine(self, max_rois=max_rois, imagemode=imagemode, debug=debug, startShow=startShow,mode=mode,name=name)
     
-    def plotTraces(regions, indices, axratios = [1,2], figsize=5, freqShow=2, col="detrended",Offset=5):
+    def plotTraces(regions, indices, axratios = [1,2], figsize=5, freqShow=2, col="detrended",Offset=5,separate=False):
         xratios = np.array([.1,axratios[0],.1,axratios[1],.1])
         yratios = xratios[:3]
         xr = xratios/sum(xratios)
@@ -961,7 +963,7 @@ class Regions:
             fig.add_axes([xr[0],yr[0],xr[1],yr[1]]),
             fig.add_axes([xr[:3].sum(),yr[0],xr[3],yr[1]]),
         ]
-        regions.plotEdges(ax=axs[0],lw=.5,)
+        regions.plotEdges(ax=axs[0],lw=.5,separate=separate)
         regions.plotEdges(ax=axs[0],ix=indices, separate=True, fill=True, alpha=.5, image=False)
         regions.plotPeaks(ax=axs[0],ix=indices, labels=True)
         nr = int(np.round(regions.Freq/freqShow))

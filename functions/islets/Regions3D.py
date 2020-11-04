@@ -173,7 +173,7 @@ class Regions:
 #         print(f"Initialized with {len(self.df)} rois.")
     
     def get_fov_trace(self, showFreq = 2, pixels=None):
-        from numeric import mydebleach
+        from .numeric import mydebleach
         from physio_def_1 import rebin
         i0, ie = self.FrameRange
 #         n = int(self.movie.fr/showFreq)
@@ -399,7 +399,7 @@ class Regions:
         self.gain = gain
     
     def fast_filter_traces(self, ironTimeScale, z_sp = 2, order=5, Npoints = None, meanSlow2Var=None, write=True):
-        from numeric import sosFilter
+        from .numeric import sosFilter
         if Npoints is None: Npoints = 15
         minDt = np.diff(self.time).mean()
         freq = 1/minDt
@@ -450,7 +450,7 @@ class Regions:
         if z_sp==0:
             return None
         from cv2 import dilate
-        from numeric import nan_helper
+        from .numeric import nan_helper
         if meanSlow2Var is None:
             var = absSlow
         else:
@@ -484,7 +484,7 @@ class Regions:
         C["faster_%g"%ironTimeScale] = [absFast[i]/C["size"].iloc[i]/Nrebin for i in range(len(C))]
 
     def calc_raster(self, ts, z_th = 3, Npoints=None, smooth = 0):
-        from numeric import runningAverage
+        from .numeric import runningAverage
         if "zScore_%g"%ts not in self.df.columns:
             self.fast_filter_traces(ts,Npoints=Npoints)
         zScores = np.vstack(self.df["zScore_%g"%ts])
@@ -531,7 +531,7 @@ class Regions:
         return rr, fig
         
     def calc_peaks(self, ts, z_th = 3, Npoints=None, smooth=None, tWindow = (None,None)):
-        from numeric import runningAverage
+        from .numeric import runningAverage
         from scipy.signal import find_peaks, peak_widths
         if "zScore_%g"%ts not in self.df.columns:
             self.fast_filter_traces(ts,Npoints=Npoints)

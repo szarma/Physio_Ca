@@ -135,10 +135,10 @@ def fit_spikes(t,y,spikeDf,
     from scipy.optimize import minimize, basinhopping
     if plot:
         if colorCode is None:
-            colorCode = dict(zip(["myShape", "myLogNorm"],["C1","C3"]))
+            colorCode = dict(zip(["myShape", "myLogNorm"],["C1","C0"]))
         if ax is None:
             fig, ax = plt.subplots(1,1,figsize=(9,4), sharex=True)
-        ax.plot(t, y, lw=.6)
+        ax.plot(t, y, lw=.6, color="grey")
         plt.tight_layout()
     if ifit is None:
         ifit = np.inf

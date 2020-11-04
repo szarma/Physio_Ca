@@ -137,6 +137,7 @@ def PicklePicker(pathToRec=None,series=None,appWidth=1500,debug=False,appHeight=
                                 if lbl not in rec.metadata.index: continue
                                 if rec.metadata.loc[lbl,"line scan"] != "none":
                                     opt["label"] += "*"
+                            opts = opts[::-1]
                         except:
                             feedback += [ str(rec.metadata.index), str(exc_info())]
 #                     val = opts[0]["value"]
@@ -174,7 +175,7 @@ def PicklePicker(pathToRec=None,series=None,appWidth=1500,debug=False,appHeight=
         frase = ""
         for f in sorted(os.listdir(pathToSer))[::-1]:
             if f.endswith("pkl"):
-                k = f.split("_")[0].replace(".","+")
+                k = f.split("_rois.pkl")[0].replace(".","+")
                 pathToRoi = os.path.join(pathToSer,f)
                 options += [{ "label": k, "value": pathToRoi }]
                 previewFile = pathToRoi.replace(f,".image_"+f.replace("_rois.pkl",".png"))
