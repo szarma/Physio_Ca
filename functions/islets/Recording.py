@@ -201,7 +201,7 @@ class Recording:
         metadata["End time"] = metadata["Start time"]+metadata["Duration"]
         self.metadata = metadata
         try:
-            self.tad_linescans()
+            self.tag_linescans()
         except:
             self.metadata["line scan"]="none"
         
@@ -211,10 +211,13 @@ class Recording:
 #         x = [el if el>=pd.Timedelta(0) else pd.Timedelta(0) for el in x]
         metadata["gap"] = [np.nan]+x
     
-    def tag_linescans(rec, min_size=6,verbose=False):
+    def tag_linescans(rec, min_size=6,verbose=False,indices=None):
         metadata = rec.metadata
-        metadata["line scan"]="none"
-        for i in metadata.index:
+        if "line scan" not in metadata.index:
+            metadata["line scan"]="none"
+        if indices is None:
+            indices = metadata.index
+        for i in indices:
             if metadata.loc[i,"SizeT"]==1: continue
             freq = rec.metadata.loc[i,"Frequency"]
             if not np.isfinite(freq): continue

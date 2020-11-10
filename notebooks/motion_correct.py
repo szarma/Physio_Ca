@@ -122,7 +122,8 @@ else:
 rec.import_series(serToImport, restrict=restrict, )
 metadata = rec.Series[serToImport]['metadata']
 
-t0, te = restrict
+#if restrist is not None:
+#    t0, te = restrict
 
 
 orig_images = rec.Series[ser]["data"]
