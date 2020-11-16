@@ -241,7 +241,7 @@ def PicklePicker(pathToRec=None,series=None,appWidth=1500,debug=False,appHeight=
                     "Number of ROIs: %i"%len(regions.df),
                 ]
                 if showExamine:
-                    japp = regions.examine3()
+                    japp = regions.examine()
                     japp._repr_html_() 
                     link2app = "https://ctn.physiologie.meduniwien.ac.at"+japp.get_app_root_url()
             else: ####### line scan ################
