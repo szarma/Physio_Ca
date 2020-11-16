@@ -93,9 +93,6 @@ ser = args.series
 
 
 
-if args.debug:
-    assert False ########################## debug stop ###########
-
 
 if len(pathToCorrected)==0:
     import javabridge
@@ -167,13 +164,22 @@ if args.line_scan!="none":
             metadata = rec.Series[name]["metadata"],
             name = lsname
             )
-        linescan.plot(save=os.path.join(saveDir,lsname.replace(": ","_")+".png"), Npoints=2000)    
+        linescan.plot(save=os.path.join(saveDir,lsname.replace(": ","_")+".png"), Npoints=2000)   
+        
+        
+        
 else:
 
     rec.import_series(serToImport, restrict=restrict, 
                       onlyMeta= bool(len(pathToCorrected))
                      )
     metadata = rec.Series[serToImport]['metadata']
+
+    try: javabridge.kill_vm()
+    except: pass
+    
+    if args.debug: assert False
+    ########################## debug stop ###########
 
     t0, te = restrict
     if len(pathToCorrected):
