@@ -105,7 +105,7 @@ conditionalFormats += [
     for col in ["experiment"]
 ]
 
-users = ["srdjan","johannes","sandra","marjan","arianna","nastja"]
+users = ["srdjan","johannes","sandra","marjan","arianna","nastja","ya-chi"]
 app = dash.Dash(__name__,suppress_callback_exceptions=True)
 
 # if __name__=="__main__":
