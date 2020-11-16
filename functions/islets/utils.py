@@ -259,19 +259,21 @@ def show_movie(m_show, figScale = 1, out="jshtml",fps = 30, saveName=None, NTime
     if out=="html5":
         from IPython.display import HTML
         return HTML(anim.to_html5_video())
-    if out=="jshtml":
+    elif out=="jshtml":
         from IPython.display import HTML
         return HTML(anim.to_jshtml())
-    if out=="save" or saveName is not None:
-        try:
-            anim.save(saveName, extra_args=['-vcodec', 'libx264'])
-        except:
-            saveName = input("please enter a valid filename. Otherwise, I'll save it as 'video.mp4'.")
-            try: anim.save(saveName, extra_args=['-vcodec', 'libx264'])
-            except:
-                saveName = "video.mp4"
-                anim.save(saveName, extra_args=['-vcodec', 'libx264'])
-        return None
+    elif out=="save" or saveName is not None:
+#         try:
+        anim.save(saveName, extra_args=['-vcodec', 'libx264'])
+#         except:
+#             saveName = input("please enter a valid filename. Otherwise, I'll save it as 'video.mp4'.")
+#             try: anim.save(saveName, extra_args=['-vcodec', 'libx264'])
+#             except:
+#                 saveName = "video.mp4"
+#                 anim.save(saveName, extra_args=['-vcodec', 'libx264'])
+#         return None
+    else:
+        raise ValueError("out can only be one of the following: 'html5, jshtml, save'")
     
 def getFigure(w=300,h=300,c="lightgrey"):
     import plotly.graph_objects as go
