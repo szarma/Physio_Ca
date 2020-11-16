@@ -181,8 +181,8 @@ while True:
 
 mc.shifts_rig = np.array(mc.shifts_rig)
 
-
-mc.shifts_rig = cm.movie(mc.shifts_rig.reshape((1,)+mc.shifts_rig.shape)).resize(n_rebin,1,1)[0]
+if n_rebin>1:
+    mc.shifts_rig = cm.movie(mc.shifts_rig.reshape((1,)+mc.shifts_rig.shape)).resize(n_rebin,1,1)[0]
 m_rshifted_name = mc.apply_shifts_movie(fname_original, save_memmap=True, save_base_name=tmpfolder+"MC")
 
 cm.stop_server(dview=dview)
