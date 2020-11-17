@@ -148,7 +148,14 @@ if args.debug:
 
 if args.line_scan!="none":
     nameDict = dict([(name, list(ii)) for ii, name in parse_leica(rec, index=True)])
-    indices = nameDict[serToImport]
+    if serToImport in nameDict:
+        indices = nameDict[serToImport]
+    else:
+        serBegin, serEnd = [int(part.strip("Series"))  for part in serToImport.split("-")]
+        serEnd += 1
+        possibleNames = ["Series%03i"%jSer for jSer in range(serBegin, serEnd)]
+        indices = rec.metadata.Name.isin(possibleNames)
+        indices = indices[indices].index
     serNames = rec.metadata.loc[indices,"Name"]
     for ix, name in zip(indices,serNames):
         lsname = "%s: %s"%(rec.Experiment[:-4], name)

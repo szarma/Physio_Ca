@@ -41,7 +41,7 @@ class LineScan:
         tmax=None,
         timeScales = [None,3],
         distances = [5,10,20,50,100],
-        times = [.5,1,2,5,10,30],
+        times = [.1,.5,1,2,5,10,30],
         save=False,
         Npoints = 1000,
         verbose=False,
@@ -75,10 +75,12 @@ class LineScan:
                 x = ls.data
             else:
                 txt = "detrended"
-                try:
+                if ls.time[-1]>ts:
                     s,x,z = ls.fast_filter_traces(ts,write=False)
-                except:
-                    continue
+                else:
+                    if not hasattr(ls, "detrended"):
+                        ls.detrend()
+                    x = ls.detrended
             ax = axs[it]
             ax.set_yticks([])
             ax.set_xticks([])
@@ -110,7 +112,7 @@ class LineScan:
             n = self.data.shape[0]
         self.detrended = np.zeros_like(self.data)
         if fast:
-            trend = np.median(self.data[:n],1)
+            trend = np.mean(self.data[:n],1)
         else:
             global iterf
             def iterf(xi):
