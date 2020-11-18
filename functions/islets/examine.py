@@ -76,7 +76,7 @@ def examine(self,
             style={"display":"inline-block","width":"200px"},
         ),
         html.Div([
-            html.Button('Mark for merging', id='mark-button', n_clicks=0),
+            html.Button('Mark for merging', id='mark-button', n_clicks=0,style={"display":"block" if debug else "none"}),
             html.Button('Merge', id='merge-button', n_clicks=0),], 
             style={"display":"inline-block","width":"200px"},
         ),
@@ -166,11 +166,11 @@ def examine(self,
                             value=startShow,
                             ),
                     ],),
+                dcc.Graph(id="roi-selector",figure = roisImage),
+                SelectedRois,
                 html.Pre(id="hidden",children=json.dumps(initNcs, indent=2),
                      style={"display":"block" if debug else "none",**outputStyle}
                     ),
-                dcc.Graph(id="roi-selector",figure = roisImage),
-                SelectedRois
             ],style={"max-width":"550px","max-height":"550px",
 #                      "border":"thin grey solid"
                     }),
@@ -375,6 +375,7 @@ def examine(self,
                  )
     def plot_callback(selected,shownRois,cols,nRebin,offset,checklist,rlod):
         from sys import exc_info
+        out = ""
         try:
             if cols is None or cols==[]:
                 return no_update
@@ -391,7 +392,13 @@ def examine(self,
             offset=float(offset)
             toSum = bool(len(checklist))
             if not toSum:
-                selectedIndices = selectedIndices[:max_rois]
+                if "interest" in self.df.columns:
+                    selectedIndices = list(
+                        self.df.loc[selectedIndices].sort_values(
+                        "interest", ascending=False
+                        ).index)[:max_rois]
+                else:
+                    selectedIndices = selectedIndices[:max_rois]
             from plotly.subplots import make_subplots
             from .Regions import MYCOLORS
             try:
@@ -489,14 +496,14 @@ def examine(self,
 
             return fg
         except:
-            out += exc_info().__repr__().replace(",","<br>")
+            out += str(exc_info()).replace(",","<br>")
             fg = getFigure(300,300)
             fg.add_trace(go.Scatter(
                     x = [0],
                     y = [0],
                     mode="text",
                     text=[out],
-                    textposition="upper right",
+                    textposition="top right",
                     showlegend=False,))
             return fg
 

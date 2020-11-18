@@ -32,14 +32,13 @@ def load_regions(path,
                  mergeDist=1,
                  mergeSizeTh=10,
                  plot=False,
-                 verbose=False
+                 verbose=False,
+                 calcInterest=True
                 ):
     with open(path,"rb") as f:
         regions = pickle.load(f)
     try:
         regions.update()
-        regions.detrend_traces()
-        regions.infer_gain(plot=plot)
         pickleDir = os.path.split(path)[0]
         if "examine3" not in dir(regions):
             regions = Regions(regions)
@@ -49,7 +48,9 @@ def load_regions(path,
         except:
             pass
         regions.pathToPickle = path
-
+        regions.sortInOrder()
+        regions.detrend_traces()
+        regions.infer_gain(plot=plot)
         if plot:
             plt.figure(figsize=(7*20,6))
 
@@ -77,6 +78,8 @@ def load_regions(path,
             ia += 1
         if plot:
             plt.tight_layout()
+        if calcInterest:
+            regions.calc_interest()
     except:
         print ("encountered error:", exc_info())
     
@@ -473,6 +476,15 @@ class Regions:
             if labels:
                 ax.text(*p[::-1],s=str(i),color=c)
     
+    def calc_interest(self, zth=4, timescales=[3,10,30,100,300]):
+        interesting = np.zeros(len(self.df))
+        for ts in [3,10,30,100,300]:
+            if 1./self.Freq   > ts/10: continue
+            if self.time[-1] < ts*5: continue
+            s,f,z = self.fast_filter_traces(ts, write=False)
+            interesting += np.mean(z>zth,1)
+        self.df["interest"] = interesting
+        
     def calcNNmap(self):
         from bidict import bidict
         peak2idx = bidict([(peak,j) for j,peak in zip(self.df.index,self.df.peak)])
@@ -536,6 +548,12 @@ class Regions:
         center = np.array(self.image.shape)/2
         self.df["distToCenter"] = [np.sum((np.array(self.df.loc[i,"peak"])-center)**2)**.5 for i in self.df.index]
         self.df.sort_values("distToCenter",inplace=True)
+        self.df.index = np.arange(len(self.df))
+        self.calcNNmap()
+
+    def sortInOrder(self):
+        idxsort = pd.DataFrame(np.vstack(self.df.peak.values), index=self.df.index).sort_values([0,1]).index
+        self.df = self.df.loc[idxsort]
         self.df.index = np.arange(len(self.df))
         self.calcNNmap()
     
