@@ -347,6 +347,38 @@ class Regions:
                 "trend":ydbl
             }
 
+    def merge_closest(self, mergeSizeTh=10, mergeDist=1, plot=False, Niter = 20):
+        if plot:
+            plt.figure(figsize=(7*Niter,6))
+
+        ia = 1
+        for ja in range(Niter):
+            size_th = np.percentile(self.df["size"].values, mergeSizeTh)
+            df = getPeak2BoundaryDF(self.df)
+            df = df.query(f"dist<={mergeDist} and size_from<={size_th}")
+            if len(df):
+                if plot:
+                    ax = plt.subplot(1,20,ia)
+                    ax.imshow(self.statImages[self.mode], cmap="Greys", norm=LogNorm())
+                    xl = ax.get_xlim()
+                    yl = ax.get_ylim()
+                else:
+                    ax = None
+                suggestGraph = getGraph_of_ROIs_to_Merge(df.iloc[:,:2], self, plot=plot,ax=ax)
+                if plot:
+                    ax.set_xlim(xl)
+                    ax.set_ylim(yl)
+                mergeBasedOnGraph(suggestGraph, self, verbose=verbose)
+            else:
+                # print ("No more suggestions.")
+                break
+            ia += 1
+        if plot:
+            plt.tight_layout()
+        if calcInterest:
+            self.calc_interest()
+    
+        
     def update(self, movie_=None):
         self.df["size"] = self.df["pixels"].apply(len)
         self.df["interest"] = [np.sum([self.image[px[0],px[1]] for px in pxs]) for pxs in self.df["pixels"]]
@@ -406,15 +438,18 @@ class Regions:
         out = np.unique(out,axis=0)
         return out
     
-    def plotEdges(self, ix=None, ax=None, image=True, imkw_args = {}, separate=False, color="k", lw=None,alpha = 1,fill=False):
+    def plotEdges(self, ix=None, ax=None, image=True, imkw_args={}, separate=False, color="darkred", lw=None, alpha=1, fill=False):
         if ix is None:
             ix = self.df.index
         if ax is None:
             ax = plt.subplot(111)
         if lw is None:
-            lw=.8
+            lw=.5
         if "cmap" not in imkw_args:
-            imkw_args["cmap"] = "Greys"
+            from copy import copy
+            mycmap = copy(plt.cm.Greys)
+            mycmap.set_bad("lime")
+            imkw_args["cmap"] = mycmap
         if image:
             im = self.statImages[self.mode]
             ax.imshow(im,norm=LogNorm(),**imkw_args)
@@ -448,7 +483,7 @@ class Regions:
             txt = str(length)
             if "pxUnit" in self.metadata:
                 txt += self.metadata["pxUnit"]
-            ax.text((x0+x1)/2, y1, txt, va="top", ha="center")
+            ax.text((x0+x1)/2, y1+.2*(y1-y0), txt, va="top", ha="center", size=ax.get_figure().get_size_inches()[0]*2.5)
             
     def plotPeaks(self, ix=None, ax=None, image=False, ms=1, labels=False,color=None, imkw_args={},absMarker=True):
         if ax is None:
@@ -965,10 +1000,11 @@ class Regions:
         return examine(self, max_rois=max_rois, imagemode=imagemode, debug=debug, startShow=startShow,mode=mode,name=name)
     
     def examine3(self, max_rois=10, imagemode=None, debug=False, startShow='',mode="jupyter",name=None,lw=None):
-        from .examine3 import examine
-        if imagemode is None:
-            imagemode = self.mode
-        return examine(self, max_rois=max_rois, imagemode=imagemode, debug=debug, startShow=startShow,mode=mode,name=name)
+        return "examine3 is deprecated. Please, use examine."
+#         from .examine3 import examine
+#         if imagemode is None:
+#             imagemode = self.mode
+#         return examine(self, max_rois=max_rois, imagemode=imagemode, debug=debug, startShow=startShow,mode=mode,name=name)
     
     def plotTraces(regions, indices, axratios = [1,2], figsize=5, freqShow=2, col="detrended",Offset=5,separate=False):
         xratios = np.array([.1,axratios[0],.1,axratios[1],.1])
@@ -1012,22 +1048,23 @@ class Regions:
         for sp in ["left","right","top"]: axs[1].spines[sp].set_visible(False)
         if not hasattr(regions,"protocol"):
             return None
-        yl = axs[1].get_ylim()[1]
-        offset = 2
+        yl = axs[1].get_ylim()
+        dy = yl[1]-yl[0]
+        offset = yl[0]/2 - dy/20
 
         for comp, df in regions.protocol.groupby("compound"):
             for ii in df.index:
                 t0,t1 = df.loc[ii].iloc[-2:]
                 conc = df.loc[ii,"concentration"]
                 x,y = [t0,t1,t1,t0,t0],[-1,-1,-2,-2,-1]
-                y = np.array(y)-offset
-                y = y*yl/20
+                y = np.array(y)
+                y = y*dy/20 + offset
                 plt.fill(x,y,color="grey",alpha =.3)
                 plt.text(t0,y[:-1].mean(), " "+conc,va="center", ha="left")
                 plt.plot(x,y,color="grey",)
 
             plt.text(df.t_begin.min(),y[:-1].mean(),comp+" ",va="center", ha="right")
-            offset += -1.3    
+            offset -= 1.3*dy/20
 
 def getGraph_of_ROIs_to_Merge(df,rreg, plot=False, ax=None,lw=.5,arrow_width=.5):
     C = rreg.df
