@@ -100,7 +100,7 @@ class LineScan:
         ax.set_xlim(0,tmax)
         if save:
             fig.tight_layout()
-            fig.savefig(save, dpi=300, facecolor='k')
+            fig.savefig(save, dpi=150, facecolor='k')
             plt.close(fig)
         else:
             fig.show()
