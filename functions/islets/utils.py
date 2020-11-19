@@ -137,7 +137,28 @@ def multi_map(some_function, iterable, processes=1, library="multiprocessing"):
         out = None
     return out
 
-
+def create_preview_image(regions, filepath=None, show=False):
+    import matplotlib.pyplot as plt
+#     import matplotlib.patheffects as path_effects
+    from copy import copy
+    cmap = copy(plt.cm.Greys)
+    cmap.set_bad("lime")
+    dims = regions.image.shape
+    fig = plt.figure(figsize=(5,5*np.divide(*dims)))
+    ax = fig.add_axes([0.01,0.01,.98,.98])
+    regions.plotEdges(imkw_args={"cmap":cmap},color="darkred", ax=ax, separate=False)
+    text = ax.text(.98,.03,len(regions.df),size=16,transform = ax.transAxes, ha="right",color="goldenrod")
+    text.set_bbox(dict(facecolor='black', alpha=0.5))
+#     text.set_path_effects([path_effects.Stroke(linewidth=3, foreground='black'),
+#                            path_effects.Normal()])
+    if filepath is None:
+        if hasattr(regions,"pathToPickle"):
+            folder, roiName = os.path.split(regions.pathToPickle)
+            filepath = ".image_"+roiName.replace("_rois","").replace(".pkl",".png")
+            filepath = os.path.join(folder, filepath)
+    fig.savefig(filepath,dpi=75)
+    if not show:
+        plt.close(fig)
 # def showMovie(m_show, figsize = (6,6), out="jshtml",fps = 30, saveName=None, NTimeFrames=100,log=True,additionalPlot=None):
 #     import matplotlib.pyplot as plt
 #     from matplotlib import animation
@@ -235,7 +256,7 @@ def show_movie(m_show, figScale = 1, out="jshtml",fps = 30, saveName=None, NTime
     def init():
         im.set_data(m_show[0])
         if tmax is not None:
-            tx.set_text("0:00.0")
+            tx.set_text("0:00")
 #             tx.set_path_effects([path_effects.Stroke(linewidth=.7, foreground='black'),
 #                            path_effects.Normal()])
         return (im,)
@@ -245,8 +266,9 @@ def show_movie(m_show, figScale = 1, out="jshtml",fps = 30, saveName=None, NTime
             time = i*dt
             mins = int(time/60)
             sec  = int(time-60*mins)
-            ms   = "%i"%(10*(time-60*mins-sec))
-            tx.set_text(f"{mins}:{sec:02d}.{ms} \n")
+#             ms   = "%i"%(10*(time-60*mins-sec))
+#             tx.set_text(f"{mins}:{sec:02d}.{ms} \n")
+            tx.set_text(f"{mins}:{sec:02d} \n")
 #         tx.set_path_effects([path_effects.Stroke(linewidth=.7, foreground='black'),
 #                        path_effects.Normal()])
         return (im,)
@@ -478,7 +500,7 @@ def createStaticImage(im,regions,showall=True,color="grey",separate=True, return
     return PilImage.open(bkg_img_file)
 
 
-def saveRois(regions,outDir,filename="",movie=None,col=["trace"],formats=["vienna","maribor"],add_date=True):
+def saveRois(regions,outDir,filename="",movie=None,col=["trace"],formats=["vienna"],add_date=True):
         feedback = []
 #     try:
         from copy import deepcopy,copy
@@ -523,6 +545,8 @@ def saveRois(regions,outDir,filename="",movie=None,col=["trace"],formats=["vienn
                 roifile = f"{outDir}/{filename}_rois.pkl"
                 with open(roifile,"wb") as f:
                     pickle.dump(subRegions,f)
+                regions.pathToPickle = roifile
+                create_preview_image(regions)
                 feedback += [f"ROI info saved in {roifile}."]
 
             elif format=="maribor":
