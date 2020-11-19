@@ -243,7 +243,7 @@ class Recording:
         umask(0o002)
         self.metadata.to_csv(self.metafile, float_format = "%#.3g")
         
-    def import_series(self,Series, onlyMeta=False,isLineScan=False,restrict=None,memmap=False,save=True):
+    def import_series(self, Series, onlyMeta=False, isLineScan=False, restrict=None, memmap=False, save=True, pathToTif=None):
         if Series=="all":
             SeriesList = self.allSeries
         elif Series in self.metadata.Name.values:
@@ -319,30 +319,40 @@ class Recording:
                 return None
             else:
                 return metadata2
-        
-        data = np.zeros((metadata1.SizeT, metadata1.SizeY, metadata1.SizeX), dtype=metadata1["bit depth"])
-        
-        try: self.rdr
-        except: self.rdr = bf.ImageReader(self.path, perform_init=True)
-        
-        assert metadata.SizeT.iloc[0]>frame_begin
-        
-        for i in metadata.index:
-#             firstFrame = self.rdr.read(series=i, rescale=False, t=0)
-#             if len(firstFrame.shape)==3:
-            if metadata.index[0]==i:
-                dt = frame_begin
-            else:
-                dt = 0
-                
-            offset = metadata.loc[:i-1,"SizeT"].sum()-frame_begin
-            for t in range(dt,metadata.loc[i,"SizeT"]):
-#                 print (t, t+offset)
-                if t+offset>=len(data):break
-                data[t+offset] = self.rdr.read(series=i, rescale=False, t=t, c=0)
-        
-        if isLineScan:
-            data = data.reshape((np.prod(data.shape[:2]),1,data.shape[-1]))
+        ###################### if not onlyMeta ##################
+        if pathToTif is None:
+            data = np.zeros((metadata1.SizeT, metadata1.SizeY, metadata1.SizeX), dtype=metadata1["bit depth"])
+
+            try:
+                self.rdr
+            except:
+                self.rdr = bf.ImageReader(self.path, perform_init=True)
+
+            assert metadata.SizeT.iloc[0]>frame_begin
+
+            for i in metadata.index:
+    #             firstFrame = self.rdr.read(series=i, rescale=False, t=0)
+    #             if len(firstFrame.shape)==3:
+                if metadata.index[0]==i:
+                    dt = frame_begin
+                else:
+                    dt = 0
+
+                offset = metadata.loc[:i-1,"SizeT"].sum()-frame_begin
+                for t in range(dt,metadata.loc[i,"SizeT"]):
+                    if t+offset>=len(data):break
+                    data[t+offset] = self.rdr.read(series=i, rescale=False, t=t, c=0)
+
+            if isLineScan:
+                data = data.reshape((np.prod(data.shape[:2]),1,data.shape[-1]))
+        else:
+            print("loading")
+            # load motion corrected
+            from caiman import load as cload
+            data = cload(pathToTif)
+            data.fr = None
+            FrameRange = metadata2.frame_range
+            data = data[FrameRange[0]:FrameRange[1]]
         if save:
             self.Series[Series]["data"] = data
         else:
