@@ -48,7 +48,7 @@ def load_regions(path,
         except:
             pass
         regions.pathToPickle = path
-        regions.sortInOrder()
+        # regions.sortInOrder()
         regions.detrend_traces()
         regions.infer_gain(plot=plot)
         if plot:
