@@ -1007,6 +1007,12 @@ class Regions:
 #         return examine(self, max_rois=max_rois, imagemode=imagemode, debug=debug, startShow=startShow,mode=mode,name=name)
     
     def plotTraces(regions, indices, axratios = [1,2], figsize=5, freqShow=2, col="detrended",Offset=5,separate=False):
+        if col not in regions.df.columns:
+            if col=="detrended":
+                regions.detrend_traces()
+            else:
+                raise ValueError(f"{col} not found in the dataframe.")
+            
         xratios = np.array([.1,axratios[0],.1,axratios[1],.1])
         yratios = xratios[:3]
         xr = xratios/sum(xratios)

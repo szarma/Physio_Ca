@@ -7,18 +7,16 @@ parser.add_argument('--recording', '-rec', type=str,
                     help='path to the recording')
 parser.add_argument('--series', '-ser', type=str,
                     help='name of the series', default="")
-parser.add_argument('--restrict', type=str,
-                    help='restrict analysis to the time interval (in seconds!), e.g. "0-100" will only process first 100 seconds of the movie', default="")
-parser.add_argument('--use-tif', type=str,
-                    help='path to a tif file to use instad of the original, useful when passing motion-corrected movie', default=None)
+parser.add_argument('--restrict', type=str, default="",
+                    help='restrict analysis to the time interval (in seconds!), e.g. "0-100" will only process first 100 seconds of the movie')
+parser.add_argument('--use-tif', type=str, default=None, 
+                    help='path to a tif file to use instad of the original, useful when passing motion-corrected movie')
 parser.add_argument('--leave-movie', const=True, default=False,action="store_const",
                     help='if the movie exists, do not attempt to overwrite it')
 parser.add_argument('--verbose', const=True, default=False,action="store_const",
                     help='toggle verbose output')
 parser.add_argument('--leave-pickles', const=True, default=False,action="store_const",
                     help='if the pickles exist, do not attempt to overwrite them')
-parser.add_argument('--test', const=True, default=False,action="store_const",
-                    help='toggle test mode on')
 parser.add_argument('--only-movie', const=True, default=False, action="store_const",
                     help='only do movie')
 parser.add_argument('--spatial-filter',"-sp", default=None, 
@@ -60,7 +58,7 @@ args = parser.parse_args()
 #             )
 #         linescan.plot(save=os.path.join(saveDir,lsname.replace(": ","_")+".png"), Npoints=2000)   
 
-if args.test:
+if args.debug:
     for k in args.__dict__.keys():
         print("%20s"%k, args.__dict__[k])
     
@@ -172,7 +170,7 @@ movie = cmovie(
     fr=metadata.Frequency
 )
 
-# if args.test:
+# if args.debug:
 #     movie = movie[:,:50,:50]
 
 #### movie saving (or not)
@@ -199,7 +197,7 @@ if os.path.isfile(movieFilename):
         if args.verbose: print("and I'll rewrite it.")
 if writeMovie:
     if args.verbose: print("Writing the movie...")
-    if not args.test: saveMovie(movie,movieFilename)
+    if not args.debug: saveMovie(movie,movieFilename)
 
 if args.only_movie:
     exit()
@@ -209,7 +207,7 @@ if args.only_movie:
 protocolFilename = movieFilename.replace(".mp4", "_protocol.txt")
 if not os.path.isfile(protocolFilename):
     if args.verbose: print("placed dummy protocol file at", protocolFilename)
-    if not args.test:
+    if not args.debug:
         DataFrame([[None]*4],columns=["compound","concentration","begin","end"]).to_csv(protocolFilename,index=False)
 
 if args.spatial_filter is None:
@@ -246,7 +244,7 @@ for spFilt in filtSizes:
     regions.infer_gain()
     regions.calc_interest()
     regions.metadata = metadata
-    if not args.test: 
+    if not args.debug: 
         saveRois(regions, saveDir, filename= ".".join(map(str,spFilt)), add_date=False, formats=["vienna"])
     if not args.debug:
         del regions
