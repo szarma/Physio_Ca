@@ -539,7 +539,7 @@ def saveRois(regions,outDir,filename="",movie=None,col=["trace"],formats=["vienn
                     if k not in saving:
                         del subRegions.__dict__[k]
                 for k in regions.df.columns:
-                    if k not in ["peak", "pixels", "peakValue","tag"]+col:
+                    if k not in ["peak", "pixels", "peakValue","tag","interest"]+col:
                         del subRegions.df[k]
                         
                 roifile = f"{outDir}/{filename}_rois.pkl"

@@ -1,55 +1,6 @@
-def process_as_linescans():
-    nameDict = dict([(name, list(ii)) for ii, name in parse_leica(rec, index=True)])
-    if serToImport in nameDict:
-        indices = nameDict[serToImport]
-    else:
-        serBegin, serEnd = [int(part.strip("Series"))  for part in serToImport.split("-")]
-        serEnd += 1
-        possibleNames = ["Series%03i"%jSer for jSer in range(serBegin, serEnd)]
-        indices = rec.metadata.Name.isin(possibleNames)
-        indices = indices[indices].index
-    serNames = rec.metadata.loc[indices,"Name"]
-    for ix, name in zip(indices,serNames):
-        lsname = "%s: %s"%(rec.Experiment[:-4], name)
-        rec.import_series(name, isLineScan=(args.line_scan=="single") )
-        data = rec.Series[name]["data"].astype("float32")
-        if args.line_scan=="multi":
-            data = data.sum(1)
-        else:
-            assert data.shape[1]==1
-            data = data[:,0]
-        linescan = LineScan(
-            data = data.T,
-            metadata = rec.Series[name]["metadata"],
-            name = lsname
-            )
-        linescan.plot(save=os.path.join(saveDir,lsname.replace(": ","_")+".png"), Npoints=2000)   
-    
+#!/opt/tljh/user/envs/physio/bin/python
+
 import argparse
-
-from contextlib import contextmanager
-
-@contextmanager
-def suppress_stdout():
-    import os, sys
-    with open(os.devnull, "w") as devnull:
-        old_stdout = sys.stdout
-        sys.stdout = devnull
-        try:  
-            yield
-        finally:
-            sys.stdout = old_stdout
-            
-@contextmanager
-def suppress_stderr():
-    import os, sys
-    with open(os.devnull, "w") as devnull:
-        old_stderr = sys.stderr
-        sys.stderr = devnull
-        try:  
-            yield
-        finally:
-            sys.stderr = old_stderr
             
 parser = argparse.ArgumentParser(description='Extract series and process from a recording')
 parser.add_argument('--recording', '-rec', type=str,
@@ -58,7 +9,7 @@ parser.add_argument('--series', '-ser', type=str,
                     help='name of the series', default="")
 parser.add_argument('--restrict', type=str,
                     help='restrict analysis to the time interval (in seconds!), e.g. "0-100" will only process first 100 seconds of the movie', default="")
-parser.add_argument('--use-this', type=str,
+parser.add_argument('--use-tif', type=str,
                     help='path to a tif file to use instad of the original, useful when passing motion-corrected movie', default=None)
 parser.add_argument('--leave-movie', const=True, default=False,action="store_const",
                     help='if the movie exists, do not attempt to overwrite it')
@@ -70,6 +21,11 @@ parser.add_argument('--test', const=True, default=False,action="store_const",
                     help='toggle test mode on')
 parser.add_argument('--only-movie', const=True, default=False, action="store_const",
                     help='only do movie')
+parser.add_argument('--spatial-filter',"-sp", default=None, 
+                    help='''produce roi pickles with exactly these filter sizes,
+                    e.g. -sp="5" or -sp="5+6" to produce simple rois with indicated sizes,
+                    or sp="5,5+6" to produce both 5 and 5+6. Default (None) will guess four
+                    sizes based on pxSize in the metadata if there are.''')
 parser.add_argument('--line-scan', default="none", type=str,
                     help='indicate if it is a line scan, and if yes, what kind ("single" or "multi")')
 parser.add_argument('--debug', const=True, default=False, action="store_const",
@@ -77,6 +33,32 @@ parser.add_argument('--debug', const=True, default=False, action="store_const",
 
 args = parser.parse_args()
 
+# def process_as_linescans():
+#     nameDict = dict([(name, list(ii)) for ii, name in parse_leica(rec, index=True)])
+#     if serToImport in nameDict:
+#         indices = nameDict[serToImport]
+#     else:
+#         serBegin, serEnd = [int(part.strip("Series"))  for part in serToImport.split("-")]
+#         serEnd += 1
+#         possibleNames = ["Series%03i"%jSer for jSer in range(serBegin, serEnd)]
+#         indices = rec.metadata.Name.isin(possibleNames)
+#         indices = indices[indices].index
+#     serNames = rec.metadata.loc[indices,"Name"]
+#     for ix, name in zip(indices,serNames):
+#         lsname = "%s: %s"%(rec.Experiment[:-4], name)
+#         rec.import_series(name, isLineScan=(args.line_scan=="single") )
+#         data = rec.Series[name]["data"].astype("float32")
+#         if args.line_scan=="multi":
+#             data = data.sum(1)
+#         else:
+#             assert data.shape[1]==1
+#             data = data[:,0]
+#         linescan = LineScan(
+#             data = data.T,
+#             metadata = rec.Series[name]["metadata"],
+#             name = lsname
+#             )
+#         linescan.plot(save=os.path.join(saveDir,lsname.replace(": ","_")+".png"), Npoints=2000)   
 
 if args.test:
     for k in args.__dict__.keys():
@@ -88,8 +70,9 @@ if args.verbose:
 import os
 import warnings
 import numpy as np
+np.corrcoef(*np.random.randn(2,3))
 import pickle
-from sys import exc_info
+from sys import exc_info, exit
 
 from pandas import DataFrame
 from sys import path as syspath
@@ -107,7 +90,7 @@ with warnings.catch_warnings():
     from caiman import load as cload
 
 
-pathToTif = args.use_this
+pathToTif = args.use_tif
 recFile = args.recording
 ser = args.series
 
@@ -169,7 +152,7 @@ else:
 if args.line_scan!="none":
     process_as_linescans()
     bf.javabridge.kill_vm()
-    quit()
+    exit()
 ################### LINESCANS STOP HERE ################    
     
 # if args.debug: assert False  #### debug stop ###
@@ -189,8 +172,8 @@ movie = cmovie(
     fr=metadata.Frequency
 )
 
-if args.test:
-    movie = movie[:,:50,:50]
+# if args.test:
+#     movie = movie[:,:50,:50]
 
 #### movie saving (or not)
 if len(rec.metadata)==1:
@@ -219,7 +202,7 @@ if writeMovie:
     if not args.test: saveMovie(movie,movieFilename)
 
 if args.only_movie:
-    quit()
+    exit()
 
 
 #### protocol filename
@@ -229,10 +212,12 @@ if not os.path.isfile(protocolFilename):
     if not args.test:
         DataFrame([[None]*4],columns=["compound","concentration","begin","end"]).to_csv(protocolFilename,index=False)
 
-filtSizes = get_filterSizes(metadata.pxSize)
+if args.spatial_filter is None:
+    filtSizes = get_filterSizes(metadata.pxSize)
+else:
+    filtSizes = args.spatial_filter.split(",")
+    filtSizes = [eval(el.replace("+",",")) if "+" in el else (int(el),) for el in filtSizes]
 
-if args.test:
-    filtSizes = filtSizes[:1]
 # # anull saturated above threshold
 # Nsatur = (movie==movie.max()).sum(0)
 # toAnull = np.where(Nsatur>len(movie)*fracSaturTh)
@@ -255,8 +240,11 @@ for spFilt in filtSizes:
         print (f"initiallized with {len(regions.df)} rois.")
 
 #     regions.purge_lones((min(spFilt)*.4)**2, verbose=args.verbose)
+    regions.merge_closest(verbose=args.verbose)
     regions.sortInOrder()
     regions.calcTraces()
+    regions.infer_gain()
+    regions.calc_interest()
     regions.metadata = metadata
     if not args.test: 
         saveRois(regions, saveDir, filename= ".".join(map(str,spFilt)), add_date=False, formats=["vienna"])

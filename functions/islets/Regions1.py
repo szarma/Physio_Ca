@@ -347,7 +347,7 @@ class Regions:
                 "trend":ydbl
             }
 
-    def merge_closest(self, mergeSizeTh=10, mergeDist=1, plot=False, Niter = 20):
+    def merge_closest(self, mergeSizeTh=10, mergeDist=1, plot=False, Niter=20, verbose=False):
         if plot:
             plt.figure(figsize=(7*Niter,6))
 
@@ -358,7 +358,7 @@ class Regions:
             df = df.query(f"dist<={mergeDist} and size_from<={size_th}")
             if len(df):
                 if plot:
-                    ax = plt.subplot(1,20,ia)
+                    ax = plt.subplot(1,Niter,ia)
                     ax.imshow(self.statImages[self.mode], cmap="Greys", norm=LogNorm())
                     xl = ax.get_xlim()
                     yl = ax.get_ylim()
@@ -375,8 +375,6 @@ class Regions:
             ia += 1
         if plot:
             plt.tight_layout()
-        if calcInterest:
-            self.calc_interest()
     
         
     def update(self, movie_=None):
@@ -483,7 +481,9 @@ class Regions:
             txt = str(length)
             if "pxUnit" in self.metadata:
                 txt += self.metadata["pxUnit"]
-            ax.text((x0+x1)/2, y1+.2*(y1-y0), txt, va="top", ha="center", size=ax.get_figure().get_size_inches()[0]*2.5)
+#             fontsize = ax.get_figure().get_size_inches()[0]*2.5
+            fontsize = 12
+            ax.text((x0+x1)/2, y1+.2*(y1-y0), txt, va="top", ha="center", size=fontsize)
             
     def plotPeaks(self, ix=None, ax=None, image=False, ms=1, labels=False,color=None, imkw_args={},absMarker=True):
         if ax is None:

@@ -1,6 +1,5 @@
 from contextlib import contextmanager
 
-
 @contextmanager
 def suppress_stdout():
     import os, sys
@@ -11,6 +10,17 @@ def suppress_stdout():
             yield
         finally:
             sys.stdout = old_stdout
+            
+@contextmanager
+def suppress_stderr():
+    import os, sys
+    with open(os.devnull, "w") as devnull:
+        old_stderr = sys.stderr
+        sys.stderr = devnull
+        try:  
+            yield
+        finally:
+            sys.stderr = old_stderr
             
 
 def getCircularKernel(n, dtype="uint8"):
