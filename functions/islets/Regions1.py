@@ -40,8 +40,8 @@ def load_regions(path,
     try:
         regions.update()
         pickleDir = os.path.split(path)[0]
-        if "examine3" not in dir(regions):
-            regions = Regions(regions)
+#         if "examine3" not in dir(regions):
+        regions = Regions(regions)
         try:
             protocolFile = os.path.join(pickleDir, [f for f in os.listdir(pickleDir) if "protocol" in f][0])
             regions.import_protocol(protocolFile)
@@ -51,33 +51,7 @@ def load_regions(path,
         # regions.sortInOrder()
         regions.detrend_traces()
         regions.infer_gain(plot=plot)
-        if plot:
-            plt.figure(figsize=(7*20,6))
-
-        ia = 1
-        while True:
-            size_th = np.percentile(regions.df["size"].values, mergeSizeTh)
-            df = getPeak2BoundaryDF(regions.df)
-            df = df.query(f"dist<={mergeDist} and size_from<={size_th}")
-            if len(df):
-                if plot:
-                    ax = plt.subplot(1,20,ia)
-                    ax.imshow(regions.statImages[regions.mode], cmap="Greys", norm=LogNorm())
-                    xl = ax.get_xlim()
-                    yl = ax.get_ylim()
-                else:
-                    ax = None
-                suggestGraph = getGraph_of_ROIs_to_Merge(df.iloc[:,:2], regions, plot=plot,ax=ax)
-                if plot:
-                    ax.set_xlim(xl)
-                    ax.set_ylim(yl)
-                mergeBasedOnGraph(suggestGraph, regions, verbose=verbose)
-            else:
-                # print ("No more suggestions.")
-                break
-            ia += 1
-        if plot:
-            plt.tight_layout()
+        regions.merge_closest(mergeSizeTh=mergeSizeTh, mergeDist=mergeDist, plot=plot, Niter=15, verbose=verbose)
         if calcInterest:
             regions.calc_interest()
     except:

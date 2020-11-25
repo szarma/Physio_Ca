@@ -530,9 +530,9 @@ def examine(self,
 
             if k not in self.df:
                 if filtTs<=10:
-                    self.fast_filter_traces(filtTs,Npoints=1000,)
+                    self.fast_filter_traces(filtTs,Npoints=np.inf,)
                 else:
-                    self.fast_filter_traces(filtTs,Npoints=1000,z_sp=0)
+                    self.fast_filter_traces(filtTs,Npoints=np.inf,z_sp=0)
                 out += f"filtering for features shorter than ~{filtTs}s done."
             else:
                 out += f"Traces filtered at {filtTs}s already exist"
