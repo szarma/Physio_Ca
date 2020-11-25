@@ -150,6 +150,8 @@ else:
 if args.line_scan!="none":
     process_as_linescans()
     bf.javabridge.kill_vm()
+    if 'rec' in globals():
+        del rec
     exit()
 ################### LINESCANS STOP HERE ################    
     
@@ -200,6 +202,8 @@ if writeMovie:
     if not args.debug: saveMovie(movie,movieFilename)
 
 if args.only_movie:
+    if 'rec' in globals():
+        del rec
     exit()
 
 
@@ -249,4 +253,7 @@ for spFilt in filtSizes:
     if not args.debug:
         del regions
 
+
+if 'rec' in globals():
+    del rec
 exit()

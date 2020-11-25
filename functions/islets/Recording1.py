@@ -138,9 +138,10 @@ class Recording:
             if "Name" in self.metadata:
                 self.allSeries = self.metadata.Name.values
                 
-#     def __del__(self):
-#         import javabridge
-#         javabridge.kill_vm()
+    def __del__(self):
+        if hasattr(self, "tempdir"):
+            from os import system
+            system(f"rm -rf {self.tempdir}")
         
     def parse_metadata(self,verbose=False):
         metadata = pd.DataFrame(columns=[
@@ -321,8 +322,12 @@ class Recording:
                 return metadata2
         ###################### if not onlyMeta ##################
         if pathToTif is None:
-            data = np.zeros((metadata1.SizeT, metadata1.SizeY, metadata1.SizeX), dtype=metadata1["bit depth"])
-
+            if not hasattr(self, "tempdir"):
+                self.tempdir = f"/data/.tmp/{np.random.randint(int(1e10))}"
+                os.makedirs(self.tempdir)
+            filename = os.path.join(self.tempdir, f"{Series}.memmap")
+            data =np.memmap(filename, dtype=metadata1["bit depth"], mode="w+",
+                      shape=(metadata1.SizeT, metadata1.SizeY, metadata1.SizeX))
             try:
                 self.rdr
             except:
@@ -371,8 +376,6 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
             if any([constr.strip() not in cur+f for constr in constrain.split(",")]):
                 continue
             path = os.path.join(cur,f)
-            pathToMeta = os.path.join(cur,"."+f+".meta")
-            if not os.path.isfile(pathToMeta): continue
             recordings += [path]
     recordings = sorted(recordings)
     
