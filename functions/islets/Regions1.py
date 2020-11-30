@@ -190,7 +190,7 @@ class Regions:
         if full and not hasattr(self,"df"):
             self.constructRois(mode=mode, img_th=img_th, diag=diag, gSig_filt=gSig_filt, processes=processes, excludePixels=excludePixels, verbose=verbose, use_restricted=use_restricted)
             
-    def constructRois(self, mode, img_th=0, diag=True, gSig_filt=None, processes=5,excludePixels=None, verbose=False,use_restricted=False):
+    def constructRois(self, mode, img_th=0, diag=True, gSig_filt=None, processes=5,excludePixels=None, verbose=False,use_restricted=True):
         from .numeric import robust_max
         if mode=="custom":
             image0=self.statImages[mode]
@@ -522,9 +522,13 @@ class Regions:
     def calcTraces(self, movie_=None, FrameRange=None):
         if movie_ is None:
             movie_ = self.movie
+        else:
+            self.movie = movie_
         if FrameRange is None:
             try: FrameRange = self.FrameRange
             except: FrameRange = [0,len(movie_)]
+        else:
+            self.FrameRange = FrameRange
         i0,ie = FrameRange
         traces = np.ones((len(self.df),(ie-i0)))*np.nan
         for i,ix in enumerate(self.df.index):

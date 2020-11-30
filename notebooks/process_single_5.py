@@ -15,6 +15,8 @@ parser.add_argument('--leave-movie', const=True, default=False,action="store_con
                     help='if the movie exists, do not attempt to overwrite it')
 parser.add_argument('--verbose', const=True, default=False,action="store_const",
                     help='toggle verbose output')
+# parser.add_argument('--mostly-blank', const=True, default=False,action="store_const",
+#                     help='use if the FOV contains large areas without cells')
 parser.add_argument('--leave-pickles', const=True, default=False,action="store_const",
                     help='if the pickles exist, do not attempt to overwrite them')
 parser.add_argument('--only-movie', const=True, default=False, action="store_const",
@@ -156,7 +158,6 @@ if args.line_scan!="none":
     exit()
 ################### LINESCANS STOP HERE ################    
     
-# if args.debug: assert False  #### debug stop ###
 
 if restrict is None:
     restrict = (0,-2)
@@ -168,10 +169,28 @@ metadata = rec.Series[serToImport]['metadata']
 if start_vm:
     bf.javabridge.kill_vm()
 
-movie = cmovie(
-    rec.Series[serToImport]['data'],
-    fr=metadata.Frequency
-)
+
+if args.debug: assert False  #### debug stop ###
+    
+
+    
+# movie = cmovie(
+#     rec.Series[serToImport]['data'],
+#     fr=metadata.Frequency
+# )
+nrebin = int(np.round(metadata.Frequency/2))
+if nrebin<=1:
+    movie = cmovie(
+        rec.Series[serToImport]['data'],
+        fr=metadata.Frequency
+    )
+else:
+    movie = cmovie(
+        rebin(rec.Series[serToImport]['data'], nrebin),
+        fr=metadata.Frequency/nrebin
+    )
+
+
 
 # if args.debug:
 #     movie = movie[:,:50,:50]
@@ -198,6 +217,7 @@ if os.path.isfile(movieFilename):
         if args.verbose: print("and I leave it be.")
     else:
         if args.verbose: print("and I'll rewrite it.")
+
 if writeMovie:
     if args.verbose: print("Writing the movie...")
     if not args.debug: saveMovie(movie,movieFilename)
@@ -237,7 +257,9 @@ for spFilt in filtSizes:
     else:
         if args.verbose: print ("processing with filter size of ", spFilt)
 
-    regions = Regions(movie,gSig_filt=spFilt,diag=True)
+    regions = Regions(movie,gSig_filt=spFilt,diag=True, 
+                      # use_restricted=args.mostly_blank
+                     )
     regions.time += metadata.time_range[0]
     if args.verbose:
         print (f"initiallized with {len(regions.df)} rois.")
@@ -249,6 +271,9 @@ for spFilt in filtSizes:
     regions.infer_gain()
     regions.calc_interest()
     regions.metadata = metadata
+    if nrebin>1: 
+        movie = cmovie( rec.Series[serToImport]['data'], fr=metadata.Frequency)
+        regions.update(movie, FrameRange=(0,len(movie)))
     if not args.debug: 
         saveRois(regions, saveDir, filename= ".".join(map(str,spFilt)), add_date=False, formats=["vienna"])
     if not args.debug:

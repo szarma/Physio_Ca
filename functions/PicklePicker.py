@@ -39,7 +39,7 @@ bodyStyle = {
 global regions
 regions = None
 
-def PicklePicker(pathToRec=None,series=None,appWidth=1500,debug=False,appHeight=1200,showExamine=True):
+def PicklePicker(pathToRec=None,series=None,appWidth=1500,debug=False,appHeight=1200,showExamine=True,max_rois=10):
     allRecs = sorted([os.path.join(cur,f) for cur,ds,fs in os.walk("/data") for f in fs if f.endswith(".lif") or f.endswith(".nd2") or f.endswith(".tif")])
     allRecs = [f for f in allRecs if os.path.isfile(f.replace(os.path.split(f)[1],"."+os.path.split(f)[1]+".meta"))]
 #     if pathToRec is not None and pathToRec in allRec and ser is not None:
@@ -241,7 +241,7 @@ def PicklePicker(pathToRec=None,series=None,appWidth=1500,debug=False,appHeight=
                     "Number of ROIs: %i"%len(regions.df),
                 ]
                 if showExamine:
-                    japp = regions.examine()
+                    japp = regions.examine(max_rois=max_rois)
                     japp._repr_html_() 
                     link2app = "https://ctn.physiologie.meduniwien.ac.at"+japp.get_app_root_url()
             else: ####### line scan ################
