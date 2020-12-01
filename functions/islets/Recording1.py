@@ -488,7 +488,11 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
                 md["add_info done"] = os.path.isfile(pathToAddInfo)
                 if md["add_info done"] and os.path.getsize(pathToAddInfo)>10:
                     # print (ser, )
-                    addInfo = pd.read_csv(pathToAddInfo, sep=":", header=None, index_col=0).T
+                    try:
+                        addInfo = pd.read_csv(pathToAddInfo, sep=":", header=None, index_col=0).T
+                    except:
+                        md["add_info done"] = False
+                        continue
                     if len(addInfo)==0:
                         md["add_info done"] = False
                         continue

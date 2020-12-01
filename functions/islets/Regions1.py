@@ -410,7 +410,7 @@ class Regions:
         out = np.unique(out,axis=0)
         return out
     
-    def plotEdges(self, ix=None, ax=None, image=True, imkw_args={}, separate=False, color="darkred", lw=None, alpha=1, fill=False):
+    def plotEdges(self, ix=None, ax=None, image=True, imkw_args={}, separate=False, color="darkred", lw=None, alpha=1, fill=False, showScale=True):
         if ix is None:
             ix = self.df.index
         if ax is None:
@@ -445,7 +445,7 @@ class Regions:
             y,x = np.array(tmp).T
             ax.plot(x,y,color,lw=lw,alpha=alpha)
             
-            
+        if not showScale: return None
         if hasattr(self, "metadata") and "pxSize" in self.metadata:
             lengths = [10,20,50]
             il = np.searchsorted(lengths,self.metadata.pxSize*self.image.shape[1]/10)
