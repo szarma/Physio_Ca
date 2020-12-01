@@ -26,8 +26,7 @@ microscope
 
 def serve_examiner(username="srdjan", 
                    rec="",
-                   ser=""
-#                    pickleFilename = "/data/Sandra/2019/2019_08_09/Experiment27.lif_analysis/Series014/13.15_rois.pkl"
+                   ser="",
                   ):
     with open(f"/data/.tmp/empty_roi_examiner.ipynb","r") as f:
         nb_text = f.read()
@@ -105,7 +104,7 @@ conditionalFormats += [
     for col in ["experiment"]
 ]
 
-users = ["srdjan","johannes","sandra","marjan","arianna","nastja","ya-chi"]
+users = sorted(["srdjan","johannes","sandra","marjan","arianna","nastja","ya-chi","dean"])
 app = dash.Dash(__name__,suppress_callback_exceptions=True)
 
 # if __name__=="__main__":
@@ -179,6 +178,7 @@ app.layout = html.Div(children=[
             size="30"
         ),
         html.Button(id="update-table",children="Update table",n_clicks=1),
+        html.Div(id="table-feedback"),
     ],),   
     checkboxes,
     html.Div(id="parser",children="",style={
@@ -233,7 +233,8 @@ def cols_sel(*collist):
 @app.callback(
     [Output("table","data"),
      Output("table","selected_rows"),
-     Output("table","tooltip_data")
+     Output("table","tooltip_data"),
+     Output("table-feedback","children")
     ],
     [Input("update-table","n_clicks"),],
     [State("main_folder","value"),
@@ -241,9 +242,12 @@ def cols_sel(*collist):
 )
 def update_table(n_clicks, main, restrict):
     if n_clicks>0:
-        df = prepareDF(main,restrict)
-        tooltip_data=[{column: {'value': str(value).replace("\n","\n\n"), 'type': 'markdown'} for column, value in row.items() if column in ["protocol","Series Durations"]} for row in df.to_dict('rows')]
-        return df.to_dict('records'), [0], tooltip_data
+        try:
+            df = prepareDF(main,restrict)
+            tooltip_data=[{column: {'value': str(value).replace("\n","\n\n"), 'type': 'markdown'} for column, value in row.items() if column in ["protocol","Series Durations"]} for row in df.to_dict('rows')]
+            return df.to_dict('records'), [0], tooltip_data, "ok"
+        except:
+            return no_update, no_update, no_update, str(exc_info())
 
 
 @app.callback(
@@ -255,13 +259,18 @@ def update_table(n_clicks, main, restrict):
 def save_protocol(n_clicks, txt, path):
     if n_clicks>0:
         path = path.split(")")[0].split("(")[-1]
-        with open(path,"w") as f:
-            f.write(txt)
-        txt1 = open(path).read()
-        if txt==txt1:
-            out = "File saved ✔"
+        folder = os.path.split(path)[0]
+        nConflicts = len([f for f in os.listdir(folder) if "protocol" in f])-1
+        if nConflicts:
+            out = html.Div("There is at least one other protocol file in the same folder. Please remove it before saving.", style={"font-size":"small","font-color":"darkred"})
         else:
-            out = "File not saved ✘"
+            with open(path,"w") as f:
+                f.write(txt)
+            txt1 = open(path).read()
+            if txt==txt1:
+                out = "File saved ✔"
+            else:
+                out = "File not saved ✘"
         return out
     
 @app.callback(
@@ -314,6 +323,8 @@ def serve_explorer_link(selected_rows, username, data):
     try:
         if selected_rows is None:
             return "Select a row to show details." #######################
+        if username is None:
+            return "Please choose your username from the dropdown menu above."
         else:
             ix = selected_rows[-1]
             rec = data[ix]["path to exp"]
@@ -386,10 +397,42 @@ def serve_stuff(selected_rows, data):
             if not os.path.isfile(protocolPath):
                 with open(protocolPath,"w") as f: f.write("")
             txt = open(protocolPath).read()
-            link = "https://ctn.physiologie.meduniwien.ac.at/user/srdjan/edit/local_"+protocolPath.lstrip("/")
+            protocolFolder = os.path.split(protocolPath)[0]
+            noProts = len([ff for ff in os.listdir(protocolFolder) if "protocol" in ff])
             protocolContent = [
-                html.A(  'Edit protocol file', href=link, target='_blank')
+                "Protocol file",
+                html.Br(),
+                html.Div(
+                    protocolPath,
+                    id="protocol-path",
+                    style={"display":"none"}
+                ),
+                dcc.Textarea(
+                    id="protocol-text",
+                    value = txt,
+                    style={
+                        "font-family":"Courier New",
+#                         "font-size":"80%",
+                        'border': 'thin lightgrey solid',
+                        "width":"95%",
+                        "height":"250px",
+                        'overflowX': 'scroll',
+                        'overflowY': 'scroll',}
+                ),
+                html.Button(
+                    'Save protocol',
+                    id='protocol-save-button',
+                    n_clicks=0,
+                ),
+                html.Div(id="protocol-save-out")
             ]
+#             if not os.path.isfile(protocolPath):
+#                 with open(protocolPath,"w") as f: f.write("")
+#             txt = open(protocolPath).read()
+#             link = "https://ctn.physiologie.meduniwien.ac.at/user/srdjan/edit/local_"+protocolPath.lstrip("/")
+#             protocolContent = [
+#                 html.A(  'Edit protocol file', href=link, target='_blank')
+#             ]
         except:
             protocolContent = [str(exc_info())]
         protocolContent += [html.Div(str(protocolPath), style={"font-size":"50%"}),]
