@@ -971,8 +971,11 @@ class Regions:
             pass
         return protocol
 
-    def examine(self, max_rois=10, imagemode=None, debug=False, startShow='',mode="jupyter",name=None,lw=None):
-        from .examine import examine
+    def examine(self, max_rois=10, imagemode=None, debug=False, startShow='',mode="jupyter",name=None,lw=None, test=False):
+        if test:
+            from .examine_test import examine
+        else:
+            from .examine import examine
         if imagemode is None:
             imagemode = self.mode
         return examine(self, max_rois=max_rois, imagemode=imagemode, debug=debug, startShow=startShow,mode=mode,name=name)

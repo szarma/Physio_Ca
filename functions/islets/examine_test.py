@@ -6,10 +6,18 @@ import plotly.graph_objects as go
 from .utils import getFigure
 import dash
 import json
-# from dash import callback_context as ctx
+from .utils import saveRois
 
 
-def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode="jupyter",name=None,lw=None):
+def examine(self, 
+            max_rois=10, 
+            imagemode=None, 
+            debug=False, 
+            startShow="all",
+            mode="jupyter",
+            name=None,
+            lw=None,
+           ):
     if name is None:
         name = __name__
     if type(startShow)!=str:
@@ -49,24 +57,47 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode
     if not hasattr(self,"gain"):
         self.infer_gain()
     SelectedRois = html.Div([
-            html.Div([
-                   "Selected ROIs:",
-                    dcc.Input(id="selected-rois",
-                        type="text",
-                        debounce=False,
-                        size=16,
-                        value="",#.join(list(map(str,self.df.index[:max_rois]))),
-                        ),
-                ],style={"visibility":"visible" if debug else "hidden"}),
-            html.Button('Discard unselected', id='discard-button', style={"display":"inline-block"},
+        html.Div([
+               "Selected ROIs:",
+                dcc.Input(id="selected-rois",
+                    type="text",
+                    debounce=False,
+                    size=16,
+                    value="",#.join(list(map(str,self.df.index[:max_rois]))),
+                    ),
+            ],style={"display":"block" if debug else "none"}),
+        html.Div([
+            html.Button('Discard unselected',
+                        id='discard-button',
                         n_clicks=0),
-            html.Div(id="discard-feedback",children="_",
-                 style={"display":"block",**outputStyle,}
-                ),
-            html.Button('Mark for merging', id='mark-button', style={"display":"inline-block"},
-                        n_clicks=0),
-            html.Button('Merge', id='merge-button', style={"display":"inline-block"},
-                        n_clicks=0),
+            html.Button('Discard selected',
+                        id='discard-button-selected',
+                        n_clicks=0),],
+            style={"display":"inline-block","width":"200px"},
+        ),
+        html.Div([
+            html.Button('Mark for merging', id='mark-button', n_clicks=0,style={"display":"block" if debug else "none"}),
+            html.Button('Merge', id='merge-button', n_clicks=0),], 
+            style={"display":"inline-block","width":"200px"},
+        ),
+        html.Pre(id="discard-feedback",children="_",
+             style={"display":"block",**outputStyle,}
+            ),
+        html.Div([
+            html.Button(id="tag-button", children="Tag cells",
+                    n_clicks=0,style={"display":"inline-block"}),
+            dcc.Dropdown(id="tag-drop", multi=True,value=[],options = [
+                {"label":opt,"value":opt} for opt in [
+                    "islet","non-islet","ductal","beta","non-beta","interesting"
+                ]],style={"width":"200px",}),
+        ],style={'align-items': 'center', 'display': 'flex'}),
+        html.Pre(id="tag-feedback",children="_",
+             style={**outputStyle}
+            ),
+        html.Button(id="save-button", children="Save", n_clicks=0),
+        html.Pre(id="save-feedback",children="_",
+             style={"display":"inline-block",**outputStyle,"padding":"5px"}
+            ),
     ])
     if not "detrended" in self.df.columns:
         try:
@@ -78,8 +109,6 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode
         html.Div([
            "Choose columns",
             dcc.Dropdown(id="cols-input",
-#                 debounce=False,
-#                 size=6,
                 value=["detrended" if "detrended" in self.df.columns else "trace"],
                  options=[{"value":c,"label":c} for c in self.df.columns if \
                           hasattr(self.df[c].iloc[0],"shape") \
@@ -88,7 +117,6 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode
                  multi=True
              ),
             ],
-#             style={"display": "inline-block"}
         ),
         html.Div([
            "Filter Timescale",
@@ -97,7 +125,6 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode
                 debounce=True,
                 size=10,
                 placeholder="30",
-#                 value="30",
               style={"width":"20px","margin-right":"5px","margin-left":"3px"},
              ),
             html.Button("Filter",id="filter-button",n_clicks=0),
@@ -125,7 +152,14 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode
                 value=[]),style={"display":"inline-block"}),
         ]),
     ])
-
+    initNcs = {"discard_unsel":0,"discard_sel":0,"mark":0,"merge":0}
+    
+    movieCloseup = [
+        html.H3("Movie closeup"),
+        html.Button("create", id="create-closeup", n_clicks=0,),
+        html.Div(id="closeup-output")
+                   ]
+    
     APP_LAYOUT = [
         html.Div([
             html.Div([
@@ -138,11 +172,12 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode
                             value=startShow,
                             ),
                     ],),
-                html.Div(id="hidden",children=json.dumps({"discard":0,"mark":0,"merge":0}),
-                     style={"display":"block",**outputStyle,"visibility":"visible" if debug else "hidden"}
-                    ),
                 dcc.Graph(id="roi-selector",figure = roisImage),
-                SelectedRois
+                SelectedRois,
+                html.Pre(id="hidden",children=json.dumps(initNcs, indent=2),
+                     style={"display":"block" if debug else "none",**outputStyle}
+                    ),
+                html.Details(title="Movie Closeup",children=movieCloseup)
             ],style={"max-width":"550px","max-height":"550px",
 #                      "border":"thin grey solid"
                     }),
@@ -173,6 +208,40 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode
                           style={"family":"Arial"}
                          )
     @app.callback(
+        Output("tag-feedback","children"),
+        [Input("tag-button", "n_clicks"),],
+        [State("tag-drop", "value"),
+         State("selected-rois", "value")
+        ],
+        )
+    def tag(n_clicks,tags,selectedData):
+        try:
+            if n_clicks>0:
+                if "tag" not in self.df.columns:
+                    self.df["tag"] = [""]*len(self.df)
+                selected = list(eval(selectedData))
+                for i in selected:
+                    self.df.loc[i,"tag"] = "|".join([self.df.loc[i,"tag"]]+tags).strip("|")
+                return f"Successfully applied tags for {len(selected)} rois."
+        except:
+            return str(exc_info())
+        
+        
+        
+    @app.callback(
+        Output("save-feedback","children"),
+        [Input("save-button", "n_clicks"),],
+        )
+    def save(n_clicks):
+        from os.path import split
+        try:
+            if n_clicks>0:
+                folder, fname = split(self.pathToPickle)
+                return saveRois(self,folder,fname.replace("_rois.pkl",""),formats=["vienna"])
+        except:
+            return str(exc_info())
+            
+    @app.callback(
         Output("selected-rois", "value"),
         [Input("roi-selector", "selectedData"),],
         )
@@ -190,30 +259,39 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode
          Output("hidden", "children"),
          Output("roi-selector","figure")],
         [Input("discard-button","n_clicks"),
+         Input("discard-button-selected","n_clicks"),
          Input("mark-button","n_clicks"),
          Input("merge-button","n_clicks"),
          Input("selectspec-rois","value"),],
         [State("selected-rois", "value"),
          State("hidden","children")]
                  )
-    def mark_discard_callback(discard_clicks,mark_clicks,merge_clicks,selspec,selected,curnc):
-        out = "___"
-        d = {"discard":discard_clicks,
-             "mark":mark_clicks,
-             "merge":merge_clicks}
-        outcurns = json.dumps(d)
+    def mark_discard_callback(discard_unsel_clicks,discard_sel_clicks,mark_clicks,merge_clicks,selspec,selected,curnc):
+        out = ["-"*40]
         fig = getFigure()
+        outcurns = "nothing"
         try:
+#             out += [html.Br(),"what now?"]
+            d = {
+                 "discard_unsel": discard_unsel_clicks,
+                 "discard_sel":  discard_sel_clicks,
+                 "mark":         mark_clicks,
+                 "merge":        merge_clicks
+                }
+            outcurns = json.dumps(d, indent=2)
             curnc = json.loads(curnc)
             ##########
-            if discard_clicks>curnc["discard"]:
-                mode="discard"
+            if discard_unsel_clicks>curnc["discard_unsel"]:
+                mode="discard_unsel"
+            elif discard_sel_clicks>curnc["discard_sel"]:
+                mode="discard_sel"
             elif mark_clicks>curnc["mark"]:
                 mode="mark"
             elif merge_clicks>curnc["merge"]:
                 mode="merge"
             else:
                 mode="plot"
+            #out += [html.Br(),f"mode = {mode}"]
             ##########
             if selspec=="all" or selspec=="":
                 seeIndices = self.df.index
@@ -228,13 +306,26 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode
                 except:
                     selectedIndices = [int(selected)]
             ##########
-            if mode=="discard":
+            if mode=="discard_unsel":
                 nremoved = len(self.df)-len(selectedIndices)
                 self.df = self.df.loc[selectedIndices]
-                out = "%i rois removed."%(nremoved)
-            if mode in ["discard","plot"]:
-                seeIndices = np.intersect1d(seeIndices, selectedIndices)
-                fig = showRoisOnly(self, indices=seeIndices, im=self.statImages[imagemode], showall=False, lw=lw)
+                out += [html.Br(), "%i rois removed."%(nremoved)]
+                self.update()
+            if mode=="discard_sel":
+                nremoved = len(selectedIndices)
+                if nremoved>len(self.df)/2:
+                    out += [html.Br(), "Can remove max 50% of existing rois in one go. Sorry, this is for your own safety :-)"]
+                else:
+                    # out += [html.Br(), "removing: "+",".join(selectedIndices.astype(str))]
+                    self.df.drop(index=selectedIndices, inplace=True)
+                    out += [html.Br(), "%i rois removed."%(nremoved)]
+                    self.update()
+            if mode in ["discard_sel","discard_unsel","plot"]:
+#                 if mode=="discard_sel":
+#                     seeIndices = np.array([j for j in seeIndices if j not in selectedIndices])
+#                 else:
+#                     seeIndices = np.intersect1d(seeIndices, selectedIndices)
+                fig = showRoisOnly(self, im=self.statImages[imagemode], showall=False, lw=lw)
             ##########
 #             if mode=="plot":
 #                 fig = showRoisOnly(self, indices=self.df.index, im=self.statImages[imagemode], showall=False)
@@ -245,7 +336,7 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode
                 self.mergeGraph = gph
             if mode=="mark":
                 A = adjacency_matrix(gph, nodelist=range(len(self.df)))
-                out = "If you now merge, this is how rois will be merged"
+                out += [ html.Br(), "If you now merge, this is how rois will be merged"]
                 fig = showRoisOnly(self, indices=selectedIndices, im=self.statImages[imagemode], showall=True, lw=lw)
                 for j,i in zip(*A.nonzero()):
                     fig.add_annotation(
@@ -268,14 +359,14 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode
             if mode=="merge":
                 dn = mergeBasedOnGraph(self.mergeGraph, self)
                 del self.mergeGraph
-                out = f"{dn} rois merged into existing roi(s)"
+                out += [ html.Br(), f"{dn} rois merged into existing roi(s)"]
                 fig = showRoisOnly(self, indices=self.df.index, im=self.statImages[imagemode], showall=True, lw=lw)
             
 
         except:
             from sys import exc_info
-            out += "  "+str(exc_info())
-            pass
+            out += [html.Br(),"  "+str(exc_info())]
+            
         
         return out, outcurns, fig
 
@@ -291,6 +382,7 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode
                  )
     def plot_callback(selected,shownRois,cols,nRebin,offset,checklist,rlod):
         from sys import exc_info
+        out = ""
         try:
             if cols is None or cols==[]:
                 return no_update
@@ -307,7 +399,13 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode
             offset=float(offset)
             toSum = bool(len(checklist))
             if not toSum:
-                selectedIndices = selectedIndices[:max_rois]
+                if "interest" in self.df.columns:
+                    selectedIndices = list(
+                        self.df.loc[selectedIndices].sort_values(
+                        "interest", ascending=False
+                        ).index)[:max_rois]
+                else:
+                    selectedIndices = selectedIndices[:max_rois]
             from plotly.subplots import make_subplots
             from .Regions import MYCOLORS
             try:
@@ -405,14 +503,14 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode
 
             return fg
         except:
-            out += exc_info().__repr__().replace(",","<br>")
+            out += str(exc_info()).replace(",","<br>")
             fg = getFigure(300,300)
             fg.add_trace(go.Scatter(
                     x = [0],
                     y = [0],
                     mode="text",
                     text=[out],
-                    textposition="upper right",
+                    textposition="top right",
                     showlegend=False,))
             return fg
 
@@ -438,7 +536,10 @@ def examine(self, max_rois=10, imagemode=None, debug=False, startShow="all",mode
             k = "faster_%g"%filtTs
 
             if k not in self.df:
-                self.fast_filter_traces(filtTs,Npoints=1000)
+                if filtTs<=10:
+                    self.fast_filter_traces(filtTs,Npoints=np.inf,)
+                else:
+                    self.fast_filter_traces(filtTs,Npoints=np.inf,z_sp=0)
                 out += f"filtering for features shorter than ~{filtTs}s done."
             else:
                 out += f"Traces filtered at {filtTs}s already exist"
