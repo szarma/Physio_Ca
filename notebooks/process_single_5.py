@@ -270,9 +270,9 @@ for spFilt in filtSizes:
     regions.metadata = metadata
     if nrebin>1: 
         movie = cmovie( rec.Series[serToImport]['data'], fr=metadata.Frequency)
-        regions.update(calcTraces, FrameRange=(0,len(movie)))
+        regions.calcTraces( movie, FrameRange=(0,len(movie)))
     else:
-	regions.calcTraces()
+        regions.calcTraces()
     regions.infer_gain()
     regions.calc_interest()
     if not args.debug: 
