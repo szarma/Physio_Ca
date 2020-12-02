@@ -267,13 +267,14 @@ for spFilt in filtSizes:
 #     regions.purge_lones((min(spFilt)*.4)**2, verbose=args.verbose)
     regions.merge_closest(verbose=args.verbose)
     regions.sortInOrder()
-    regions.calcTraces()
-    regions.infer_gain()
-    regions.calc_interest()
     regions.metadata = metadata
     if nrebin>1: 
         movie = cmovie( rec.Series[serToImport]['data'], fr=metadata.Frequency)
-        regions.update(movie, FrameRange=(0,len(movie)))
+        regions.update(calcTraces, FrameRange=(0,len(movie)))
+    else:
+	regions.calcTraces()
+    regions.infer_gain()
+    regions.calc_interest()
     if not args.debug: 
         saveRois(regions, saveDir, filename= ".".join(map(str,spFilt)), add_date=False, formats=["vienna"])
     if not args.debug:
