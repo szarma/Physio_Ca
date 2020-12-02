@@ -205,7 +205,21 @@ def create_preview_image(regions, filepath=None, show=False):
 #                 anim.save(saveName)
 #         return None
     
-def show_movie(m_show, figScale = 1, out="jshtml",fps = 30, saveName=None, NTimeFrames=100,log=True,additionalPlot=None, dpi=100, tmax=None, autoadjust=True,cmapArgs=None):
+def show_movie(m_show,
+               figScale = 1,
+               out="jshtml",
+               fps = 30,
+               saveName=None,
+               NTimeFrames=100,
+               log=True,
+               additionalPlot=None,
+               dpi=100,
+               tmax=None,
+               autoadjust=True,
+               cmapArgs=None,
+               offset=(0,0),
+              ):
+    from islets.numeric import rebin
     import matplotlib.pyplot as plt
     from matplotlib import animation
     try:
@@ -215,6 +229,7 @@ def show_movie(m_show, figScale = 1, out="jshtml",fps = 30, saveName=None, NTime
     if tmax is not None:
         import matplotlib.patheffects as path_effects
         from pandas import Timedelta
+    m_show = m_show.copy()
     if NTimeFrames is not None:
         n_rebin = len(m_show)//NTimeFrames
         if n_rebin>1:
@@ -233,10 +248,11 @@ def show_movie(m_show, figScale = 1, out="jshtml",fps = 30, saveName=None, NTime
     plt.switch_backend('agg')
     fig = plt.figure(figsize=figsize,dpi=dpi)
     ax = fig.add_axes([0.01,0.01,.98,.98])
+    extent = (offset[0]-.5, offset[0]-.5+m_show.shape[2], offset[1]-.5+m_show.shape[1], offset[1]-.5, )
     if cmapArgs is None:
-        im = ax.imshow(m_show[0], cmap="Greys", vmin=m_show.min(), vmax=m_show.max())
+        im = ax.imshow(m_show[0], cmap="Greys", vmin=m_show.min(), vmax=m_show.max(), extent=extent)
     else:
-        im = ax.imshow(m_show[0], **cmapArgs)
+        im = ax.imshow(m_show[0], extent=extent, **cmapArgs)
     tx = ax.text(1,0," \n",
                  transform = ax.transAxes,
                  ha="right",
@@ -295,8 +311,9 @@ def show_movie(m_show, figScale = 1, out="jshtml",fps = 30, saveName=None, NTime
 #                 anim.save(saveName, extra_args=['-vcodec', 'libx264'])
 #         return None
     else:
-        raise ValueError("out can only be one of the following: 'html5, jshtml, save'")
-    
+        raise ValueError("out can only be one of the following: 'html5, jshtml, save'")    
+        
+        
 def getFigure(w=300,h=300,c="lightgrey"):
     import plotly.graph_objects as go
     fig = go.Figure(layout={
