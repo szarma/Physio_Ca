@@ -219,13 +219,9 @@ def show_movie(m_show,
                cmapArgs=None,
                offset=(0,0),
               ):
-    from islets.numeric import rebin
+    from .numeric import rebin
     import matplotlib.pyplot as plt
     from matplotlib import animation
-    try:
-        from .numeric import rebin
-    except:
-        pass
     if tmax is not None:
         import matplotlib.patheffects as path_effects
         from pandas import Timedelta

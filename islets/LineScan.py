@@ -106,8 +106,8 @@ class LineScan:
             fig.show()
 
     def detrend(self, fast=True, n=None, processes=1, func=None, points=100):
-        from islets.numeric import mydebleach
-        from islets.utils import multi_map
+        from .numeric import mydebleach
+        from .utils import multi_map
         if n is None:
             n = self.data.shape[0]
         self.detrended = np.zeros_like(self.data)

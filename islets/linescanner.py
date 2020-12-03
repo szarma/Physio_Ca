@@ -40,7 +40,7 @@ def take_part(ls, key, extent):
     return x0,x1,it0,it1
 
 def plot_heatmap(ls, key="zScore_2", extent=None, NTimepoints=300):
-    from islets.numeric import robust_max
+    from .numeric import robust_max
     x0,x1,it0,it1 = take_part(ls,key,extent)
     nt = it1-it0
     nr = int(nt/NTimepoints)

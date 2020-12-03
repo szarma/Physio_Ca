@@ -359,7 +359,7 @@ class Recording:
             return metadata2, data
 
 def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
-    from general_functions import td2str
+    from .general_functions import td2str
     from tqdm.notebook import tqdm
 #     tqdm().pandas()
     recordings = []
@@ -376,8 +376,8 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
             recordings += [path]
     recordings = sorted(recordings)
     
-    from islets.Recording import Recording, parse_leica
-    from islets.utils import get_series_dir, get_filterSizes
+    from .Recording import Recording, parse_leica
+    from .utils import get_series_dir, get_filterSizes
     import numpy as np
     import pandas as pd
     
