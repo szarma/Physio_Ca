@@ -9,7 +9,7 @@ from .utils import multi_map
 import plotly.graph_objects as go
 from .Regions import Regions as Regions0
 from matplotlib._color_data import TABLEAU_COLORS, CSS4_COLORS
-from general_functions import getCircularKernel
+from .general_functions import getCircularKernel
 import pickle
 from matplotlib.colors import LogNorm
 import os
