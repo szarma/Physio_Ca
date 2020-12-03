@@ -299,7 +299,7 @@ class Regions:
     
     def get_fov_trace(self, showFreq = 2, pixels=None):
         from .numeric import mydebleach
-        from physio_def_1 import rebin
+        from .physio_def_1 import rebin
         i0, ie = self.FrameRange
 #         n = int(self.movie.fr/showFreq)
         n = int(self.Freq/showFreq)
