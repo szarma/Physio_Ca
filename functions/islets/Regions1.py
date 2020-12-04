@@ -483,7 +483,7 @@ class Regions:
                 c = color
             ax.plot(*p[::-1],marker="o",mfc="none",ms=ms,c=c)
             if labels:
-                ax.text(*p[::-1],s=str(i),color=c)
+                ax.text(*p[::-1],s=" "+str(i),color=c)
     
     def calc_interest(self, zth=4, timescales=[3,10,30,100,300]):
         interesting = np.zeros(len(self.df))
@@ -538,6 +538,7 @@ class Regions:
         self.df["trace"] = list(traces)
         time = np.arange(len(movie_))/movie_.fr
         self.time = time[i0:ie]
+        self.Freq = movie_.fr
         
     def detrend_traces(self,fast=True, timescale=200):
 #         from .numeric import mydebleach

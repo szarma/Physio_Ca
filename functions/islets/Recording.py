@@ -138,9 +138,10 @@ class Recording:
             if "Name" in self.metadata:
                 self.allSeries = self.metadata.Name.values
                 
-#     def __del__(self):
-#         import javabridge
-#         javabridge.kill_vm()
+    def __del__(self):
+        if hasattr(self, "tempdir"):
+            from os import system
+            system(f"rm -rf {self.tempdir}")
         
     def parse_metadata(self,verbose=False):
         metadata = pd.DataFrame(columns=[
@@ -236,14 +237,12 @@ class Recording:
                 except:
                     if verbose: print("autocorr2d failed")
         
-                
-        
     def save_metadata(self):
         from os import umask
         umask(0o002)
         self.metadata.to_csv(self.metafile, float_format = "%#.3g")
         
-    def import_series(self, Series, onlyMeta=False, isLineScan=False, restrict=None, memmap=False, save=True, pathToTif=None):
+    def import_series(self, Series, onlyMeta=False, isLineScan=False, restrict=None, mode="auto", save=True, pathToTif=None):
         if Series=="all":
             SeriesList = self.allSeries
         elif Series in self.metadata.Name.values:
@@ -320,9 +319,43 @@ class Recording:
             else:
                 return metadata2
         ###################### if not onlyMeta ##################
-        if pathToTif is None:
-            data = np.zeros((metadata1.SizeT, metadata1.SizeY, metadata1.SizeX), dtype=metadata1["bit depth"])
-
+        
+        if pathToTif is not None:
+            if mode!="auto":
+                warn("If you supply a tiff file, the mode will be ignored.")
+                mode="auto"
+            print("loading")
+            # load motion corrected
+            from caiman import load as cload
+            data = cload(pathToTif)
+            data.fr = None
+            FrameRange = metadata2.frame_range
+            data = data[FrameRange[0]:FrameRange[1]]
+        else:
+            if mode=="auto":
+                Nbytes = np.zeros(1,dtype=metadata1["bit depth"]).nbytes
+                Nbytes = Nbytes * metadata1.SizeT * metadata1.SizeY * metadata1.SizeX
+                if Nbytes>1e9:
+                    mode="memmap"
+                else:
+                    mode="ram"
+            if mode=="memmap":
+                if not hasattr(self, "tempdir"):
+                    import tempfile
+                    tempdir = tempfile.gettempdir()
+                    self.tempdir = os.path.join(tempdir,f"{np.random.randint(int(1e10))}")
+                    os.makedirs(self.tempdir)
+                filename = os.path.join(self.tempdir, f"{Series}.memmap")
+                data =np.memmap(filename, dtype=metadata1["bit depth"], mode="w+",
+                          shape=(metadata1.SizeT, metadata1.SizeY, metadata1.SizeX))
+            elif mode=="ram":
+                data = np.zeros(
+                    shape=(metadata1.SizeT, metadata1.SizeY, metadata1.SizeX),
+                    dtype=metadata1["bit depth"],
+                )
+            else:
+                raise ValueError("mode can only take the following values: 'ram', 'memmap', and 'auto'.")
+        
             try:
                 self.rdr
             except:
@@ -345,14 +378,7 @@ class Recording:
 
             if isLineScan:
                 data = data.reshape((np.prod(data.shape[:2]),1,data.shape[-1]))
-        else:
-            print("loading")
-            # load motion corrected
-            from caiman import load as cload
-            data = cload(pathToTif)
-            data.fr = None
-            FrameRange = metadata2.frame_range
-            data = data[FrameRange[0]:FrameRange[1]]
+        
         if save:
             self.Series[Series]["data"] = data
         else:
@@ -371,8 +397,6 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
             if any([constr.strip() not in cur+f for constr in constrain.split(",")]):
                 continue
             path = os.path.join(cur,f)
-            pathToMeta = os.path.join(cur,"."+f+".meta")
-            if not os.path.isfile(pathToMeta): continue
             recordings += [path]
     recordings = sorted(recordings)
     
@@ -485,7 +509,11 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
                 md["add_info done"] = os.path.isfile(pathToAddInfo)
                 if md["add_info done"] and os.path.getsize(pathToAddInfo)>10:
                     # print (ser, )
-                    addInfo = pd.read_csv(pathToAddInfo, sep=":", header=None, index_col=0).T
+                    try:
+                        addInfo = pd.read_csv(pathToAddInfo, sep=":", header=None, index_col=0).T
+                    except:
+                        md["add_info done"] = False
+                        continue
                     if len(addInfo)==0:
                         md["add_info done"] = False
                         continue

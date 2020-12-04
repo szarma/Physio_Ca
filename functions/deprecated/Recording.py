@@ -138,10 +138,9 @@ class Recording:
             if "Name" in self.metadata:
                 self.allSeries = self.metadata.Name.values
                 
-    def __del__(self):
-        if hasattr(self, "tempdir"):
-            from os import system
-            system(f"rm -rf {self.tempdir}")
+#     def __del__(self):
+#         import javabridge
+#         javabridge.kill_vm()
         
     def parse_metadata(self,verbose=False):
         metadata = pd.DataFrame(columns=[
@@ -322,14 +321,8 @@ class Recording:
                 return metadata2
         ###################### if not onlyMeta ##################
         if pathToTif is None:
-            if not hasattr(self, "tempdir"):
-                import tempfile
-                tempdir = tempfile.gettempdir()
-                self.tempdir = os.path.join(tempdir,f"{np.random.randint(int(1e10))}")
-                os.makedirs(self.tempdir)
-            filename = os.path.join(self.tempdir, f"{Series}.memmap")
-            data =np.memmap(filename, dtype=metadata1["bit depth"], mode="w+",
-                      shape=(metadata1.SizeT, metadata1.SizeY, metadata1.SizeX))
+            data = np.zeros((metadata1.SizeT, metadata1.SizeY, metadata1.SizeX), dtype=metadata1["bit depth"])
+
             try:
                 self.rdr
             except:
@@ -378,6 +371,8 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
             if any([constr.strip() not in cur+f for constr in constrain.split(",")]):
                 continue
             path = os.path.join(cur,f)
+            pathToMeta = os.path.join(cur,"."+f+".meta")
+            if not os.path.isfile(pathToMeta): continue
             recordings += [path]
     recordings = sorted(recordings)
     
@@ -490,11 +485,7 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
                 md["add_info done"] = os.path.isfile(pathToAddInfo)
                 if md["add_info done"] and os.path.getsize(pathToAddInfo)>10:
                     # print (ser, )
-                    try:
-                        addInfo = pd.read_csv(pathToAddInfo, sep=":", header=None, index_col=0).T
-                    except:
-                        md["add_info done"] = False
-                        continue
+                    addInfo = pd.read_csv(pathToAddInfo, sep=":", header=None, index_col=0).T
                     if len(addInfo)==0:
                         md["add_info done"] = False
                         continue

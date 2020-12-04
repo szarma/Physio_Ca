@@ -1,110 +1,29 @@
-from general_functions import multi_map
 import numpy as np
 import pandas as pd
 from itertools import product
 from collections import OrderedDict
 import matplotlib.pyplot as plt
 import networkx as nx
-from physio_def_1 import rebin
-
+from .numeric import rebin
+from .utils import multi_map
+import plotly.graph_objects as go
 from matplotlib._color_data import TABLEAU_COLORS, CSS4_COLORS
-MYCOLORS = OrderedDict(TABLEAU_COLORS)
-del MYCOLORS["tab:gray"]
-ks = ["lime",
-    "orangered",
-    "yellowgreen",
-      "lawngreen",
-    # "mediumspringgreen",
-    "aquamarine"]#+list(MYCOLORS.values())
-MYCOLORS.update({k:CSS4_COLORS[k] for k in ks})
-MYCOLORS = list(MYCOLORS.values())
-
-
-def climb(x,blurredWeights,diag=True,min_gradient = 0):
-    dims = blurredWeights.shape
-    # x = (60,60)
-    x = x+(blurredWeights[x[0],x[1]],)
-    xs = [x]
-    for i in range(100):
-        vs = []
-        for di,dj in product([-1,0,1],[-1,0,1]):
-            if not diag:
-                if di*dj!=0: continue
-            i,j = x[0]+di,x[1]+dj
-            if i<0 or i>=dims[0] or j<0 or j>=dims[1]:
-                continue
-            vs += [(i,j,blurredWeights[i,j])]
-        x1 = vs[np.argmax(vs,axis=0)[-1]]
-        dx = x1[-1]-x[-1]
-        if dx<=0:
-            break
-        elif dx<=min_gradient:
-            return (None,)
-        else:
-            x = x1
-            xs += [x]
-    return x[:2]
-
-# def crawlDict(image, th=-np.inf, diag=False, min_gradient=0):
-#     A_ = [(i,j)+climb((i,j),image,diag=diag,min_gradient=min_gradient) for i,j in product(range(image.shape[0]),range(image.shape[1])) if image[i,j]>th]
-#     A_ = [el for el in A_ if el[-1] is not None]
-#     B_ = OrderedDict()
-#     for (i0,j0,i1,j1) in A_:
-#         if (i1,j1) not in B_:
-#             B_[(i1,j1)] = []
-#         B_[(i1,j1)] += [(i0,j0)]
-#     return B_
-
-
-def crawlDict(image, crawl_th=-np.inf, diag=False, min_gradient=0, n_processes=10):
-    global iterf
-    ijs_ = [(i,j) for i,j in product(range(image.shape[0]),range(image.shape[1])) if image[i,j]>crawl_th]
-    def iterf(ij):
-        return climb((ij[0],ij[1]), image, diag=diag, min_gradient=min_gradient)
-    R_ = multi_map(iterf,ijs_, processes=n_processes)
-    A_ = [ij+r for ij,r in zip(ijs_,R_)]
-    A_ = [el for el in A_ if el[-1] is not None]
-    B_ = OrderedDict()
-    for (i0,j0,i1,j1) in A_:
-        if (i1,j1) not in B_:
-            B_[(i1,j1)] = []
-        B_[(i1,j1)] += [(i0,j0)]
-    return B_
-
-def edges2nodes(x,start=0,direction=1):
-    if np.array(x[0]).shape != (2,2):
-        x = [(el[:2],el[2:]) for el in x]
-    nodes = list(x[start][::direction])
-
-    for i in range(len(x)-1):
-        nexts = [edge for edge in x if (edge[0]==nodes[-1] or edge[1]==nodes[-1])]
-        for cand in np.unique(sum(nexts,()),axis=0):
-            if tuple(cand) not in nodes:
-                nodes += [tuple(cand)]
-    return nodes
-
-def getStatImages(movie_, debleach=True, downsampleFreq=10):
-    m_for_image = movie_.astype("float")
-    if m_for_image.fr>downsampleFreq:
-        n_rebin = int(m_for_image.fr/downsampleFreq)
-        if n_rebin>=2:
-            m_for_image = rebin(m_for_image,n_rebin)
-    statImages = {}
-    if debleach:
-        m_for_image.debleach()
-
-    for f in [np.mean,np.std]:
-        statImages[f.__name__] = f(m_for_image,axis=0)
-
-    m_for_image = np.diff(m_for_image,axis=0)
-    for f in [np.mean,np.std]:
-        statImages["diff_"+f.__name__] = f(m_for_image,axis=0)
-
-    return statImages
-
+# MYCOLORS = OrderedDict(TABLEAU_COLORS)
+# del MYCOLORS["tab:gray"]
+# ks = ["lime",
+#     "orangered",
+#     "yellowgreen",
+#       "lawngreen",
+#     # "mediumspringgreen",
+#     "aquamarine"]#+list(MYCOLORS.values())
+# MYCOLORS.update({k:CSS4_COLORS[k] for k in ks})
+# MYCOLORS = list(MYCOLORS.values())
+from plotly_express import colors as plc
+MYCOLORS = plc.qualitative.Plotly
+# MYCOLORS = ["darkred"]
 
 class Regions:
-    def __init__(self, movie_, crawl_th=0, diag=False, min_gradient=0, debleach=True, gSig_filt=None, mode="diff_std", full=True, img_th=-np.inf, FrameRange=None, nRebin=1):
+    def __init__(self, movie_, diag=False, min_gradient=0, debleach=False, gSig_filt=None, mode="diff_std", full=True, img_th=-np.inf, FrameRange=None, processes=10):
         self.mode = mode
         if isinstance(movie_, (np.ndarray,)):
             if len(movie_.shape)==2:
@@ -112,19 +31,27 @@ class Regions:
                 self.statImages = {mode:image0}
             if len(movie_.shape)==3:
                 self.movie = movie_
-                self.nRebin = nRebin
                 time = np.arange(len(movie_))/movie_.fr
                 if FrameRange is None:
                     FrameRange = [0, len(movie_)]
                 i0, ie = FrameRange
                 self.FrameRange = FrameRange
-                self.statImages = getStatImages(movie_[i0:ie], debleach=debleach, downsampleFreq=movie_.fr/nRebin)
-                self.time = rebin(time[i0:ie], nRebin)
+                self.statImages = getStatImages(movie_[i0:ie], debleach=debleach, downsampleFreq=5)
+                self.time = time[i0:ie]
+                self.Freq = movie_.fr
+                self.showTime = {}
         elif isinstance(movie_, dict):
             self.statImages = movie_
         else:
             raise ValueError("Regions can initialize either from a movie, or image, or a dictionary of stats images.")
+        
+        if full:
+            self.constructRois(mode=mode, img_th=img_th, diag=diag, min_gradient=min_gradient, gSig_filt=gSig_filt, processes=processes)
             
+    def constructRois(self, mode="diff_std", img_th=-np.inf, diag=False, min_gradient=0, gSig_filt=None, processes=5):
+        from caiman.motion_correction import high_pass_filter_space
+        from pandas import DataFrame
+        
         for k0 in self.statImages:
             break
         tmp = np.zeros_like(self.statImages[k0])
@@ -134,14 +61,7 @@ class Regions:
             tmp += im
         self.statImages[mode] = tmp/tmp.max()
         image0 = tmp/tmp.max()
-        
-        if full:
-            self.constructRois(image0, crawl_th=crawl_th, img_th=img_th, diag=diag, min_gradient=min_gradient, gSig_filt=gSig_filt)
-            
-    def constructRois(self, image0, crawl_th=0, img_th=-np.inf, diag=False, min_gradient=0, gSig_filt=None):
-        from caiman.motion_correction import high_pass_filter_space
-        from pandas import DataFrame
-        toMin = image0<img_th
+        toMin = image0<=img_th
         if gSig_filt is None:
             image = image0
         else:
@@ -158,7 +78,7 @@ class Regions:
         image[toMin] = image.min()
         self.filterSize = gSig_filt
         self.image = image
-        B_ = crawlDict(image,crawl_th,diag=diag,min_gradient=min_gradient)
+        B_ = crawlDict(image,image.min(),diag=diag,min_gradient=min_gradient, processes=processes)
         if diag:
             try:
                 from scipy.spatial import distance_matrix
@@ -195,8 +115,9 @@ class Regions:
             except:
                 print ("Cannot initialize with diagonal crawl. Reverting to diag=False")
                 diag = False
-                B_ = crawlDict(image,crawl_th,diag=diag,min_gradient=min_gradient)
-            
+                B_ = crawlDict(image,image.min(),diag=diag,min_gradient=min_gradient, processes=processes)
+        
+        
         self.df = DataFrame(OrderedDict([
             ("peak",  list(B_.keys())),
             ("pixels",list(B_.values()))
@@ -206,14 +127,17 @@ class Regions:
 #         print(f"Initialized with {len(self.df)} rois.")
     
     def get_fov_trace(self, showFreq = 2, pixels=None):
-        from numeric import mydebleach
+        from .numeric import mydebleach
         from physio_def_1 import rebin
         i0, ie = self.FrameRange
-        n = int(self.movie.fr/showFreq)
+#         n = int(self.movie.fr/showFreq)
+        n = int(self.Freq/showFreq)
         if n==0: n=1
-        x = rebin(np.arange(i0,ie)/self.movie.fr,n)
+        x = rebin(np.arange(i0,ie)/self.Freq,n)
         try:
-            y = sum(self.df.trace)
+            y = np.sum([self.df.loc[i,"trace"]*self.df.loc[i,"size"] for i in self.df.index],axis=0)/self.df["size"].sum()
+            if n>1:
+                y = rebin(y,n)
         except:
             if pixels is None:
                 y = self.movie[i0:ie:n].mean(axis=(1,2))
@@ -226,8 +150,7 @@ class Regions:
                 "trend":ydbl
             }
 
-    
-    def update(self, movie_=None, nRebin=None):
+    def update(self, movie_=None):
         self.df["size"] = self.df["pixels"].apply(len)
         self.df["interest"] = [np.sum([self.image[px[0],px[1]] for px in pxs]) for pxs in self.df["pixels"]]
         self.calcEdgeIds()
@@ -235,12 +158,9 @@ class Regions:
         self.df["boundary"] = [edges2nodes(self.df["edges"][j]) for j in self.df.index]
         self.calcNNmap()
         if movie_ is not None:
-            if nRebin is None:
-                try: nRebin = self.nRebin
-                except: nRebin = 1
-            self.calcTraces(movie_, nRebin)
+            self.calcTraces(movie_)
             self.movie = movie_
-    
+            self.Freq  = movie_.fr
     
     def calcEdgeIds(self):
         dround = np.vstack([(-1,-1),(-1, 1),( 1, 1),( 1,-1),(-1,-1)])
@@ -300,7 +220,6 @@ class Regions:
             im += .05
             ax.imshow(im,norm=LogNorm(),**imkw_args)
         if separate:
-            print ("going in")
             for i in ix:
                 c = MYCOLORS[i%len(MYCOLORS)]
                 y,x = np.array(self.df.loc[i,"boundary"]).T
@@ -315,7 +234,7 @@ class Regions:
             y,x = np.array(tmp).T
             ax.plot(x,y,color,lw=lw,alpha=alpha)
             
-    def plotPeaks(self, ix=None, ax=None, image=False, ms=1, labels=False,color=None, imkw_args={},absMarker=False):
+    def plotPeaks(self, ix=None, ax=None, image=False, ms=1, labels=False,color=None, imkw_args={},absMarker=True):
         if ax is None:
             ax = plt.subplot(111)
         if image:
@@ -366,36 +285,84 @@ class Regions:
         self.df = self.df.drop(index=toDel)
         print (f"deleted {len(toDel)} rois. {len(self.df)} remain.")
     
-    def calcTraces(self, movie_=None, nRebin=None, FrameRange=None):
+    def calcTraces(self, movie_=None, FrameRange=None):
         if movie_ is None:
             movie_ = self.movie
-        if nRebin is None:
-            try: nRebin = self.nRebin
-            except: nRebin = 1
         if FrameRange is None:
             try: FrameRange = self.FrameRange
-            except: FrameRange = [0,len(movie)]
+            except: FrameRange = [0,len(movie_)]
         i0,ie = FrameRange
-        traces = np.ones((len(self.df),(ie-i0)//nRebin))*np.nan
+        traces = np.ones((len(self.df),(ie-i0)))*np.nan
         for i,ix in enumerate(self.df.index):
             x = self.df.loc[ix,"pixels"]
             x = [ el[0] for el in x ] , [ el[1] for el in x ]
-            traces[i] = rebin(movie_[i0:ie, x[0], x[1] ].mean(axis=1), nRebin)
+            traces[i] = movie_[i0:ie, x[0], x[1] ].mean(axis=1)
         self.df["trace"] = list(traces)
         time = np.arange(len(movie_))/movie_.fr
-        self.time = rebin(time[i0:ie], nRebin)
-        self.nRebin = nRebin
+        self.time = time[i0:ie]
         
+    def detrend_traces(self,fast=True, timescale=200):
+#         from .numeric import mydebleach
+#         traces = np.vstack(self.df.trace.values)
+#         trend = multi_map( mydebleach, traces, processes=processes)
+#         self.df["trend"] = trend
+#         self.df["detrended"] = list(traces - np.array(trend))
+#         traces = np.vstack(self.df.trace.values)
+#         print ("Deprecated method. I used to think it makes sense, now I don't think so. The method is still here, not to break your scripts, but it only subtracts mean from the trace.")
+        if fast:
+            trend = self.df.trace.apply(np.mean)
+            self.df["trend"] = trend
+            self.df["detrended"] = [self.df.trace[i] - self.df.trend[i] for i in self.df.index]
+        else:
+            self.slow_filter_traces(timescale,percentile=[5.])
+            self.df["detrended"] = self.df["faster_%g"%timescale]
+            self.df["trend"]     = self.df["slower_%g"%timescale]
+            del self.df["faster_%g"%timescale], self.df["slower_%g"%timescale]
+
     def sortFromCenter(self):
         center = np.array(self.image.shape)/2
         self.df["distToCenter"] = [np.sum((np.array(self.df.loc[i,"peak"])-center)**2)**.5 for i in self.df.index]
         self.df.sort_values("distToCenter",inplace=True)
         self.df.index = np.arange(len(self.df))
         self.calcNNmap()
-
-    def filter_traces(self,ironScale, n_processes = 10, percentile = [10.,50.], calcStd=False):
-        from general_functions import multi_map
-        from numeric import lowPass
+    
+    def infer_gain(self, plot=False):
+        minDt = np.diff(self.time).mean()
+        freq = 1/minDt
+#         ts = min(50/freq,10)
+        ts = 30/freq
+        absSlow, absFast, _ = self.fast_filter_traces(ts,write=False, normalize=False,z_sp=0)
+        di = 30
+        slow_est, fast_vars = [],[]
+        for i in range(absFast.shape[0]):
+            for j in range(di, absFast.shape[1]-di, absFast.shape[1]//30):
+                slow_est  += [absSlow[i,j]]
+                fast_vars += [absFast[i,j-di:j+di].var()]
+        fast_vars = np.array(fast_vars)
+        slow_est = np.array(slow_est)
+        
+        logbs = np.log(np.logspace(np.log10(np.percentile(slow_est,2)),np.log10(np.percentile(slow_est,98))))
+        d = np.digitize(np.log(slow_est), logbs)
+        x = np.array([slow_est[d==i].mean() for i in np.unique(d)])
+        y = np.array([np.median(fast_vars[d==i]) for i in np.unique(d)])
+        gain = np.mean(y/x)
+        gain = np.exp(np.mean(np.log(y)-np.log(x)))
+        
+        if plot:
+            ax = plt.subplot(111)
+            ax.hexbin(slow_est, fast_vars, bins="log",
+                      xscale="log",
+                      yscale="log",
+                      cmap="hot",
+                      mincnt=1
+                     )
+            ax.plot(x,y,"C0o",mfc="none")
+            ax.plot(x,x*gain)
+        self.gain = gain
+    
+    def slow_filter_traces(self,ironScale, n_processes=10, percentile = [10.], calcStd=False,avg=True):
+        from .numeric import lowPass
+        from .utils import multi_map
         global iterf
         try:
             freq = self.movie.fr
@@ -405,13 +372,18 @@ class Regions:
         if wIron%2==0:
             wIron += 1
         print(f"The movie frequency is {freq:.2f}, so the filter size is {wIron}. This may take some time.")
-        def iterf(x_): 
-            out = lowPass(x_,wIron,wIron,percentile)
-            return out
+        if avg:
+            def iterf(x_): 
+                out = lowPass(x_,wIron,wIron,percentile)
+                return out
+        else:
+            def iterf(x_): 
+                out = lowPass(x_,wIron,perc=percentile)
+                return out
             
-        self.df["slower_%g"%ironScale] = multi_map(iterf,self.df["trace"].values,processes=n_processes)
-        self.df["faster_%g"%ironScale] = [self.df.loc[i,"trace"] - \
-                                          self.df.loc[i,"slower_%g"%ironScale] for i in self.df.index]
+        self.df["slower_%g_"%ironScale] = multi_map(iterf,self.df["trace"].values,processes=n_processes)
+        self.df["faster_%g_"%ironScale] = [self.df.loc[i,"trace"] - \
+                                          self.df.loc[i,"slower_%g_"%ironScale] for i in self.df.index]
             
         def iterf(x_):
             mad2std = 1.4826
@@ -420,72 +392,253 @@ class Regions:
         if calcStd:
             self.df["faster_%g_std"%ironScale] = multi_map(iterf,self.df["faster_%g"%ironScale].values,processes=n_processes)
     
-    def fast_filter_traces(self, ironTimeScale, z_sp = 2, order=5):
-        # from general_functions import multi_map
-        from numeric import sosFilter
+    
+    
+    def fast_filter_traces(self,
+                           ironTimeScale,
+                           z_sp=3,
+                           order=5,
+                           Npoints=None,
+                           write=True,
+                           verbose=False,
+                           usecol="trace",
+                           normalize=True
+#                            meanSlow2Var=None
+                          ):
+        from .numeric import sosFilter
+        if Npoints is None: Npoints = 15
+        minDt = np.diff(self.time).mean()
+        freq = 1/minDt
         try:
-            freq = self.movie.fr/self.nRebin
+            self.movie
+            if np.abs(freq/self.movie.fr-1)>1e-2:
+                print (f"movie frame rate ({self.movie.fr}) and inferred frame ({freq}) rate are different!")
         except:
-            freq = 1./np.diff(self.time).mean()
-        cutFreq = 1/ironTimeScale
-        self.sosFilter = sosFilter(cutFreq, freq, order=order)
+            pass
+        N_dt = ironTimeScale/minDt
+        Nrebin = max(1,int(np.round(N_dt/Npoints)))
+        if verbose:
+            print (f"Nrebin = {Nrebin}")
         C = self.df
-        data = np.vstack([C.loc[i,"trace"] for i in C.index])
-        dataFilt = self.sosFilter.run(data)
-        
-        self.df["slower_%g"%ironTimeScale] = list(dataFilt)
-        self.df["faster_%g"%ironTimeScale] = [self.df.loc[i,"trace"] - \
-                                              self.df.loc[i,"slower_%g"%ironTimeScale] for i in self.df.index]
-        if z_sp==0:
-            return None
-        from cv2 import dilate
-        from numeric import nan_helper
-        absFast = np.vstack([C.loc[i,"faster_%g"%ironTimeScale]*C.loc[i,"size"] for i in C.index])*self.nRebin
-        absSlow = np.vstack([C.loc[i,"slower_%g"%ironTimeScale]*C.loc[i,"size"] for i in C.index])*self.nRebin
-        std = absSlow**.5
-        ff = (absFast > z_sp*std).astype("uint8")
-        dilateKernelSize = max(3,int(ironTimeScale*freq*.03))
-        if dilateKernelSize%2==0:
-            dilateKernelSize+=1
-        print (dilateKernelSize)
-        ff = dilate(ff, np.ones(dilateKernelSize, dtype = np.uint8).reshape(1,-1)).astype("bool")
-        absFast_tmp = absFast.copy()
-        absFast_tmp[ff] = np.nan
-        for j in range(C.shape[0]):
-            y = absFast_tmp[j]
-            nans, x= nan_helper(y)
-            y[nans]= np.interp(x(nans), x(~nans), y[~nans])
-        dFast = self.sosFilter.run(absFast_tmp)
-        absSlow = absSlow + dFast
-        absFast = absFast - dFast
-        std = absSlow**.5
-        zScore = absFast/std
-        C["zScore_%g"%ironTimeScale] = list(zScore)
-        C["slower_%g"%ironTimeScale] = [absSlow[i]/C["size"].iloc[i]/self.nRebin for i in range(len(C))]
-        C["faster_%g"%ironTimeScale] = [absFast[i]/C["size"].iloc[i]/self.nRebin for i in range(len(C))]
+        if "trace" in usecol:
+            data = np.vstack([C.loc[i,"trace"] for i in C.index])
+            trend = np.zeros(len(C))
+        else:
+            data = np.vstack([C.loc[i,"detrended"] for i in C.index])
+            trend = C.trend.values
             
-#         C["slower_%g"%ironTimeScale] = [C["slower_%g"%ironTimeScale].iloc[i]+ dFast[i]/C["size"].iloc[i]/self.nRebin for i in range(len(C))]
-#         self.df["faster_%g"%ironTimeScale] = [self.df.loc[i,"trace"] - \
-#                                               self.df.loc[i,"slower_%g"%ironTimeScale] for i in self.df.index]
-    def calc_raster(self, ts, z_th = 3, smooth=0):
-        from numeric import runningAverage
+        if Nrebin>1:
+            freq = freq/Nrebin
+            data = rebin(data, Nrebin, axis=1)
+            if len(trend.shape)>1:
+                trend = rebin(trend, Nrebin, axis=1)
+            try: self.showTime
+            except: self.showTime = {}
+            self.showTime["%g"%ironTimeScale] = rebin(self.time, Nrebin)
+        cutFreq = .5/ironTimeScale
+        self.sosFilter = sosFilter(cutFreq, freq, order=order)
+        dataFilt = self.sosFilter.run(data)
+#         if write:
+#             slowk, fastk = "slower_%g"%ironTimeScale, "faster_%g"%ironTimeScale
+#         else:
+#             slowk, fastk = "_slower_%g"%ironTimeScale, "_faster_%g"%ironTimeScale
+
+        absSlow = np.vstack([dataFilt[i]*C.loc[ix,"size"] for i,ix in enumerate(C.index)])*Nrebin
+        absFast = np.vstack([(data[i]-dataFilt[i])*C.loc[ix,"size"] for i,ix in enumerate(C.index)])*Nrebin
+
+        if z_sp>0:
+            from cv2 import dilate
+            from .numeric import nan_helper
+            var = absSlow
+            if hasattr(self,"gain"):
+                var = var*self.gain    
+            std = var**.5
+            ff = (absFast > z_sp*std).astype("uint8")
+            if ff.any():
+                dilateKernelSize = int(ironTimeScale/minDt/Nrebin*.2)#*.03)
+                if dilateKernelSize%2==0:
+                    dilateKernelSize+=1
+                if dilateKernelSize>=3:
+                    if verbose:
+                        print ("dilating by", dilateKernelSize)
+                    ff = dilate(ff, np.ones(dilateKernelSize, dtype = np.uint8).reshape(1,-1)).astype("bool")
+                absFast_tmp = absFast.copy()
+                absFast_tmp[ff] = np.nan
+                for j in range(C.shape[0]):
+                    y = absFast_tmp[j]
+                    nans, x= nan_helper(y)
+                    if nans.any(): 
+                        y[nans]= np.interp( x(nans), x(~nans), y[~nans] )
+#                         y[nans]= np.interp( x(nans), x(~nans), absSlow[j][~nans] )
+                dFast = self.sosFilter.run(absFast_tmp)
+                absSlow = absSlow + dFast
+                absFast = absFast - dFast
+        var = absSlow
+        if hasattr(self,"gain"):
+            var = var*self.gain    
+        std = var**.5
+        zScore = absFast/std
+        if normalize:
+            slower = [absSlow[i]/C["size"].iloc[i]/Nrebin for i in range(len(C))]
+            faster = [absFast[i]/C["size"].iloc[i]/Nrebin for i in range(len(C))]
+        else:
+            slower = absSlow
+            faster = absFast
+        if write:
+            C["slower_%g"%ironTimeScale] = slower
+            C["faster_%g"%ironTimeScale] = faster
+            C["zScore_%g"%ironTimeScale] = list(zScore)
+        else:
+            return np.array(slower), np.array(faster), zScore
+
+    def calc_raster(self, ts, z_th = 3, Npoints=None, smooth = 0):
+        from .numeric import runningAverage
         if "zScore_%g"%ts not in self.df.columns:
-            self.fast_filter_traces(ts)
+            self.fast_filter_traces(ts,Npoints=Npoints)
         zScores = np.vstack(self.df["zScore_%g"%ts])
         if smooth:
-            ksize = 2*smooth+1
-            zScores = runningAverage(zScores.T,ksize).T
-            zScores *= ksize**.5
-            k = "%g_%g"%(ts,smooth)
-        else:
-            k = ts
+            avgSize = 2*smooth+1
+            zScores = runningAverage(zScores.T,avgSize).T#*avgSize**.5
+        k = "%g"%(ts)
         try:
             self.raster
         except:
             self.raster = {}
         self.raster[k] = zScores>z_th
         
+    def peaks2raster(self, ts, npoints = 1000, onlyRaster=True, z_th = 3):
+        k = "%g"%ts
+        try:
+            self.peaks[k]
+        except:
+            self.calc_peaks(ts, z_th = z_th)
+        df = self.peaks[k]
+        C = self.df
+        rr = np.zeros((len(C),npoints))
+        tt = pd.Series(np.linspace(0,self.time.max(),npoints))
+        for i,ix in enumerate(C.index):
+            ddf = df.query(f"roi=={ix}")
+            for _,row in ddf.iterrows():
+                rr[i,tt.between(row.t0,row.t0+row.iloc[1])] = 1
+        if onlyRaster:
+            return rr,
+        fig = go.Figure(go.Heatmap(
+                x=tt,
+                z=rr,
+                showscale=False,
+                hoverinfo="text",text=[[str(i)] for i in self.df.index]
+            ))
+        fig.update_yaxes(title_text='roi id')
+        fig.update_xaxes(title_text='time [s]')
+        fig.update_layout({
+            "width":  600,
+            "height": 400,
+            "margin": dict(l=20, r=10, t=50, b=20),
+        })
+            # fig.update_xaxes(showticklabels=False)
+        return rr, fig
         
+    def calc_peaks(self, ts, z_th=3, Npoints=None, smooth=None, verbose=False, save=True, t=None, zScores=None):
+        from .numeric import runningAverage
+        from scipy.signal import find_peaks, peak_widths
+        if zScores is None:
+            if "zScore_%g"%ts not in self.df.columns:
+                if verbose:
+                    print ("filtering...")
+                self.fast_filter_traces(ts,Npoints=Npoints)
+            zScores = np.vstack(self.df["zScore_%g"%ts])
+        if t is None:
+            try:
+                t = self.showTime["%g"%ts]
+            except:
+                t = self.time
+        dt = np.diff(t).mean()
+        if smooth is None:
+            smooth = int(ts/dt/5)
+            if smooth%2==0: smooth += 1
+        if smooth>0:
+            if verbose:
+                print ("smoothing with kernel", smooth)
+            zScores = runningAverage(zScores.T,smooth).T
+        peaks = []
+        for i,z in zip(self.df.index,zScores):
+            pp = find_peaks(z,
+                            width=ts/dt/8,
+                            height=z_th
+                              )
+            w,h,x0 = peak_widths(z, pp[0], rel_height=.5)[:3]
+            w = w*dt
+            x0 = x0*dt + t[0]
+            df = pd.DataFrame({"peak height [z-score]":z[pp[0]],"peak half-width [s]":w, "t0":x0})
+            df["roi"] = i
+            peaks += [df]
+        peaks = pd.concat(peaks,ignore_index=True)
+        if save:
+            k = "%g"%(ts)
+            try:
+                self.peaks
+            except:
+                self.peaks = {}
+            self.peaks[k] = peaks
+        else:
+            return peaks
+        
+    def show_scatter_peaks(self,ts,timeWindows=None):
+        from plotly_express import scatter
+        peaks = self.peaks["%g"%ts].copy()
+        if timeWindows is None:
+            timeWindows = [[0,np.inf]]
+        peaks["timeWindow"] = [""]*len(peaks)
+        for i,tw in enumerate(timeWindows):
+#                 print (tw)
+            if tw[1]<=tw[0]:continue
+            iis = np.where(peaks["t0"].between(*tw) & (peaks["t0"]+peaks[peaks.columns[1]]).between(*tw))[0]
+            for j in iis:
+                if peaks.loc[j,"timeWindow"]=="":
+                    peaks.loc[j,"timeWindow"] = str(i)
+                else:
+                    j1 = len(peaks)
+                    peaks.loc[j1] = peaks.loc[j]
+                    peaks.loc[j1,"timeWindow"] = str(i)
+#             peaks["timeWindow"][ff] = str(i+1)
+        df = peaks.query("timeWindow!=''")    
+        from plotly.colors import DEFAULT_PLOTLY_COLORS
+        fig = scatter(df,
+                      x=df.columns[1],
+                      y=df.columns[0],
+                      opacity = .2,
+                      labels = ["roi"],
+                      color=[DEFAULT_PLOTLY_COLORS[int(c)] for c in df["timeWindow"]],
+#                       hover_data={k:(k=="roi") for k in df.columns},
+#                       hover_data={"roi":True},
+                      hover_data=["roi"],
+#                       hoverinfo=df["roi"].astype("str"),
+                      marginal_x="box",
+                      log_y=True,
+                      render_mode = "webgl",
+                      width=450,
+                      height=450,
+                     )
+#         fig.update_traces(hovertemplate='x: %{x} <br>y: %{y} <br>roi: %{roi}') # 
+        fig.update_layout({
+        "plot_bgcolor":"white","margin":dict(l=10, r=10, t=20, b=40),"showlegend":False})
+        fig.update_layout(
+            legend=dict(
+                x=.99,
+                y=.72,
+                traceorder="normal",
+                xanchor="right",
+            )
+        )
+        
+        fig.update_xaxes(showline=True, linewidth=1, linecolor='black', mirror=True, ticks="outside", ticklen=2,
+#                          gridcolor="none"
+                        )
+        fig.update_yaxes(showline=True, linewidth=1, linecolor='black', mirror=True, ticks="outside", ticklen=2,
+#                          gridcolor="none"
+                        )
+        return fig
+
     def calcIntraCCs(self,movie_,diff=False,indices=None):
         intraCCs = []
         if indices is None:
@@ -508,9 +661,26 @@ class Regions:
             intraCCs += [ccs]
 
         C.loc[indices,"intraCCs"] = intraCCs
-#         del intraCCs
 
-def getGraph_of_ROIs_to_Merge(df,rreg, plot=False, ax=None,lw=.5):
+    def import_protocol(self,pathToProtocol):
+        self.protocol = pd.read_csv(pathToProtocol)
+        self.protocol.dropna(how='all', inplace=True)
+        if self.protocol.empty:
+            raise ValueError('protocol file contains nothing ')
+        self.protocol["t_begin"] = pd.to_timedelta(["00:"+el if type(el)==str else "00:00:00" \
+                                                       for el in self.protocol["begin"]]).total_seconds()
+        self.protocol["t_end"] = pd.to_timedelta(["00:"+el if type(el)==str else (self.time[0]+len(self.time)/self.Freq)*1e9 \
+                                                     for el in self.protocol["end"]]).total_seconds()
+
+    def examine(self, test=False, max_rois=10, imagemode=None, debug=False, startShow=''):
+        from .examine2 import examine
+        if imagemode is None:
+            imagemode = self.mode
+        return examine(self, test=test, max_rois=max_rois, imagemode=imagemode, debug=debug, startShow=startShow)
+    
+    
+
+def getGraph_of_ROIs_to_Merge(df,rreg, plot=False, ax=None,lw=.5,arrow_width=.5):
     C = rreg.df
     Gph = nx.DiGraph()
     ixs = np.unique(df.values.flatten())
@@ -526,7 +696,7 @@ def getGraph_of_ROIs_to_Merge(df,rreg, plot=False, ax=None,lw=.5):
         l = list(df.query(f"i=={j}")["j"])
         if i in l:
             c="darkgoldenrod"
-            iaccept = C.loc[[i,j],"peakValue"].idxmax()
+            iaccept = C.loc[sorted([i,j]),"peakValue"].idxmax()
             if j!=iaccept:
                 continue
         else:
@@ -537,7 +707,7 @@ def getGraph_of_ROIs_to_Merge(df,rreg, plot=False, ax=None,lw=.5):
             x1,y1 = C.loc[j,"peak"]
             dx = x1-x0
             dy = y1-y0
-            ax.arrow(y0,x0,dy,dx,width = .5,
+            ax.arrow(y0,x0,dy,dx,width = arrow_width,
                      linewidth = lw,
                      color="r",
                      zorder=10,
@@ -565,7 +735,10 @@ def plotRoi_to_be_connected(Gph, rreg, nplot=35):
         cl = list(cl)
         gph = Gph.subgraph(nodes=cl)
         pos = np.array([el[::-1] for el in C.loc[cl,"peak"]])
-        nx.draw_networkx(gph,ax=ax,node_size=30,node_color="w",
+        nx.draw_networkx(gph,
+                         ax=ax,
+                         node_size=30,
+                         node_color="w",
                          pos=dict(zip(cl,pos)),
                          font_size=6
                         )
@@ -588,10 +761,12 @@ def mergeBasedOnGraph(Gph,rreg):
         cl = list(cl)
         gph = Gph.subgraph(nodes=cl)
         attr = sum(list(map(list,nx.attracting_components(gph))),[])
-        if len(attr)>1:
-            print ("more than two attractors, not implemented yet, will skip")
+        if len(attr)>2:
+            # print ("more than two attractors, not implemented yet, will skip")
             continue
-        attr = attr[0]
+        if len(attr)==2 and len(cl)>2:
+            continue
+        attr = C.loc[attr,"peakValue"].sort_values().index[-1]
         other = [j for j in cl if j!=attr]
         C.loc[[attr],"pixels"] = [sum(C.loc[cl,"pixels"],[])]
         toDrop += other
@@ -627,7 +802,6 @@ def getPeak2BounAndTraceDF(C):
     try: peak2bnd = pd.DataFrame(peak2bnd, columns=["i","j","size_i","size_j","dist","nclose","cc"])
     except: peak2bnd = pd.DataFrame(peak2bnd, columns=["i","j","size_i","size_j","dist","nclose"])
     return peak2bnd
-
 
 def getPeak2BoundaryDF(C):
     peak2bnd = []
@@ -687,3 +861,80 @@ def getPeak2EdgesDF(C, regions):
         peak2bnd += [(i,jmin)+tuple(df.loc[jmin])]
     peak2bnd = pd.DataFrame(peak2bnd, columns=["i","j","dist","barrier"])
     return peak2bnd
+
+def climb(x,blurredWeights,diag=True,min_gradient = 0):
+    dims = blurredWeights.shape
+    # x = (60,60)
+    x = x+(blurredWeights[x[0],x[1]],)
+    xs = [x]
+    for i in range(100):
+        vs = []
+        for di,dj in product([-1,0,1],[-1,0,1]):
+            if not diag:
+                if di*dj!=0: continue
+            i,j = x[0]+di,x[1]+dj
+            if i<0 or i>=dims[0] or j<0 or j>=dims[1]:
+                continue
+            vs += [(i,j,blurredWeights[i,j])]
+        x1 = vs[np.argmax(vs,axis=0)[-1]]
+        dx = x1[-1]-x[-1]
+        if dx<=0:
+            break
+        elif dx<=min_gradient:
+            return (None,)
+        else:
+            x = x1
+            xs += [x]
+    return x[:2]
+
+def crawlDict(image, crawl_th=-np.inf, diag=False, min_gradient=0, processes=10):
+    global iterf
+    ijs_ = [(i,j) for i,j in product(range(image.shape[0]),range(image.shape[1])) if image[i,j]>crawl_th]
+    def iterf(ij):
+        return climb((ij[0],ij[1]), image, diag=diag, min_gradient=min_gradient)
+    R_ = multi_map(iterf,ijs_, processes=processes)
+    A_ = [ij+r for ij,r in zip(ijs_,R_)]
+    A_ = [el for el in A_ if el[-1] is not None]
+    B_ = OrderedDict()
+    for (i0,j0,i1,j1) in A_:
+        if (i1,j1) not in B_:
+            B_[(i1,j1)] = []
+        B_[(i1,j1)] += [(i0,j0)]
+    return B_
+
+def edges2nodes(x,start=0,direction=1):
+    if np.array(x[0]).shape != (2,2):
+        x = [(el[:2],el[2:]) for el in x]
+    nodes = list(x[start][::direction])
+
+    for i in range(len(x)-1):
+        nexts = [edge for edge in x if (edge[0]==nodes[-1] or edge[1]==nodes[-1])]
+        for cand in np.unique(sum(nexts,()),axis=0):
+            if tuple(cand) not in nodes:
+                nodes += [tuple(cand)]
+    return nodes
+
+def getStatImages(movie_, debleach=False, downsampleFreq=5):
+    if movie_.fr>downsampleFreq:
+        n_rebin = int(np.round(movie_.fr/downsampleFreq))
+        if n_rebin>=2:
+            m_for_image = rebin(movie_,n_rebin)
+        else:
+            m_for_image = movie_
+    else:
+        m_for_image = movie_
+    statImages = {}
+    if debleach:
+        m_for_image = m_for_image.astype("float32")
+        m_for_image.debleach()
+
+    for f in [np.mean,np.std]:
+        statImages[f.__name__] = f(m_for_image,axis=0)
+    statImages["highperc"] = np.percentile(m_for_image,100*(1-10/len(m_for_image)), axis=0)
+    
+    m_for_image = np.diff(m_for_image,axis=0)
+    for f in [np.mean,np.std]:
+        statImages["diff_"+f.__name__] = f(m_for_image,axis=0)
+    statImages["diff_highperc"] = np.percentile(m_for_image,100*(1-10/len(m_for_image)), axis=0)
+    
+    return statImages
