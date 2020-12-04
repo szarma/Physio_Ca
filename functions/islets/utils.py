@@ -72,6 +72,23 @@ def split_unconnected_rois(B_, image=None):
 #         B_[nnpeak] += [px]
 #     return B_
 
+def closeup_movie(regions, indices, movie=None, labels=False):
+    if movie is None:
+        movie = regions.movie
+#     from islets.utils import show_movie
+    allpixels = np.vstack(sum(regions.df.loc[indices,"pixels"],[]))
+    i0, j0 = allpixels.min(0)
+    ie, je = allpixels.max(0)+1
+    i0 = max(i0-10,0)
+    j0 = max(j0-10,0)
+    ie += 10
+    je += 10
+    def addplot(ax_):
+        regions.plotEdges(ax=ax_, ix=indices, separate=True, image=False, showScale=False)
+        regions.plotPeaks(ax=ax_, ix=indices, labels=labels)
+    m = movie[:,i0:ie,j0:je]
+    a = show_movie(m, additionalPlot = addplot, offset = (j0,i0), figScale=3, autoadjust=False)
+    return a
 
 def mode(l):
     from collections import Counter

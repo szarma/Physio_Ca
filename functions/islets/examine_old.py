@@ -153,13 +153,7 @@ def examine(self,
         ]),
     ])
     initNcs = {"discard_unsel":0,"discard_sel":0,"mark":0,"merge":0}
-    
-    movieCloseup = [
-        html.H3("Movie closeup"),
-        html.Button("create", id="create-closeup", n_clicks=0,),
-        html.Div(id="closeup-output")
-                   ]
-    
+
     APP_LAYOUT = [
         html.Div([
             html.Div([
@@ -177,7 +171,6 @@ def examine(self,
                 html.Pre(id="hidden",children=json.dumps(initNcs, indent=2),
                      style={"display":"block" if debug else "none",**outputStyle}
                     ),
-                html.Details(title="Movie Closeup",children=movieCloseup)
             ],style={"max-width":"550px","max-height":"550px",
 #                      "border":"thin grey solid"
                     }),

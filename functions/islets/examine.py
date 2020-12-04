@@ -7,6 +7,7 @@ from .utils import getFigure
 import dash
 import json
 from .utils import saveRois
+from sys import exc_info
 
 
 def examine(self, 
@@ -153,7 +154,13 @@ def examine(self,
         ]),
     ])
     initNcs = {"discard_unsel":0,"discard_sel":0,"mark":0,"merge":0}
-
+    
+    movieCloseup = [
+        html.H3("Movie closeup"),
+        html.Button("create", id="create-closeup", n_clicks=0,),
+        html.Div(id="closeup-output")
+                   ]
+    
     APP_LAYOUT = [
         html.Div([
             html.Div([
@@ -170,13 +177,14 @@ def examine(self,
                 SelectedRois,
                 html.Pre(id="hidden",children=json.dumps(initNcs, indent=2),
                      style={"display":"block" if debug else "none",**outputStyle}
-                    ),
+                    )
             ],style={"max-width":"550px","max-height":"550px",
 #                      "border":"thin grey solid"
                     }),
             html.Div([
                 dcc.Graph(id="trace-show",figure=getFigure(400,300)),
-                FilterBox
+                FilterBox,
+                html.Details(title="Movie Closeup",children=movieCloseup, open=debug)
             ],style={"max-width":"550px","max-height":"800px",
 #                      "border":"thin grey solid"
                     })
@@ -201,12 +209,42 @@ def examine(self,
                           style={"family":"Arial"}
                          )
     @app.callback(
+        Output("closeup-output","children"),
+        [Input("create-closeup", "n_clicks"),],
+        [State("selected-rois", "value")],
+        )
+    def create_closeup(n_clicks,selectedData):
+        if debug:
+            output = [f"Start n_clicks: {n_clicks}; {selectedData}"]
+        else:
+            output = []
+        try:
+            from .utils import closeup_movie
+            if n_clicks>0:
+                if hasattr(self,"movie"):
+                    selected = eval(selectedData)
+                    if hasattr(selected, '__getitem__'):
+                        selected = list(selected)
+                    else:
+                        selected = [selected]
+                    output += [f"selected={selected}"]
+#                     output += [str(type(m))]
+                    m = closeup_movie(self, indices = selected)
+                    output += [html.Iframe(srcDoc=m._repr_html_(), width = 700, height = 800)]
+                else:
+                    output += ["Oops, you first need to associate a movie to the regions."]
+        except:
+            output+=[str(exc_info())]
+        return output
+        
+    @app.callback(
         Output("tag-feedback","children"),
         [Input("tag-button", "n_clicks"),],
         [State("tag-drop", "value"),
          State("selected-rois", "value")
         ],
         )
+    
     def tag(n_clicks,tags,selectedData):
         try:
             if n_clicks>0:
@@ -357,7 +395,6 @@ def examine(self,
             
 
         except:
-            from sys import exc_info
             out += [html.Br(),"  "+str(exc_info())]
             
         
