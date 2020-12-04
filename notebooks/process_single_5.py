@@ -78,12 +78,11 @@ from pandas import DataFrame
 from sys import path as syspath
 syspath.append(os.path.expanduser("~/srdjan_functs/"))
 
-from islets.Recording import saveMovie, parse_leica
-from islets.Recording1 import Recording 
+from islets.Recording1 import Recording, saveMovie
 from islets.LineScan import LineScan
 from islets.numeric import rebin
 from islets.utils import saveRois, get_filterSizes
-from islets.Regions1 import Regions, getPeak2BoundaryDF, getGraph_of_ROIs_to_Merge, mergeBasedOnGraph
+from islets.Regions1 import Regions, getStatImages
 
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category= FutureWarning,)
@@ -92,6 +91,8 @@ with warnings.catch_warnings():
 
 
 pathToTif = args.use_tif
+if pathToTif is not None:
+    args.leave_movie=True
 recFile = args.recording
 ser = args.series
 
@@ -159,8 +160,8 @@ if args.line_scan!="none":
 ################### LINESCANS STOP HERE ################    
     
 
-if restrict is None:
-    restrict = (0,-2)
+# if restrict is None:
+#     restrict = (0,-2)
 rec.import_series(serToImport,
                   restrict=restrict, 
                   pathToTif=pathToTif
@@ -169,28 +170,10 @@ metadata = rec.Series[serToImport]['metadata']
 if start_vm:
     bf.javabridge.kill_vm()
 
-
-if args.debug: assert False  #### debug stop ###
-    
-
-    
-# movie = cmovie(
-#     rec.Series[serToImport]['data'],
-#     fr=metadata.Frequency
-# )
-nrebin = int(np.round(metadata.Frequency/2))
-if nrebin<=1:
-    movie = cmovie(
-        rec.Series[serToImport]['data'],
-        fr=metadata.Frequency
-    )
-else:
-    movie = cmovie(
-        rebin(rec.Series[serToImport]['data'], nrebin),
-        fr=metadata.Frequency/nrebin
-    )
-
-
+movie = cmovie(
+    rec.Series[serToImport]['data'][:-1],
+)
+movie.fr=metadata.Frequency
 
 # if args.debug:
 #     movie = movie[:,:50,:50]
@@ -200,7 +183,6 @@ if len(rec.metadata)==1:
     movieFilename = os.path.join(saveDir, ".".join(rec.Experiment.split(".")[:-1]+["mp4"]))
 else:
     movieFilename = os.path.join(saveDir, rec.Experiment+"_"+ser+".mp4")
-
 
 if metadata.pxSize<.8:
     if args.verbose: print ("Resizing the movie resolution by 2...")
@@ -241,11 +223,9 @@ else:
     filtSizes = args.spatial_filter.split(",")
     filtSizes = [eval(el.replace("+",",")) if "+" in el else (int(el),) for el in filtSizes]
 
-# # anull saturated above threshold
-# Nsatur = (movie==movie.max()).sum(0)
-# toAnull = np.where(Nsatur>len(movie)*fracSaturTh)
-# movie[(slice(None), )+toAnull] = 0
+if args.debug: assert False  #### debug stop ###
 
+statistics = getStatImages(movie)
 
 for spFilt in filtSizes:
     if args.verbose: print ("\t"*2,"#"*5,spFilt)
@@ -257,28 +237,18 @@ for spFilt in filtSizes:
     else:
         if args.verbose: print ("processing with filter size of ", spFilt)
 
-    regions = Regions(movie,gSig_filt=spFilt,diag=True, 
-                      # use_restricted=args.mostly_blank
-                     )
-    regions.time += metadata.time_range[0]
+    regions = Regions(statistics,gSig_filt=spFilt)
     if args.verbose:
         print (f"initiallized with {len(regions.df)} rois.")
-
-#     regions.purge_lones((min(spFilt)*.4)**2, verbose=args.verbose)
     regions.merge_closest(verbose=args.verbose)
     regions.sortInOrder()
     regions.metadata = metadata
-    if nrebin>1: 
-        movie = cmovie( rec.Series[serToImport]['data'], fr=metadata.Frequency)
-        regions.calcTraces( movie, FrameRange=(0,len(movie)))
-    else:
-        regions.calcTraces()
+    regions.calcTraces(movie)
+    regions.time += metadata.frame_range[0]/metadata.Frequency
     regions.infer_gain()
     regions.calc_interest()
     if not args.debug: 
         saveRois(regions, saveDir, filename= ".".join(map(str,spFilt)), add_date=False, formats=["vienna"])
-    if not args.debug:
-        del regions
 
 
 if 'rec' in globals():
