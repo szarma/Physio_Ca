@@ -127,8 +127,7 @@ class Regions:
 #         print(f"Initialized with {len(self.df)} rois.")
     
     def get_fov_trace(self, showFreq = 2, pixels=None):
-        from .numeric import mydebleach
-        from .physio_def_1 import rebin
+        from .numeric import mydebleach, rebin
         i0, ie = self.FrameRange
 #         n = int(self.movie.fr/showFreq)
         n = int(self.Freq/showFreq)
