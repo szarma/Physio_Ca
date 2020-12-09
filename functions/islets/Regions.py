@@ -15,6 +15,7 @@ import os
 from sys import exc_info
 from plotly_express import colors as plc
 MYCOLORS = plc.qualitative.Plotly
+from .numeric import bspline
 # MYCOLORS = ["darkred"]
 
 def load_regions(path,
@@ -24,6 +25,7 @@ def load_regions(path,
                  verbose=False,
                  calcInterest=True
                 ):
+#     from .Regions1 import Regions as R
     with open(path,"rb") as f:
         regions = pickle.load(f)
     try:
@@ -129,7 +131,8 @@ class Regions:
                  verbose=False,
                  use_restricted=None
                 ):
-        if isinstance(movie_, Regions):
+#         if isinstance(movie_, Regions):
+        if hasattr(movie_, "df") and "pixels" in movie_.df.columns:
             for k in movie_.__dict__.keys():
                 if verbose:
                     print ("Initiating from another Regions object.")
@@ -397,7 +400,7 @@ class Regions:
         out = np.unique(out,axis=0)
         return out
     
-    def plotEdges(self, ix=None, ax=None, image=True, imkw_args={}, separate=False, color="darkred", lw=None, alpha=1, fill=False, showScale=True):
+    def plotEdges(self, ix=None, ax=None, image=True, imkw_args={}, separate=False, color="darkred", lw=None, alpha=1, fill=False, showScale=True,norm=LogNorm(vmin=1), spline=True):
         if ix is None:
             ix = self.df.index
         if ax is None:
@@ -411,20 +414,25 @@ class Regions:
             imkw_args["cmap"] = mycmap
         if image:
             im = self.statImages[self.mode]
-            ax.imshow(im,norm=LogNorm(),**imkw_args)
+            ax.imshow(im,norm=norm,**imkw_args)
         if separate:
             for i in ix:
                 try:
                     c = self.df.loc[i,"color"]
                 except:
                     c = MYCOLORS[i%len(MYCOLORS)]
-                y,x = np.array(self.df.loc[i,"boundary"]+self.df.loc[i,"boundary"][:1]).T
+                points = self.df.loc[i,"boundary"]+self.df.loc[i,"boundary"][:1]
+                if spline:
+                    points = bspline(points, n=30)
+                y,x = np.array(points).T
                 ax.plot(x,y,"-",lw=lw,c=c,alpha=alpha)
                 if fill:
                     ax.fill(x,y,c=c,alpha=alpha*.8)
         else:
             tmp = []
             for el in self.df.loc[ix,"boundary"]:
+                if spline:
+                    el = list(bspline(el, n=30))
                 tmp += el
                 tmp += [el[0]]
                 tmp += [(np.nan,)*2]
@@ -718,9 +726,14 @@ class Regions:
             data = rebin(data, Nrebin, axis=1)
             if len(trend.shape)>1:
                 trend = rebin(trend, Nrebin, axis=1)
-            try: self.showTime
-            except: self.showTime = {}
-            self.showTime["%g"%ironTimeScale] = rebin(self.time, Nrebin)
+        if not hasattr(self,"showTime"):
+            self.showTime = {}
+        if write:
+            if Nrebin>1:
+                self.showTime["%g"%ironTimeScale] = rebin(self.time, Nrebin)
+            else:
+                if "%g"%ironTimeScale in self.showTime:
+                    del self.showTime["%g"%ironTimeScale]
         cutFreq = .5/ironTimeScale
         self.sosFilter = sosFilter(cutFreq, freq, order=order)
         dataFilt = self.sosFilter.run(data)
@@ -1243,18 +1256,18 @@ def edges2nodes(x,start=0,direction=1):
                 nodes += [tuple(cand)]
     return nodes
 
-def getStatImages(movie_, debleach=False, downsampleFreq=5):
+def getStatImages(movie_, debleach=False, downsampleFreq=2):
     if movie_.fr>downsampleFreq:
         n_rebin = int(np.round(movie_.fr/downsampleFreq))
         if n_rebin>=2:
-            m_for_image = rebin(movie_,n_rebin)
+            m_for_image = rebin(movie_,n_rebin, dtype="float16")
         else:
             m_for_image = movie_
     else:
         m_for_image = movie_
     statImages = {}
+    m_for_image = m_for_image.astype("float16")
     if debleach:
-        m_for_image = m_for_image.astype("float32")
         m_for_image.debleach()
 
     for f in [np.mean,np.std]:
@@ -1265,5 +1278,5 @@ def getStatImages(movie_, debleach=False, downsampleFreq=5):
     for f in [np.mean,np.std]:
         statImages["diff_"+f.__name__] = f(m_for_image,axis=0)
     statImages["diff_highperc"] = np.percentile(m_for_image,100*(1-10/len(m_for_image)), axis=0)
-    
+    statImages = {k:statImages[k].astype("float32") for k in statImages}
     return statImages

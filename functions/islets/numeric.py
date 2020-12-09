@@ -4,6 +4,29 @@ from scipy.stats import distributions as dst
 from scipy.optimize import curve_fit#,minimize,basinhopping
 from numba import jit,prange
 
+def bspline(cv, n=100, degree=3):
+    """ Calculate n samples on a bspline
+
+        cv :      Array ov control vertices
+        n  :      Number of samples to return
+        degree:   Curve degree
+        taken from https://stackoverflow.com/a/39262872/2043500
+    """
+    from scipy.interpolate import splev
+    cv = np.asarray(cv)
+    count = cv.shape[0]
+
+    # Prevent degree from exceeding count-1, otherwise splev will crash
+    degree = np.clip(degree,1,count-1)
+
+    # Calculate knot vector
+    kv = np.array([0]*degree + list(range(count-degree+1)) + [count-degree]*degree,dtype='int')
+
+    # Calculate query range
+    u = np.linspace(0,(count-degree),n)
+
+    # Calculate result
+    return np.array(splev(u, (kv,cv.T,degree))).T
 
 
 def fast_filter(absdata,

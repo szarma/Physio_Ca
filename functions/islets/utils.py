@@ -1,6 +1,16 @@
 import numpy as np
 import os
 
+def save_tiff(movie, movieFilename):
+    import PIL
+    im = PIL.Image.fromarray(movie[0])
+    im.save(movieFilename,
+            save_all=True,
+            append_images=[PIL.Image.fromarray(movie[i]) for i in range(1,len(movie))],
+            compression="tiff_deflate"
+           )
+
+
 def hex_to_rgb(value):
     """Return (red, green, blue) for the color given as #rrggbb."""
     value = value.lstrip('#')
@@ -259,7 +269,7 @@ def show_movie(m_show,
             if np.all(m_show>0): break
     if log:
         m_show = np.log(m_show)
-    figsize = np.array(m_show.shape[1:][::-1])/100*figScale
+    figsize = np.array(m_show.shape[1:3][::-1])/100*figScale
     import matplotlib
     currentBackend = matplotlib.get_backend()
     plt.switch_backend('agg')
@@ -512,10 +522,10 @@ def createStaticImage(im,regions,showall=True,color="grey",separate=True, return
     ax = fig.add_axes([0, 0, 1, 1])
     im[im==0] = np.nan
     try:
-        im = np.clip(im, np.percentile(im,.2), np.percentile(im,(1-20/im.size)*100))
+        im = np.clip(im, np.percentile(im,1), np.percentile(im,(1-20/im.size)*100))
     except:
         pass
-    ax.imshow(np.log(im),cmap=cmap,origin=origin)
+    ax.imshow(np.log(im+1),cmap=cmap,origin=origin)
     for sp in ax.spines: ax.spines[sp].set_visible(False)
     if showall:
         try:
