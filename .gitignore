@@ -10,3 +10,6 @@ data/*
 **.mmap
 **lifs
 .idea
+*.egg-info
+dist
+build
