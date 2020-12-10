@@ -33,9 +33,11 @@ parser.add_argument('--debug', const=True, default=False, action="store_const",
 
 args = parser.parse_args()
 
-def process_as_linescans():
-    from islets.Recording import parse_leica
-    nameDict = dict([(name, list(ii)) for ii, name in parse_leica(rec, index=True)])
+def process_as_linescans(nameDict=None):
+    global data, linescan
+    if nameDict is None:
+        from islets.Recording import parse_leica
+        nameDict = dict([(name, list(ii)) for ii, name in parse_leica(rec, index=True)])
     if serToImport in nameDict:
         indices = nameDict[serToImport]
     else:
@@ -46,7 +48,7 @@ def process_as_linescans():
         indices = indices[indices].index
     serNames = rec.metadata.loc[indices,"Name"]
     for ix, name in zip(indices,serNames):
-        lsname = "%s: %s"%(rec.Experiment[:-4], name)
+        lsname = "%s: %s"%(rec.Experiment[:-4], name.replace("/","_"))
         rec.import_series(name, isLineScan=(args.line_scan=="single") )
         data = rec.Series[name]["data"].astype("float32")
         if args.line_scan=="multi":
@@ -153,7 +155,14 @@ else:
         print (f"{saveDir} exists already.")
 
 if args.line_scan!="none":
-    process_as_linescans()
+    if ser=="all":
+        df = rec.metadata
+        df = df[df["line scan"]!="none"]
+        nameDict = {name: [i_] for name, i_ in zip(df.Name, df.index)}
+        for serToImport in nameDict:
+            process_as_linescans(nameDict)
+    else:
+        process_as_linescans()
     bf.javabridge.kill_vm()
     if 'rec' in globals():
         del rec
