@@ -38,7 +38,7 @@ from tempfile import gettempdir
 from sys import path as syspath
 syspath.append(os.path.expanduser("~/srdjan_functs/"))
 from islets.numeric import rebin
-from islets.Recording1 import Recording, saveMovie
+from islets.Recording import Recording, saveMovie
 
 import bioformats as bf
 bf.javabridge.start_vm(class_path=bf.JARS, max_heap_size="20G")

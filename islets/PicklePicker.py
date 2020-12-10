@@ -18,7 +18,7 @@ import pandas as pd
 from dash import no_update
 
 from .Recording import Recording
-from .Regions1 import Regions,load_regions
+from .Regions import Regions,load_regions
 from .LineScan import LineScan
 from .utils import getFigure, showRoisOnly
 from .numeric import rebin
