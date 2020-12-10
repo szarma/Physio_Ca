@@ -9,3 +9,4 @@ data/*
 **/*-checkpoint.ipynb
 **.mmap
 **lifs
+.idea
