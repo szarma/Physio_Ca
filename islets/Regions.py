@@ -957,7 +957,7 @@ class Regions:
         C.loc[indices,"intraCCs"] = intraCCs
 
     def import_protocol(self,pathToProtocol):
-        protocol = pd.read_csv(pathToProtocol)
+        protocol = pd.read_csv(pathToProtocol, dtype=str)
         protocol.dropna(how='all', inplace=True)
         if protocol.empty:
             raise ValueError('protocol file contains nothing ')
