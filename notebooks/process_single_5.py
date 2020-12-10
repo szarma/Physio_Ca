@@ -78,11 +78,11 @@ from pandas import DataFrame
 from sys import path as syspath
 syspath.append(os.path.expanduser("~/srdjan_functs/"))
 
-from islets.Recording1 import Recording, saveMovie
+from islets.Recording import Recording, saveMovie
 from islets.LineScan import LineScan
 from islets.numeric import rebin
 from islets.utils import saveRois, get_filterSizes
-from islets.Regions1 import Regions, getStatImages
+from islets.Regions import Regions, getStatImages
 
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category= FutureWarning,)
