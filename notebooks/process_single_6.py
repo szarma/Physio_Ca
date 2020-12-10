@@ -33,32 +33,33 @@ parser.add_argument('--debug', const=True, default=False, action="store_const",
 
 args = parser.parse_args()
 
-# def process_as_linescans():
-#     nameDict = dict([(name, list(ii)) for ii, name in parse_leica(rec, index=True)])
-#     if serToImport in nameDict:
-#         indices = nameDict[serToImport]
-#     else:
-#         serBegin, serEnd = [int(part.strip("Series"))  for part in serToImport.split("-")]
-#         serEnd += 1
-#         possibleNames = ["Series%03i"%jSer for jSer in range(serBegin, serEnd)]
-#         indices = rec.metadata.Name.isin(possibleNames)
-#         indices = indices[indices].index
-#     serNames = rec.metadata.loc[indices,"Name"]
-#     for ix, name in zip(indices,serNames):
-#         lsname = "%s: %s"%(rec.Experiment[:-4], name)
-#         rec.import_series(name, isLineScan=(args.line_scan=="single") )
-#         data = rec.Series[name]["data"].astype("float32")
-#         if args.line_scan=="multi":
-#             data = data.sum(1)
-#         else:
-#             assert data.shape[1]==1
-#             data = data[:,0]
-#         linescan = LineScan(
-#             data = data.T,
-#             metadata = rec.Series[name]["metadata"],
-#             name = lsname
-#             )
-#         linescan.plot(save=os.path.join(saveDir,lsname.replace(": ","_")+".png"), Npoints=2000)   
+def process_as_linescans():
+    from islets.Recording import parse_leica
+    nameDict = dict([(name, list(ii)) for ii, name in parse_leica(rec, index=True)])
+    if serToImport in nameDict:
+        indices = nameDict[serToImport]
+    else:
+        serBegin, serEnd = [int(part.strip("Series"))  for part in serToImport.split("-")]
+        serEnd += 1
+        possibleNames = ["Series%03i"%jSer for jSer in range(serBegin, serEnd)]
+        indices = rec.metadata.Name.isin(possibleNames)
+        indices = indices[indices].index
+    serNames = rec.metadata.loc[indices,"Name"]
+    for ix, name in zip(indices,serNames):
+        lsname = "%s: %s"%(rec.Experiment[:-4], name)
+        rec.import_series(name, isLineScan=(args.line_scan=="single") )
+        data = rec.Series[name]["data"].astype("float32")
+        if args.line_scan=="multi":
+            data = data.sum(1)
+        else:
+            assert data.shape[1]==1
+            data = data[:,0]
+        linescan = LineScan(
+            data = data.T,
+            metadata = rec.Series[name]["metadata"],
+            name = lsname
+            )
+        linescan.plot(save=os.path.join(saveDir,lsname.replace(": ","_")+".png"), Npoints=2000)
 
 if args.debug:
     for k in args.__dict__.keys():
