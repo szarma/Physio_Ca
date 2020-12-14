@@ -52,6 +52,7 @@ class PicklePicker:
         self.debug = debug
         self.appHeight = appHeight
         self.showExamine = showExamine
+        self.max_rois = max_rois
 
         self.regions = None
         self.linescan = None
@@ -252,13 +253,13 @@ class PicklePicker:
                         "Number of ROIs: %i" % len(self.regions.df),
                     ]
                     if self.showExamine:
-                        japp = self.regions.examine(max_rois=max_rois)
+                        japp = self.regions.examine(max_rois=self.max_rois)
                         japp._repr_html_()
                         link2app = "https://ctn.physiologie.meduniwien.ac.at" + japp.get_app_root_url()
                 else:  ####### line scan ################
                     self.pathToRec, ser = os.path.split(path)
                     self.pathToRec = os.path.split(self.pathToRec)[0].split("_analysis")[0]
-                    feedback += [f"Loading the line scan {ser} from {pathToRec}"]
+                    feedback += [f"Loading the line scan {ser} from {self.pathToRec}"]
                     rec = Recording(self.pathToRec)
                     md = rec.metadata.set_index("Name")
                     #                 feedback += [str(md.index)]
