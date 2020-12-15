@@ -399,7 +399,7 @@ class Regions:
         out = np.unique(out,axis=0)
         return out
     
-    def plotEdges(self, ix=None, ax=None, image=True, imkw_args={}, separate=False, color="darkred", lw=None, alpha=1, fill=False, showScale=True,norm=LogNorm(vmin=1), spline=True):
+    def plotEdges(self, ix=None, ax=None, image=True, imkw_args={}, separate=False, color="darkred", lw=None, alpha=1, fill=False, scaleFontSize=12, norm=LogNorm(vmin=1), spline=True):
         if ix is None:
             ix = self.df.index
         if ax is None:
@@ -439,7 +439,7 @@ class Regions:
             y,x = np.array(tmp).T
             ax.plot(x,y,color,lw=lw,alpha=alpha)
             
-        if not showScale: return None
+        if scaleFontSize<=0: return None
         if hasattr(self, "metadata") and "pxSize" in self.metadata:
             lengths = [10,20,50]
             il = np.searchsorted(lengths,self.metadata.pxSize*self.image.shape[1]/10)
@@ -449,9 +449,7 @@ class Regions:
             txt = str(length)
             if "pxUnit" in self.metadata:
                 txt += self.metadata["pxUnit"]
-#             fontsize = ax.get_figure().get_size_inches()[0]*2.5
-            fontsize = 12
-            ax.text((x0+x1)/2, y1+.2*(y1-y0), txt, va="top", ha="center", size=fontsize)
+            ax.text((x0+x1)/2, y1+.2*(y1-y0), txt, va="top", ha="center", size=scaleFontSize)
             
     def plotPeaks(self, ix=None, ax=None, image=False, ms=1, labels=False,color=None, imkw_args={},absMarker=True):
         if ax is None:
