@@ -1,3 +1,7 @@
+from pathlib import Path
+from typing import Union
+import mgzip
+import json
 import numpy as np
 import pandas as pd
 from itertools import product
@@ -179,7 +183,81 @@ class Regions:
         
         if full and not hasattr(self,"df"):
             self.constructRois(mode=mode, img_th=img_th, diag=diag, gSig_filt=gSig_filt, processes=processes, excludePixels=excludePixels, verbose=verbose, use_restricted=use_restricted)
-            
+
+    def to_json(self, file_path: str, use_compression: bool = False) -> None:
+        if file_path is None:
+            raise TypeError('file_path cannot be None if regions shall be saved to a file.')
+
+        json_dict = {
+            'metadata': json.JSONDecoder().decode(self.metadata.to_json(double_precision=15)),
+            'filerSize': self.filterSize,
+            'gain': str(self.gain),
+        }
+
+        json_string = json.dumps(json_dict)
+
+        if use_compression:
+            if not file_path.endswith('.gz'):
+                file_path += '.gz'
+            with gzip.open(file_path, 'wb') as file:
+                file.write(json_string)
+        else:
+            with open(file_path, 'w') as file:
+                file.write(json_string)
+
+    @staticmethod
+    def from_json(file_path: Union[str, Path],
+                  use_compression: Union[bool, None] = None) -> object:
+        if type(file_path) == str:
+            file_path = Path(file_path)
+        if not file_path.exists():
+            raise FileNotFoundError
+
+        if use_compression is None:
+            if file_path.suffix == '.gz':
+                use_compression = True
+            else:
+                use_compression = False
+
+        if use_compression:
+            with mgzip.open(file_path.as_posix(), 'rt') as file:
+                file_content = file.read()
+        else:
+            with open(file_path.as_posix(), 'r') as file:
+                file_content = file.read()
+
+        # Load JSON-object from file-content:
+        json_obj = json.loads(file_content)
+
+        # DataFrame needs to be restored manually. Peaks and Pixels need to be converted to tuples.
+        json_obj['df'] = pd.DataFrame.from_dict(json_obj['df'])
+        json_obj['df']['peak'] = json_obj['df']['peak'].apply(lambda x: tuple(x))
+        json_obj['df']['pixels'] = json_obj['df']['pixels'].apply(lambda x: [tuple(y) for y in x])
+
+        # Metadata needs to be restored manually
+        json_obj['metadata'] = pd.Series(json_obj['metadata'])
+
+        # statImages need to be restored manually because they cannot be converted to JSON by default:
+        for key, value in json_obj['statImages'].items():
+            json_obj['statImages'][key] = np.array(value)
+
+        # Create Regions object and set all attributes stored in the JSON file:
+        regions = Regions(dict(zip(json_obj['df']['peak'], json_obj['df']['pixels'])))
+        for key, value in json_obj.items():
+            regions.__setattr__(key, value)
+        regions.update()
+        pickle_dir = file_path.parent
+        regions = Regions(regions)
+        protocol_files = list(file_path.parent.glob('*protocol*.*'))
+        if len(protocol_files) > 0:
+            regions.import_protocol(protocol_files[0].as_posix())
+        regions.pathToPickle = file_path.as_posix()
+        regions.detrend_traces()
+        regions.infer_gain(plot=False)
+        regions.merge_closest(Niter=15)
+
+        return regions
+
     def constructRois(self, mode, img_th=0, diag=True, gSig_filt=None, processes=5,excludePixels=None, verbose=False,use_restricted=True):
         from .numeric import robust_max
         if mode=="custom":
