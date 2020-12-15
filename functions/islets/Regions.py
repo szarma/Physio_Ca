@@ -23,7 +23,8 @@ def load_regions(path,
                  mergeSizeTh=10,
                  plot=False,
                  verbose=False,
-                 calcInterest=True
+                 calcInterest=True,
+                 baremin=False
                 ):
 #     from .Regions1 import Regions as R
     with open(path,"rb") as f:
@@ -32,14 +33,15 @@ def load_regions(path,
         regions.update()
         pickleDir = os.path.split(path)[0]
         regions = Regions(regions)
+        regions.pathToPickle = path
         try:
             protocolFile = os.path.join(pickleDir, [f for f in os.listdir(pickleDir) if "protocol" in f][0])
             regions.import_protocol(protocolFile)
         except:
             pass
-        regions.pathToPickle = path
-        regions.detrend_traces()
-        regions.infer_gain(plot=plot)
+        if not baremin:
+            regions.detrend_traces()
+            regions.infer_gain(plot=plot)
         regions.merge_closest(mergeSizeTh=mergeSizeTh, mergeDist=mergeDist, plot=plot, Niter=15, verbose=verbose)
         if calcInterest:
             regions.calc_interest()
