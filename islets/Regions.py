@@ -446,10 +446,10 @@ class Regions:
             length=lengths[il]
             x0,x1,y0,y1 = np.array([0,length,0,length*3/50])/self.metadata.pxSize + self.image.shape[0]*.02
             ax.fill_between([x0,x1],[y1]*2,[y0]*2, color="k")
-            txt = str(length)
+            txt = "\n"*2+str(length)
             if "pxUnit" in self.metadata:
                 txt += self.metadata["pxUnit"]
-            ax.text((x0+x1)/2, y1+.2*(y1-y0), txt, va="top", ha="center", size=scaleFontSize)
+            ax.text((x0+x1)/2, y1+.2*(y1-y0), txt, va="center", ha="center", size=scaleFontSize)
             
     def plotPeaks(self, ix=None, ax=None, image=False, ms=1, labels=False,color=None, imkw_args={},absMarker=True):
         if ax is None:
