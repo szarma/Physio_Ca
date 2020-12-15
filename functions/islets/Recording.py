@@ -7,6 +7,7 @@ from sys import exc_info
 from warnings import warn
 
 
+
 def parse_leica(rec,
                 merge=True,
                 skipTags = ["crop","split","frame", "every","half", "snapshot","-","proj","max","resize"],
@@ -425,11 +426,10 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
             sers = [rec.Experiment.split(".")[0]]
 #             print ("Nikon not yet supported. Bug me to enable it.")
 #             continue
-            
-
         analysisFolder = os.path.join(rec.folder, rec.Experiment+"_analysis")
         if not os.path.isdir(analysisFolder):
-            os.makedirs(analysisFolder)
+            continue
+#             os.makedirs(analysisFolder)
         existingSeries = [fs.split("_")[0] for fs in os.listdir(analysisFolder) if os.path.isdir(os.path.join(analysisFolder, fs)) and fs[0]!="." and len(os.listdir(os.path.join(analysisFolder, fs)))]
         sers = np.unique(sers+existingSeries)
         for series in sers:
@@ -447,12 +447,12 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
                     series = "all"
 #                     rec.import_series("all", onlyMeta=True)
 #                 else:
-#                 try:
-                rec.import_series(series, onlyMeta=True)
-#                 except:
-#                     print (f"could not import {series} from {rec.path}", exc_info())
-#                     status += [md]
-#                     continue
+                try:
+                    rec.import_series(series, onlyMeta=True)
+                except:
+                    print (f"could not import {series} from {rec.path}", exc_info())
+                    status += [md]
+                    continue
                 
                 saveDir = os.path.join(analysisFolder, ser)
                 for k,v in rec.Series[series]["metadata"].items(): md[k] = v
