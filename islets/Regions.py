@@ -23,9 +23,9 @@ def load_regions(path,
                  mergeSizeTh=10,
                  plot=False,
                  verbose=False,
-                 calcInterest=True
+                 calcInterest=True,
+                 baremin=False
                 ):
-#     from .Regions1 import Regions as R
     with open(path,"rb") as f:
         regions = pickle.load(f)
     try:
@@ -37,9 +37,9 @@ def load_regions(path,
             regions.import_protocol(protocolFile)
         except:
             pass
-        regions.pathToPickle = path
-        regions.detrend_traces()
-        regions.infer_gain(plot=plot)
+        if not baremin:
+            regions.detrend_traces()
+            regions.infer_gain(plot=plot)
         regions.merge_closest(mergeSizeTh=mergeSizeTh, mergeDist=mergeDist, plot=plot, Niter=15, verbose=verbose)
         if calcInterest:
             regions.calc_interest()
