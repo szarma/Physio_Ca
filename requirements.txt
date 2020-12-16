@@ -6,11 +6,15 @@ plotly
 scipy
 numba
 networkx
-python-bioformats
 nd2reader
 ipython
 opencv-python
 Pillow
 setuptools
 jupyter-plotly-dash
+python-bioformats
 plotly-express
+islets
+caiman
+mgzip
+orjson

@@ -1,21 +1,32 @@
-import numpy as np
-import pandas as pd
-from itertools import product
-from collections import OrderedDict
-import matplotlib.pyplot as plt
-import networkx as nx
-from .numeric import rebin
-from .utils import multi_map
-import plotly.graph_objects as go
-from matplotlib._color_data import TABLEAU_COLORS, CSS4_COLORS
-from .general_functions import getCircularKernel
-import pickle
-from matplotlib.colors import LogNorm
+import json
 import os
+import pickle
+from collections import OrderedDict
+from copy import deepcopy
+from datetime import date
+from itertools import product
+from pathlib import Path
 from sys import exc_info
+from typing import Union
+
+import matplotlib.pyplot as plt
+import mgzip
+import networkx as nx
+import numpy as np
+import orjson
+import pandas as pd
+import plotly.graph_objects as go
+from matplotlib.colors import LogNorm
 from plotly_express import colors as plc
+
+from .general_functions import getCircularKernel
+from .numeric import rebin, bspline
+from .utils import multi_map
+
 MYCOLORS = plc.qualitative.Plotly
-from .numeric import bspline
+
+
+
 # MYCOLORS = ["darkred"]
 
 def load_regions(path,
@@ -179,7 +190,172 @@ class Regions:
         
         if full and not hasattr(self,"df"):
             self.constructRois(mode=mode, img_th=img_th, diag=diag, gSig_filt=gSig_filt, processes=processes, excludePixels=excludePixels, verbose=verbose, use_restricted=use_restricted)
-            
+
+    def to_json(self,
+                output_dir: Union[str, Path],
+                file_name: str = '',
+                movie=None,
+                col: Union[list, None] = None,
+                formats: Union[list, None] = None,
+                add_date: bool = True,
+                use_compression: bool = False) -> None:
+        """
+        Exports the current regions object to json-format.
+
+        :param output_dir: Directory, where the output will be written to.
+        :param file_name: Base filename (will be extended automatically e.g. "5.6" becomes "5.6_rois.json.gz"
+        :param movie: Movie, which shall be manually connected to the regions object.
+        :param col: Columns, which are required to serialize. Default: ['trace']
+        :param formats: Format, which should be used to store json-data. Default: ['vienna']
+        :param add_date: If True then the current date will be added to the filename. Default: True
+        :param use_compression: If True then the .json file will be compressed to .gz
+        :return: None
+        """
+
+        if col is None:
+            col = ['trace']
+        if formats is None:
+            formats = ['vienna']
+        if type(output_dir) == str:
+            output_dir = Path(output_dir)
+        if movie is None:
+            self.update(movie)
+        file_name = file_name.replace(' ', '_')
+        if add_date:
+            today = date.today()
+            if len(file_name):
+                file_name = '_'.join([today.strftime('%Y_%m_%d'), file_name])
+            else:
+                file_name = today.strftime('%Y_%m_%d')
+        if not output_dir.is_dir():
+            output_dir.mkdir(parents=True)
+
+        for format in formats:
+            if format == 'vienna':
+                saving = ['statImages',
+                          'mode',
+                          'image',
+                          'filterSize',
+                          'df',
+                          'trange',
+                          'FrameRange',
+                          'analysisFolder',
+                          'time',
+                          'Freq',
+                          'metadata']
+                juggle_movie = hasattr(self, 'movie')
+                if juggle_movie:
+                    movie = self.movie
+                    del self.movie
+                all_keys = list(self.__dict__.keys())
+                subregions = deepcopy(self)
+                if juggle_movie:
+                    self.movie = movie
+                    del movie
+                for k in all_keys:
+                    if k not in saving:
+                        del subregions.__dict__[k]
+                for k in self.df.columns:
+                    if k not in ['peak', 'pixels', 'peakValue','tag','interest'] + col:
+                        del subregions.df[k]
+
+                json_dict = {}
+                for k, v in subregions.__dict__.items():
+                    value = v
+                    if isinstance(v, (pd.DataFrame, pd.Series)):
+                        value = json.JSONDecoder().decode(v.to_json(double_precision=15))
+                    if isinstance(v, (np.float64, np.int64)):
+                        value = str(v)
+                    if isinstance(v, np.ndarray):
+                        value = v.tolist()
+                    if isinstance(v, dict):
+                        for k_, v_ in v.items():
+                            if isinstance(v_, np.ndarray):
+                                # v[k_] = json.dumps(v_.tolist())
+                                v[k_] = v_.tolist()
+                        value = v
+
+                    json_dict[k] = value
+
+                json_string = orjson.dumps(json_dict).decode()
+
+                roi_file = f'{output_dir.as_posix()}/{file_name}_rois.json'
+                if use_compression:
+                    if not roi_file.endswith('.gz'):
+                        roi_file += '.gz'
+                    with mgzip.open(roi_file, 'wt') as file:
+                        file.write(json_string)
+                else:
+                    with open(roi_file, 'wt') as file:
+                        file.write(json_string)
+
+                self.pathToPickle = roi_file
+                # create_preview_image(self)
+                # TODO: Add json to creation process to let it work
+            elif format == 'maribor':
+                raise NotImplementedError
+            else:
+                raise NotImplementedError(f'Output format {format} not recognized.')
+
+    @staticmethod
+    def from_json(file_path: Union[str, Path], use_compression: Union[bool, None] = None) -> object:
+        """
+        Static method, which enabled creation of a regions object by reading a (compressed) json file.
+
+        :param file_path: Path to the file, which will be read.
+        :param use_compression: Specifies the usage of compression. None means the algorithm decides it by file suffix.
+        :return: Regions object.
+        :raises FileNotFoundError: Gets raised if file_path does not exist.
+        """
+        if type(file_path) == str:
+            file_path = Path(file_path)
+        if not file_path.exists():
+            raise FileNotFoundError
+
+        if use_compression is None:
+            use_compression = True if file_path.suffix == '.gz' else False
+
+        if use_compression:
+            with mgzip.open(file_path.as_posix(), 'rt') as file:
+                file_content = file.read()
+        else:
+            with open(file_path.as_posix(), 'rt') as file:
+                file_content = file.read()
+
+        # Load JSON-object from file-content:
+        json_obj = orjson.loads(file_content.encode())
+
+        # Restoring data types:
+        df = pd.DataFrame.from_dict(json_obj['df'])
+        df['peak'] = df['peak'].apply(lambda x: tuple(x))
+        df['pixels'] = df['pixels'].apply(lambda x: [tuple(y) for y in x])
+        del json_obj['df']
+
+        json_obj['metadata'] = pd.Series(json_obj['metadata'])
+        json_obj['Freq'] = np.float64(json_obj['Freq'])
+        json_obj['image'] = np.array(json_obj['image'])
+
+        for key, value in json_obj['statImages'].items():
+            json_obj['statImages'][key] = np.array(value)
+
+        # Create Regions object and set all attributes stored in the JSON file:
+        regions = Regions(dict(zip(df['peak'], df['pixels'])))
+        for key, value in json_obj.items():
+            regions.__setattr__(key, value)
+        regions.df = df
+        regions.update()
+        pickle_dir = file_path.parent
+        regions = Regions(regions)
+        protocol_files = list(file_path.parent.glob('*protocol*.*'))
+        if len(protocol_files) > 0:
+            regions.import_protocol(protocol_files[0].as_posix())
+        regions.pathToPickle = file_path.as_posix()
+        regions.detrend_traces()
+        regions.infer_gain(plot=False)
+        regions.merge_closest(Niter=15)
+
+        return regions
+
     def constructRois(self, mode, img_th=0, diag=True, gSig_filt=None, processes=5,excludePixels=None, verbose=False,use_restricted=True):
         from .numeric import robust_max
         if mode=="custom":
