@@ -199,6 +199,19 @@ class Regions:
                 formats: Union[list, None] = None,
                 add_date: bool = True,
                 use_compression: bool = False) -> None:
+        """
+        Exports the current regions object to json-format.
+
+        :param output_dir: Directory, where the output will be written to.
+        :param file_name: Base filename (will be extended automatically e.g. "5.6" becomes "5.6_rois.json.gz"
+        :param movie: Movie, which shall be manually connected to the regions object.
+        :param col: Columns, which are required to serialize. Default: ['trace']
+        :param formats: Format, which should be used to store json-data. Default: ['vienna']
+        :param add_date: If True then the current date will be added to the filename. Default: True
+        :param use_compression: If True then the .json file will be compressed to .gz
+        :return: None
+        """
+
         if col is None:
             col = ['trace']
         if formats is None:
@@ -286,6 +299,14 @@ class Regions:
 
     @staticmethod
     def from_json(file_path: Union[str, Path], use_compression: Union[bool, None] = None) -> object:
+        """
+        Static method, which enabled creation of a regions object by reading a (compressed) json file.
+
+        :param file_path: Path to the file, which will be read.
+        :param use_compression: Specifies the usage of compression. None means the algorithm decides it by file suffix.
+        :return: Regions object.
+        :raises FileNotFoundError: Gets raised if file_path does not exist.
+        """
         if type(file_path) == str:
             file_path = Path(file_path)
         if not file_path.exists():
