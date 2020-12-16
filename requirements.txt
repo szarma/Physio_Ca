@@ -12,6 +12,7 @@ opencv-python
 Pillow
 setuptools
 jupyter-plotly-dash
+python-bioformats
 plotly-express
 islets
 caiman
