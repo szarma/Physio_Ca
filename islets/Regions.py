@@ -532,7 +532,7 @@ class Regions:
         self.time = time[i0:ie]
         self.Freq = movie_.fr
         
-    def detrend_traces(self,fast=True, timescale=200):
+    def detrend_traces(self,method="simple", timescale=200):
 #         from .numeric import mydebleach
 #         traces = np.vstack(self.df.trace.values)
 #         trend = multi_map( mydebleach, traces, processes=processes)
@@ -540,15 +540,26 @@ class Regions:
 #         self.df["detrended"] = list(traces - np.array(trend))
 #         traces = np.vstack(self.df.trace.values)
 #         print ("Deprecated method. I used to think it makes sense, now I don't think so. The method is still here, not to break your scripts, but it only subtracts mean from the trace.")
-        if fast:
+        if method=="simple":
             trend = self.df.trace.apply(np.mean)
             self.df["trend"] = trend
             self.df["detrended"] = [self.df.trace[i] - self.df.trend[i] for i in self.df.index]
-        else:
+        elif method=="fast":
+            self.fast_filter_traces(timescale)
+            self.df["detrended"] = self.df["faster_%g"%timescale]
+            self.df["trend"]     = self.df["slower_%g"%timescale]
+            del self.df["faster_%g"%timescale], self.df["slower_%g"%timescale]
+        elif method=="slow":
             self.slow_filter_traces(timescale)
             self.df["detrended"] = self.df["faster_%g"%timescale]
             self.df["trend"]     = self.df["slower_%g"%timescale]
             del self.df["faster_%g"%timescale], self.df["slower_%g"%timescale]
+        elif method=="debleach":
+            from .numeric import fit_bleaching
+            self.df["trend"] = multi_map(fit_bleaching, self.df.trace, processes=5)
+            self.df["detrended"] = [self.df.trace[i] - self.df.trend[i] for i in self.df.index]
+        else:
+            raise NotImplementedError()
 
     def sortFromCenter(self):
         center = np.array(self.image.shape)/2

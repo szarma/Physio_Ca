@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import distributions as dst
 from scipy.optimize import curve_fit#,minimize,basinhopping
 from numba import jit,prange
+import warnings
 
 def bspline(cv, n=100, degree=3):
     """ Calculate n samples on a bspline
@@ -220,19 +221,24 @@ def decay(time,top,bottom,rate):
 #     top,bottom,rate = p
     return bottom+(top-bottom)*np.exp(-time*rate)
 
+# def guessDecayPars(y):
+#     b0 = np.nanpercentile(y,1)
+#     with np.errstate(divide='ignore', invalid="ignore"):
+#         y  = np.log(y-b0)
+#     r0 = .1/len(y)
+#     t0 = np.nanpercentile(y[:len(y)//10+1],99)
+#     p0 = (np.exp(t0)+b0,b0,r0)
+#     return p0
+
 def guessDecayPars(y):
-    b0 = np.nanpercentile(y,1)
-    with np.errstate(divide='ignore', invalid="ignore"):
-        y  = np.log(y-b0)
-#     r0 = np.diff(y)
-#     r0 = r0[np.isfinite(r0)]
-#     r0 = -np.mean(r0)
-    r0 = .1/len(y)#y[1]-y[-2]/len(y)
-    t0 = np.nanpercentile(y,99)
-    p0 = (np.exp(t0)+b0,b0,r0)
+    r0 = 1e-6
+    t0 = np.percentile(y,60)
+    b0 = np.percentile(y,40)
+    p0 = (t0,b0,r0)
     return p0
 
-def mydebleach(x_, points=None, func=None):
+def fit_bleaching(x_, points=100, func=None, lin_corr=True):
+    from scipy.interpolate import interp1d
     N = len(x_) 
     t_ = np.arange(len(x_))
     if points!=None:
@@ -240,19 +246,32 @@ def mydebleach(x_, points=None, func=None):
         if nrebin>1:
             if func is None:
                 func = np.mean
-            x_ = rebin(x_, nrebin, func=func)
-            t_ = rebin(t_, nrebin, func=np.mean)
         else:
             nrebin = 1
-    try:
-        out = decayfit(x_)
-    except:
-        pass
-    if np.isnan(out).any():
-        out = x_ - x_.mean()
-    p = np.polyfit(t_,x_,1)
-    out = p[1]+p[0]*np.arange(N)
+    else:
+        nrebin = 1
+    if nrebin>1:
+#         x = rebin(x_, nrebin, func=func)
+        x = np.percentile(x_[:len(x_)//nrebin*nrebin].reshape((-1,nrebin)), 10, axis=1)
+#         x = rebin(x_, nrebin, func=func)
+        t = rebin(t_, nrebin, func=np.mean)
+    else:
+        x = x_
+        t = t_
+#     try:
+#     out = decayfit(x)
+    x = x[len(x)//10:-len(x)//10-1]
+    t = t[len(t)//10:-len(t)//10-1]
+    out = simple_decayfit(x)
     
+    out = interp1d(t, out, fill_value="extrapolate")(t_)
+#     except:
+#         pass
+#     if np.isnan(out).any():
+#         out = x_ - x_.mean()
+    if lin_corr:
+        p = np.polyfit(t_,x_-out,1)
+        out += p[1]+p[0]*np.arange(N)
     return out
 
 def decayfit(x,Ntrials=None, outPars=False):
@@ -287,6 +306,18 @@ def decayfit(x,Ntrials=None, outPars=False):
     else:
         return expDecay
 
+
+def simple_decayfit(x):
+    p0 = guessDecayPars(x)
+    ff = np.isfinite(x)
+    tt = np.arange(len(x))
+    try:
+        popt = curve_fit(decay,tt[ff],x[ff],p0=p0)[0]
+    except:
+        warnings.warn("Did not manage to fit the decay.")
+        popt = p0
+    expDecay = decay(tt,*popt)
+    return expDecay
 
 @jit 
 def percFilter(x_,perc,filterSize):
