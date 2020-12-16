@@ -11,6 +11,8 @@ ipython
 opencv-python
 Pillow
 setuptools
+jupyter-plotly-dash
+plotly-express
 islets
 caiman
 mgzip
