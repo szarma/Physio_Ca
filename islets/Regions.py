@@ -399,7 +399,20 @@ class Regions:
         out = np.unique(out,axis=0)
         return out
     
-    def plotEdges(self, ix=None, ax=None, image=True, imkw_args={}, separate=False, color="darkred", lw=None, alpha=1, fill=False, scaleFontSize=12, norm=LogNorm(vmin=1), spline=True):
+    def plotEdges(self,
+                  ix=None,
+                  ax=None,
+                  image=True,
+                  imkw_args={},
+                  separate=False,
+                  color="darkred",
+                  lw=None,
+                  alpha=1,
+                  fill=False,
+                  scaleFontSize=12,
+                  norm=LogNorm(vmin=1),
+                  spline=True
+                  ):
         if ix is None:
             ix = self.df.index
         if ax is None:
