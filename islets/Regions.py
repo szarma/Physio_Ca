@@ -1,28 +1,32 @@
-from datetime import date
-from pathlib import Path
-from typing import Union
-from copy import deepcopy
-import mgzip
 import json
-import numpy as np
-import pandas as pd
-from itertools import product
-from collections import OrderedDict
-import matplotlib.pyplot as plt
-import networkx as nx
-from .numeric import rebin
-from .utils import multi_map
-import plotly.graph_objects as go
-from matplotlib._color_data import TABLEAU_COLORS, CSS4_COLORS
-from .general_functions import getCircularKernel
-import pickle
-from matplotlib.colors import LogNorm
 import os
+import pickle
+from collections import OrderedDict
+from copy import deepcopy
+from datetime import date
+from itertools import product
+from pathlib import Path
 from sys import exc_info
+from typing import Union
+
+import matplotlib.pyplot as plt
+import mgzip
+import networkx as nx
+import numpy as np
+import orjson
+import pandas as pd
+import plotly.graph_objects as go
+from matplotlib.colors import LogNorm
 from plotly_express import colors as plc
+
+from .general_functions import getCircularKernel
+from .numeric import rebin, bspline
+from .utils import multi_map
+
 MYCOLORS = plc.qualitative.Plotly
-from .numeric import bspline
-from .utils import create_preview_image
+
+
+
 # MYCOLORS = ["darkred"]
 
 def load_regions(path,
@@ -260,7 +264,7 @@ class Regions:
 
                     json_dict[k] = value
 
-                json_string = json.dumps(json_dict)
+                json_string = orjson.dumps(json_dict).decode()
 
                 roi_file = f'{output_dir.as_posix()}/{file_name}_rois.json'
                 if use_compression:
@@ -269,7 +273,7 @@ class Regions:
                     with mgzip.open(roi_file, 'wt') as file:
                         file.write(json_string)
                 else:
-                    with open(roi_file, 'w') as file:
+                    with open(roi_file, 'wt') as file:
                         file.write(json_string)
 
                 self.pathToPickle = roi_file
@@ -294,11 +298,11 @@ class Regions:
             with mgzip.open(file_path.as_posix(), 'rt') as file:
                 file_content = file.read()
         else:
-            with open(file_path.as_posix(), 'r') as file:
+            with open(file_path.as_posix(), 'rt') as file:
                 file_content = file.read()
 
         # Load JSON-object from file-content:
-        json_obj = json.loads(file_content)
+        json_obj = orjson.loads(file_content.encode())
 
         # Restoring data types:
         df = pd.DataFrame.from_dict(json_obj['df'])
