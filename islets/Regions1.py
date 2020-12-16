@@ -23,11 +23,12 @@ def load_regions(path,
                  mergeSizeTh=10,
                  plot=False,
                  verbose=False,
-                 calcInterest=True,
-                 baremin=False
+                 calcInterest=True
                 ):
+#     from .Regions1 import Regions as R
     with open(path,"rb") as f:
         regions = pickle.load(f)
+        regions = Regions(regions)
     try:
         regions.update()
         pickleDir = os.path.split(path)[0]
@@ -37,9 +38,9 @@ def load_regions(path,
             regions.import_protocol(protocolFile)
         except:
             pass
-        if not baremin:
-            regions.detrend_traces()
-            regions.infer_gain(plot=plot)
+        regions.pathToPickle = path
+        regions.detrend_traces()
+        regions.infer_gain(plot=plot)
         regions.merge_closest(mergeSizeTh=mergeSizeTh, mergeDist=mergeDist, plot=plot, Niter=15, verbose=verbose)
         if calcInterest:
             regions.calc_interest()
@@ -399,7 +400,7 @@ class Regions:
         out = np.unique(out,axis=0)
         return out
     
-    def plotEdges(self, ix=None, ax=None, image=True, imkw_args={}, separate=False, color="darkred", lw=None, alpha=1, fill=False, scaleFontSize=12, norm=LogNorm(vmin=1), spline=True):
+    def plotEdges(self, ix=None, ax=None, image=True, imkw_args={}, separate=False, color="darkred", lw=None, alpha=1, fill=False, showScale=True,norm=LogNorm(vmin=1), spline=True):
         if ix is None:
             ix = self.df.index
         if ax is None:
@@ -420,7 +421,7 @@ class Regions:
                     c = self.df.loc[i,"color"]
                 except:
                     c = MYCOLORS[i%len(MYCOLORS)]
-                points = self.df.loc[i,"boundary"]+self.df.loc[i,"boundary"][:3]
+                points = self.df.loc[i,"boundary"]+self.df.loc[i,"boundary"][:1]
                 if spline:
                     points = bspline(points, n=30)
                 y,x = np.array(points).T
@@ -433,23 +434,25 @@ class Regions:
                 if spline:
                     el = list(bspline(el, n=30))
                 tmp += el
-                tmp += el[:3]
+                tmp += [el[0]]
                 tmp += [(np.nan,)*2]
 
             y,x = np.array(tmp).T
             ax.plot(x,y,color,lw=lw,alpha=alpha)
             
-        if scaleFontSize<=0: return None
+        if not showScale: return None
         if hasattr(self, "metadata") and "pxSize" in self.metadata:
             lengths = [10,20,50]
             il = np.searchsorted(lengths,self.metadata.pxSize*self.image.shape[1]/10)
             length=lengths[il]
             x0,x1,y0,y1 = np.array([0,length,0,length*3/50])/self.metadata.pxSize + self.image.shape[0]*.02
             ax.fill_between([x0,x1],[y1]*2,[y0]*2, color="k")
-            txt = "\n"*1+str(length)
+            txt = str(length)
             if "pxUnit" in self.metadata:
                 txt += self.metadata["pxUnit"]
-            ax.text((x0+x1)/2, y1+.3*(y1-y0), txt, va="center", ha="center", size=scaleFontSize)
+#             fontsize = ax.get_figure().get_size_inches()[0]*2.5
+            fontsize = 12
+            ax.text((x0+x1)/2, y1+.2*(y1-y0), txt, va="top", ha="center", size=fontsize)
             
     def plotPeaks(self, ix=None, ax=None, image=False, ms=1, labels=False,color=None, imkw_args={},absMarker=True):
         if ax is None:
