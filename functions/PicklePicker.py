@@ -18,7 +18,7 @@ import pandas as pd
 from dash import no_update
 
 from islets.Recording import Recording
-from islets.Regions1 import Regions,load_regions
+from islets.Regions import Regions,load_regions
 from islets.LineScan import LineScan
 from islets.utils import getFigure, showRoisOnly
 from islets.numeric import rebin
