@@ -7,8 +7,6 @@ import os
 import numpy as np
 from IPython.core.display import HTML
 
-from sys import path as syspath
-syspath.append(os.path.expanduser("~/srdjan_functs/"))
 from sys import exc_info
 from caiman import movie as cmovie
 import json
