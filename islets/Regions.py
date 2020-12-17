@@ -486,6 +486,18 @@ class Regions:
             interesting += np.mean(z>zth,1)
         self.df["interest"] = interesting
         
+    def change_frequency(self, fr=2):
+        from caiman import movie as cmovie
+        traces = np.vstack(self.df.trace)
+        fr0 = self.Freq
+        trmov = cmovie(traces.T.reshape((-1,len(self.df),1)), fr=fr0)
+        print (trmov.shape)
+        trmov = trmov.resize(1,1,fr/fr0)
+        print (trmov.shape)
+        self.df.trace = list(trmov[:,:,0].T)
+        self.Freq = fr
+        self.time = np.arange(len(trmov))/fr
+        
     def calcNNmap(self):
         from bidict import bidict
         peak2idx = bidict([(peak,j) for j,peak in zip(self.df.index,self.df.peak)])

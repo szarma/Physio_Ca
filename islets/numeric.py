@@ -170,7 +170,7 @@ def power_spectrum(x, fr, mean=True):
         ndim = len(x.shape)
         if ndim>1:
             FA = FA.mean(axis=tuple(range(ndim-1)))
-    return freq, FA
+    return freq, np.abs(FA)
 
 
 def get_sep_th(x_,ax=None,plot=False,thMax=None,log=False):
@@ -286,7 +286,7 @@ def decayfit(x,Ntrials=None, outPars=False):
         try:
             p0 = guessDecayPars(x)
             ff = np.isfinite(x)
-            popt = curve_fit(decay,tt[ff],x[ff],p0=p0)[0]
+            popt = curve_fit(decay,tt[ff],x[ff],p0=p0,bounds=[(None, None),(None, None),(0,None)])[0]
             expDecay = decay(TT,*popt)
             if outPars:
                 return expDecay, popt
