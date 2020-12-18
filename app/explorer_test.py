@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import dash
+import dash_html_components as html
 import dash_table
 from dash_table.Format import Format, Scheme#, Sign, Symbol
 import dash_core_components as dcc
@@ -8,6 +9,8 @@ from dash.dependencies import Input, Output, State
 import json
 import os
 from sys import exc_info
+
+
 from islets.general_functions import td2str
 from islets.Recording import import_data
 
@@ -83,7 +86,7 @@ def prepareDF(mainFolder, constrain="",ishow=None):
 
 # startFolder = "/data/Sandra/2020/2020_07_08/"
 constr = None
-startFolder, constr = "/data/Sandra/2020","59a"
+startFolder, constr = "/data/Ariana",""
 # startFolder = "/data/Sandra/2019/2019_09_03/"
 exceptCols = ["path to movie", "path to protocol", "path to add_info"]
 Nrows = 4
@@ -102,7 +105,7 @@ conditionalFormats += [
     for col in ["experiment"]
 ]
 
-users = sorted(["srdjan","johannes","sandra","marjan","arianna","nastja","ya-chi","dean"])
+users = sorted(["srdjan","johannes","sandra","marjan","arianna","nastja","ya-chi","dean","lidija"])
 app = dash.Dash(__name__,suppress_callback_exceptions=True)
 
 # if __name__=="__main__":

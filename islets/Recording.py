@@ -423,14 +423,25 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
             sers = parse_leica(rec)
         else:
             sers = [rec.Experiment.split(".")[0]]
-#             print ("Nikon not yet supported. Bug me to enable it.")
-#             continue
-            
 
         analysisFolder = os.path.join(rec.folder, rec.Experiment+"_analysis")
         if not os.path.isdir(analysisFolder):
-            os.makedirs(analysisFolder)
-        existingSeries = [fs.split("_")[0] for fs in os.listdir(analysisFolder) if os.path.isdir(os.path.join(analysisFolder, fs)) and fs[0]!="." and len(os.listdir(os.path.join(analysisFolder, fs)))]
+            continue
+        existingSeries = []
+        for fs in os.listdir(analysisFolder):
+            if not os.path.isdir(os.path.join(analysisFolder, fs)) : continue
+            if len(os.listdir(os.path.join(analysisFolder, fs)))==0: continue
+            if fs[0]=="." : continue
+            ############
+            fssplit = fs.split("_")
+            if len(fssplit)==1:
+                existingSeries += [fs]
+                continue
+            trange = fssplit[-1].split("-")
+            if len(trange)>1:
+                fs = "_".join(fssplit[:-1])
+            existingSeries += [fs]
+        print (existingSeries)
         sers = np.unique(sers+existingSeries)
         for series in sers:
             subdirs = get_series_dir(pathToRecording, series)
@@ -457,13 +468,16 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
                 saveDir = os.path.join(analysisFolder, ser)
                 for k,v in rec.Series[series]["metadata"].items(): md[k] = v
                 if "_" in ser:
-                    try:
-                        t0,t1 = [float(t) for t in ser.rstrip("s").split("_")[-1].split("-", maxsplit=1)]
-                        md["Time Range"] = "%i-%i"%(t0,t1)
-                        md["Duration [s]"] = t1-t0
-                    except:
-                        print ("Oops, having problems parsing ",ser)
-                        continue
+                    fssplit = ser.split("_")
+                    trange = fssplit[-1].split("-")
+                    if len(trange)>=2:
+                        try:
+                            t0,t1 = [float(t.strip("s")) for t in fssplit[-1].split("-", maxsplit=1)]
+                            md["Time Range"] = "%i-%i"%(t0,t1)
+                            md["Duration [s]"] = t1-t0
+                        except:
+                            print ("Oops, having problems parsing ",ser)
+                            continue
                 else:
                     md["Time Range"] = "all"
                     md["Duration [s]"] = md["SizeT"]/md["Frequency"]
