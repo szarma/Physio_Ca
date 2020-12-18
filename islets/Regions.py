@@ -218,7 +218,7 @@ class Regions:
             formats = ['vienna']
         if type(output_dir) == str:
             output_dir = Path(output_dir)
-        if movie is None:
+        if movie is not None:
             self.update(movie)
         file_name = file_name.replace(' ', '_')
         if add_date:
