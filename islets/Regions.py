@@ -775,7 +775,7 @@ class Regions:
         self.df.index = np.arange(len(self.df))
         self.calcNNmap()
     
-    def infer_gain(self, plot=False, verbose=False):
+    def infer_gain(self, plot=False, verbose=False, ret_points=False):
         minDt = np.diff(self.time).mean()
         freq = 1/minDt
 #         ts = min(50/freq,10)
@@ -793,6 +793,8 @@ class Regions:
         d = np.digitize(np.log(slow_est), logbs)
         x = np.array([slow_est[d==i].mean() for i in np.unique(d)])
         y = np.array([np.median(fast_vars[d==i]) for i in np.unique(d)])
+        if ret_points:
+            return x,y
         gain = np.mean(y/x)
         slow_est[slow_est<=0] = np.nan
         if plot:
