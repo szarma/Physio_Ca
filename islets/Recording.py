@@ -466,10 +466,13 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
 #                     continue
                 
                 saveDir = os.path.join(analysisFolder, ser)
-                for k,v in rec.Series[series]["metadata"].items(): md[k] = v
+                for k,v in rec.Series[series]["metadata"].items(): 
+                    md[k] = v
+                print ("Hi!")
                 if "_" in ser:
                     fssplit = ser.split("_")
                     trange = fssplit[-1].split("-")
+                    print(trange)
                     if len(trange)>=2:
                         try:
                             t0,t1 = [float(t.strip("s")) for t in fssplit[-1].split("-", maxsplit=1)]
@@ -478,6 +481,9 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
                         except:
                             print ("Oops, having problems parsing ",ser)
                             continue
+                    else:
+                        md["Time Range"] = "all"
+                        md["Duration [s]"] = md["SizeT"]/md["Frequency"]
                 else:
                     md["Time Range"] = "all"
                     md["Duration [s]"] = md["SizeT"]/md["Frequency"]
