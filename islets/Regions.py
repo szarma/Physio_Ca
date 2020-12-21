@@ -41,6 +41,7 @@ def load_regions(path,
         regions = pickle.load(f)
     try:
         regions.update()
+        regions.pathToRois = path
         pickleDir = os.path.split(path)[0]
         regions = Regions(regions)
         try:

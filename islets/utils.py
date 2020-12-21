@@ -94,7 +94,7 @@ def closeup_movie(regions, indices, movie=None, labels=False):
     ie += 10
     je += 10
     def addplot(ax_):
-        regions.plotEdges(ax=ax_, ix=indices, separate=True, image=False, showScale=False)
+        regions.plotEdges(ax=ax_, ix=indices, separate=True, image=False, scaleFontSize=0)
         regions.plotPeaks(ax=ax_, ix=indices, labels=labels)
     m = movie[:,i0:ie,j0:je]
     a = show_movie(m, additionalPlot = addplot, offset = (j0,i0), figScale=3, autoadjust=False)
@@ -525,7 +525,7 @@ def createStaticImage(im,regions,showall=True,color="grey",separate=True, return
     for sp in ax.spines: ax.spines[sp].set_visible(False)
     if showall:
         try:
-            regions.plotEdges(ax=ax,color=color,image=False,lw=figsize[0]*lw,separate=separate)
+            regions.plotEdges(ax=ax,color=color,image=False,lw=figsize[0]*lw,separate=separate,scaleFontSize=0)
         except:
             pass
     plt.xticks([])
