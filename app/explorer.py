@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import dash
+import dash_html_components as html
 import dash_table
 from dash_table.Format import Format, Scheme#, Sign, Symbol
 import dash_core_components as dcc
@@ -8,9 +9,9 @@ from dash.dependencies import Input, Output, State
 import json
 import os
 from sys import exc_info
-from sys import path as syspath
-syspath.append("/home/jupyter-srdjan/srdjan_functs/")
-from general_functions import td2str
+
+
+from islets.general_functions import td2str
 from islets.Recording import import_data
 
 
@@ -28,7 +29,7 @@ def serve_examiner(username="srdjan",
                    rec="",
                    ser="",
                   ):
-    with open(f"/data/.tmp/empty_roi_examiner.ipynb","r") as f:
+    with open(f"../notebooks/new_empty_roi_examiner.ipynb","r") as f:
         nb_text = f.read()
     nb_text = nb_text.replace("##pathToRec##", rec)
     nb_text = nb_text.replace("##series##", ser)
@@ -85,7 +86,7 @@ def prepareDF(mainFolder, constrain="",ishow=None):
 
 # startFolder = "/data/Sandra/2020/2020_07_08/"
 constr = None
-startFolder, constr = "/data/Sandra/2020","59a"
+startFolder, constr = "/data/Ariana",""
 # startFolder = "/data/Sandra/2019/2019_09_03/"
 exceptCols = ["path to movie", "path to protocol", "path to add_info"]
 Nrows = 4
