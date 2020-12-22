@@ -4,6 +4,7 @@ import warnings
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=FutureWarning, )
     from caiman import movie as cmovie
+    from caiman import load as cload
 
 from .examine import examine
 from .CrossfilterApp import crossfilterApp
@@ -14,5 +15,6 @@ from .PicklePicker import PicklePicker
 from .Regions import Regions, load_regions
 from .Recording import Recording, saveMovie, parse_leica
 from .utils import saveRois, get_filterSizes
+from .fitting import fit_spikes
 
 __version__ = pkg_resources.get_distribution('islets').version
