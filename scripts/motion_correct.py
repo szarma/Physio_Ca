@@ -30,13 +30,9 @@ import warnings
 import os
 import matplotlib.pyplot as plt
 import PIL
-with warnings.catch_warnings():
-    warnings.filterwarnings("ignore", category= FutureWarning,)
-    from caiman import movie as cmovie
-
 from tempfile import gettempdir
-from sys import path as syspath
-syspath.append(os.path.expanduser("~/srdjan_functs/"))
+
+from islets import cmovie
 from islets.numeric import rebin
 from islets.Recording import Recording, saveMovie
 

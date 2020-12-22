@@ -78,8 +78,6 @@ import pickle
 from sys import exc_info, exit
 
 from pandas import DataFrame
-from sys import path as syspath
-syspath.append(os.path.expanduser("~/srdjan_functs/"))
 
 from islets.Recording import Recording, saveMovie
 from islets.LineScan import LineScan
