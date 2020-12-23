@@ -1017,13 +1017,13 @@ class Regions:
             self.raster = {}
         self.raster[k] = zScores>z_th
         
-    def peaks2raster(self, ts, npoints = 1000, onlyRaster=True, z_th = 3):
+    def spikes2raster(self, ts, npoints = 1000, onlyRaster=True, z_th = 3):
         k = "%g"%ts
         try:
-            self.peaks[k]
+            self.spikes[k]
         except:
-            self.calc_peaks(ts, z_th = z_th)
-        df = self.peaks[k]
+            self.calc_spikes(ts, z_th = z_th)
+        df = self.spikes[k]
         C = self.df
         rr = np.zeros((len(C),npoints))
         tt = pd.Series(np.linspace(0,self.time.max(),npoints))
@@ -1049,7 +1049,7 @@ class Regions:
             # fig.update_xaxes(showticklabels=False)
         return rr, fig
         
-    def calc_peaks(self, ts, z_th=3, Npoints=None, smooth=None, verbose=False, save=True, t=None, zScores=None):
+    def calc_spikes(self, ts, z_th=3, Npoints=None, smooth=None, verbose=False, save=True, t=None, zScores=None):
         from .numeric import runningAverage
         from scipy.signal import find_peaks, peak_widths
         if zScores is None:
@@ -1071,7 +1071,7 @@ class Regions:
             if verbose:
                 print ("smoothing with kernel", smooth)
             zScores = runningAverage(zScores.T,smooth).T
-        peaks = []
+        spikes = []
         for i,z in zip(self.df.index,zScores):
             pp = find_peaks(z,
                             width=ts/dt/8,
@@ -1082,37 +1082,37 @@ class Regions:
             x0 = x0*dt + t[0]
             df = pd.DataFrame({"peak height [z-score]":z[pp[0]],"peak half-width [s]":w, "t0":x0})
             df["roi"] = i
-            peaks += [df]
-        peaks = pd.concat(peaks,ignore_index=True)
+            spikes += [df]
+        spikes = pd.concat(spikes,ignore_index=True)
         if save:
             k = "%g"%(ts)
             try:
-                self.peaks
+                self.spikes
             except:
-                self.peaks = {}
-            self.peaks[k] = peaks
+                self.spikes = {}
+            self.spikes[k] = spikes
         else:
-            return peaks
+            return spikes
         
-    def show_scatter_peaks(self,ts,timeWindows=None):
+    def show_scatter_spikes(self,ts,timeWindows=None):
         from plotly_express import scatter
-        peaks = self.peaks["%g"%ts].copy()
+        spikes = self.spikes["%g"%ts].copy()
         if timeWindows is None:
             timeWindows = [[0,np.inf]]
-        peaks["timeWindow"] = [""]*len(peaks)
+        spikes["timeWindow"] = [""]*len(spikes)
         for i,tw in enumerate(timeWindows):
 #                 print (tw)
             if tw[1]<=tw[0]:continue
-            iis = np.where(peaks["t0"].between(*tw) & (peaks["t0"]+peaks[peaks.columns[1]]).between(*tw))[0]
+            iis = np.where(spikes["t0"].between(*tw) & (spikes["t0"]+spikes[spikes.columns[1]]).between(*tw))[0]
             for j in iis:
-                if peaks.loc[j,"timeWindow"]=="":
-                    peaks.loc[j,"timeWindow"] = str(i)
+                if spikes.loc[j,"timeWindow"]=="":
+                    spikes.loc[j,"timeWindow"] = str(i)
                 else:
-                    j1 = len(peaks)
-                    peaks.loc[j1] = peaks.loc[j]
-                    peaks.loc[j1,"timeWindow"] = str(i)
-#             peaks["timeWindow"][ff] = str(i+1)
-        df = peaks.query("timeWindow!=''")    
+                    j1 = len(spikes)
+                    spikes.loc[j1] = spikes.loc[j]
+                    spikes.loc[j1,"timeWindow"] = str(i)
+#             spikes["timeWindow"][ff] = str(i+1)
+        df = spikes.query("timeWindow!=''")
         from plotly.colors import DEFAULT_PLOTLY_COLORS
         fig = scatter(df,
                       x=df.columns[1],
