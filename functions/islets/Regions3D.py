@@ -501,10 +501,10 @@ class Regions:
     def peaks2raster(self, ts, npoints = 1000, onlyRaster=True, z_th = 3):
         k = "%g"%ts
         try:
-            self.peaks[k]
+            self.spikes[k]
         except:
-            self.calc_peaks(ts, z_th = z_th)
-        df = self.peaks[k]
+            self.calc_spikes(ts, z_th = z_th)
+        df = self.spikes[k]
         C = self.df
         rr = np.zeros((len(C),npoints))
         tt = pd.Series(np.linspace(0,self.time.max(),npoints))
@@ -530,7 +530,7 @@ class Regions:
             # fig.update_xaxes(showticklabels=False)
         return rr, fig
         
-    def calc_peaks(self, ts, z_th = 3, Npoints=None, smooth=None, tWindow = (None,None)):
+    def calc_spikes(self, ts, z_th = 3, Npoints=None, smooth=None, tWindow = (None,None)):
         from .numeric import runningAverage
         from scipy.signal import find_peaks, peak_widths
         if "zScore_%g"%ts not in self.df.columns:
@@ -561,14 +561,14 @@ class Regions:
         peaks = pd.concat(peaks,ignore_index=True)
         k = "%g"%(ts)
         try:
-            self.peaks
+            self.spikes
         except:
-            self.peaks = {}
-        self.peaks[k] = peaks
+            self.spikes = {}
+        self.spikes[k] = peaks
         
     def show_scatter_peaks(self,ts,timeWindows = None):
         from plotly_express import scatter
-        peaks = self.peaks["%g"%ts].copy()
+        peaks = self.spikes["%g"%ts].copy()
         if timeWindows is None:
             timeWindows = [[0,np.inf]]
         peaks["timeWindow"] = [""]*len(peaks)
