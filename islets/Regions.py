@@ -734,7 +734,7 @@ class Regions:
         self.time = time[i0:ie]
         self.Freq = movie_.fr
         
-    def detrend_traces(self,method="simple", timescale=200):
+    def detrend_traces(self,method="debleach", timescale=None):
 #         from .numeric import mydebleach
 #         traces = np.vstack(self.df.trace.values)
 #         trend = multi_map( mydebleach, traces, processes=processes)
