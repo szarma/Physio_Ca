@@ -733,6 +733,12 @@ class Regions:
         time = np.arange(len(movie_))/movie_.fr
         self.time = time[i0:ie]
         self.Freq = movie_.fr
+    
+    def reset_filtered(self):
+        for col in self.df.columns:
+            if "slower" in col or "faster" in col or "zScore" in col:
+                del self.df[col]
+        self.showTime = {}
         
     def detrend_traces(self,method="debleach", timescale=None):
 #         from .numeric import mydebleach
