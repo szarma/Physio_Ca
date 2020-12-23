@@ -681,9 +681,7 @@ class Regions:
         traces = np.vstack(self.df.trace)
         fr0 = self.Freq
         trmov = cmovie(traces.T.reshape((-1,len(self.df),1)), fr=fr0)
-        print (trmov.shape)
-        trmov = trmov.resize(1,1,fr/fr0)
-        print (trmov.shape)
+        trmov = trmov.resize(1,1,fr/fr0)*fr0/fr
         self.df.trace = list(trmov[:,:,0].T)
         self.Freq = fr
         self.time = np.arange(len(trmov))/fr
