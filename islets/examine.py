@@ -356,7 +356,7 @@ def examine(self,
 #                     seeIndices = np.array([j for j in seeIndices if j not in selectedIndices])
 #                 else:
 #                     seeIndices = np.intersect1d(seeIndices, selectedIndices)
-                fig = showRoisOnly(self, im=self.statImages[imagemode], showall=False, lw=lw)
+                fig = showRoisOnly(self, im=self.statImages[imagemode], showall=True, lw=lw, indices=seeIndices)
             ##########
 #             if mode=="plot":
 #                 fig = showRoisOnly(self, indices=self.df.index, im=self.statImages[imagemode], showall=False)

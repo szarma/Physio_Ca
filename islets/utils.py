@@ -359,7 +359,7 @@ def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None):
 #         indices = regions.df.sort_values("size",ascending=False).index
         indices = regions.df.index
     f = go.Figure()
-    if hasattr(regions.df, "color"):
+    if "color" in regions.df.columns:
         colors = regions.df.loc[indices,"color"]
     else:
         colors = [MYCOLORS[i%len(MYCOLORS)] for i in indices]
@@ -412,7 +412,7 @@ def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None):
         # f.add_heatmap(z=im, hoverinfo='skip',showscale=False,colorscale=plxcolors.sequential.Greys)
         imgpointer = createStaticImage(None,
                                        regions,
-#                                        showall=showall,
+                                       showall=showall,
 #                                        separate=bool(len(MYCOLORS)-1),
 #                                        origin="lower",
                                        lw=lw
