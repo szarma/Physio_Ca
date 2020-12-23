@@ -178,9 +178,12 @@ metadata = rec.Series[serToImport]['metadata']
 if start_vm:
     bf.javabridge.kill_vm()
 
-movie = cmovie(
-    rec.Series[serToImport]['data'][:-1],
-)
+if pathToTif is None:
+    movie = cmovie(
+        rec.Series[serToImport]['data'][:-1],
+    )
+else:
+    movie = rec.Series[serToImport]['data'][:-1]
 movie.fr=metadata.Frequency
 
 # if args.debug:
