@@ -106,7 +106,7 @@ class LineScan:
             fig.show()
 
     def detrend(self, fast=True, n=None, processes=1, func=None, points=100):
-        from .numeric import fit_debleach
+        from .numeric import fit_bleaching
         from .utils import multi_map
         if n is None:
             n = self.data.shape[0]
@@ -116,7 +116,7 @@ class LineScan:
         else:
             global iterf
             def iterf(xi):
-                return fit_debleach(xi, func=func, points=points)
+                return fit_bleaching(xi, func=func, points=points)
             trend = multi_map(iterf, self.data[:n], processes = processes)
             if processes==1:
                 trend = list(trend)
