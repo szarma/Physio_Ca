@@ -1074,13 +1074,13 @@ class Regions:
         spikes = []
         for i,z in zip(self.df.index,zScores):
             pp = find_peaks(z,
-                            width=ts/dt/8,
+                            width=(ts/dt*.1,ts/dt*.7),
                             height=z_th
                               )
             w,h,x0 = peak_widths(z, pp[0], rel_height=.5)[:3]
             w = w*dt
             x0 = x0*dt + t[0]
-            df = pd.DataFrame({"peak height [z-score]":z[pp[0]],"peak half-width [s]":w, "t0":x0})
+            df = pd.DataFrame({"height":z[pp[0]],"halfwidth":w, "t0":x0})
             df["roi"] = i
             spikes += [df]
         spikes = pd.concat(spikes,ignore_index=True)
@@ -1199,10 +1199,10 @@ class Regions:
     
     def examine3(self, max_rois=10, imagemode=None, debug=False, startShow='',mode="jupyter",name=None,lw=None):
         return "examine3 is deprecated. Please, use examine."
-#         from .examine3 import examine
-#         if imagemode is None:
-#             imagemode = self.mode
-#         return examine(self, max_rois=max_rois, imagemode=imagemode, debug=debug, startShow=startShow,mode=mode,name=name)
+
+    def examine_spikes(self, timescale, debug=False):
+        from .examine_spikes import examine_spikes
+        return examine_spikes(self, timescale)
     
     def plotTraces(regions, indices, axratios = [1,2], figsize=5, freqShow=2, col="detrended",Offset=5,separate=False):
         if col not in regions.df.columns:
