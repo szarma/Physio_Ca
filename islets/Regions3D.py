@@ -173,7 +173,7 @@ class Regions:
 #         print(f"Initialized with {len(self.df)} rois.")
     
     def get_fov_trace(self, showFreq = 2, pixels=None):
-        from .numeric import mydebleach, rebin
+        from .numeric import fit_debleach, rebin
         i0, ie = self.FrameRange
 #         n = int(self.movie.fr/showFreq)
         n = int(self.Freq/showFreq)
@@ -188,7 +188,7 @@ class Regions:
                 y = self.movie[i0:ie:n].mean(axis=(1,2))
             else:
                 y = self.movie[(slice(i0,ie,n),)+pixels].mean(axis=1)
-        ydbl = mydebleach(y)
+        ydbl = fit_debleach(y)
         self.fov_trace = {
                 "time": x,
                 "raw": y,
@@ -350,9 +350,9 @@ class Regions:
         self.time = time[i0:ie]
         
     def detrend_traces(self,processes=10):
-        from .numeric import mydebleach
+        from .numeric import fit_debleach
         traces = np.vstack(self.df.trace.values)
-        trend = multi_map( mydebleach, traces, processes=processes)
+        trend = multi_map( fit_debleach, traces, processes=processes)
         self.df["trend"] = trend
         self.df["detrended"] = list(traces - np.array(trend))
 
