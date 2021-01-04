@@ -267,7 +267,7 @@ def examine(self,
         from os.path import split
         try:
             if n_clicks>0:
-                folder, fname = split(self.pathToPickle)
+                folder, fname = split(self.pathToRois)
                 return saveRois(self,folder,fname.replace("_rois.pkl",""),formats=["vienna"])
         except:
             return str(exc_info())
