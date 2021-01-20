@@ -8,7 +8,6 @@ from itertools import product
 from pathlib import Path
 from sys import exc_info
 from typing import Union
-
 import matplotlib.pyplot as plt
 import mgzip
 import networkx as nx
@@ -462,7 +461,7 @@ class Regions:
             return newPeaks, newValues
     
     def get_fov_trace(self, showFreq = 2, pixels=None):
-        from .numeric import mydebleach, rebin
+        from .numeric import fit_bleaching, rebin
         i0, ie = self.FrameRange
 #         n = int(self.movie.fr/showFreq)
         n = int(self.Freq/showFreq)
@@ -477,7 +476,7 @@ class Regions:
                 y = self.movie[i0:ie:n].mean(axis=(1,2))
             else:
                 y = self.movie[(slice(i0,ie,n),)+pixels].mean(axis=1)
-        ydbl = mydebleach(y)
+        ydbl = fit_bleaching(y)
         self.fov_trace = {
                 "time": x,
                 "raw": y,
@@ -1073,7 +1072,7 @@ class Regions:
         if smooth>1:
             if verbose:
                 print ("smoothing with kernel", smooth)
-            zScores = runningAverage(zScores.T,smooth).T/smooth**.5
+            zScores = runningAverage(zScores.T,smooth).T
         spikes = []
         for i,z in zip(self.df.index,zScores):
             pp = find_peaks(z,
@@ -1156,6 +1155,7 @@ class Regions:
 
     def calcIntraCCs(self,movie_,diff=False,indices=None):
         intraCCs = []
+        C = self.df
         if indices is None:
             indices = self.df.index
         for roi in indices:

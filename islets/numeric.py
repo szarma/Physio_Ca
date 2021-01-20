@@ -1,9 +1,10 @@
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy.stats import distributions as dst
-from scipy.optimize import curve_fit#,minimize,basinhopping
-from numba import jit,prange
 import warnings
+
+import matplotlib.pyplot as plt
+import numpy as np
+from numba import jit, prange
+from scipy.optimize import curve_fit  # ,minimize,basinhopping
+
 
 def bspline(cv, n=100, degree=3):
     """ Calculate n samples on a bspline
@@ -530,7 +531,7 @@ def agglomerativeLinkage(X,distMatrix):
     return np.array(Z)
 
 def eventIdx2Rois(ks, evIndices, dims):
-    from cv2 import Laplacian,CV_16F
+    from cv2 import Laplacian, CV_16F
     M = np.zeros(dims)
     for k in ks:
         x,y= evIndices[k]
@@ -552,7 +553,6 @@ def get_cluster_color_classes(den, labels = None):
 
 # code
 def putRois(ks, evIndices, dims):
-    from cv2 import Laplacian,CV_64F
     M = np.zeros(dims)
     for k in ks:
         x,y= evIndices[k]

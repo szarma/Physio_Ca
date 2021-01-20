@@ -1,19 +1,22 @@
-import numpy as np
 import os
-import bioformats as bf
-import pandas as pd
-from nd2reader import ND2Reader
 from sys import exc_info
 from warnings import warn
+
+import bioformats as bf
+import numpy as np
+import pandas as pd
+from nd2reader import ND2Reader
 
 
 def parse_leica(rec,
                 merge=True,
-                skipTags = ["crop","split","frame", "every","half", "snapshot","-","proj","max","resize"],
+                skipTags=None,
                 index=False,
                 verbose=False,
                ):
-    from pandas import Timedelta
+    if skipTags is None:
+        skipTags = ["crop", "split", "frame", "every", "half", "snapshot", "-", "proj", "max", "resize"]
+
     toDrop = [i for i,row in rec.metadata.iterrows() if "Series" not in row["Name"] 
 #               or row["SizeY"]*row["SizeT"]<2000 
               #or row["SizeT"]/row["Frequency"]<2
@@ -39,7 +42,7 @@ def parse_leica(rec,
                 [rec.metadata["Frequency"].diff().abs()/rec.metadata["Frequency"]>.02],
             axis=0)
         sers = np.split(rec.metadata.Name.values, np.where(ff)[0])[1:]
-        idxs = np.split(list(rec.metadata.index), np.where(ff)[0])[1:]
+        idxs = np.split(rec.metadata.index.asarray(), np.where(ff)[0])[1:]
     else:
         sers = [rec.metadata.Name.values]
         idxs = [list(rec.metadata.index)]
@@ -96,7 +99,7 @@ def saveMovie(movie, filename, maxFreq=2, frameRate=60, dpi=100,figScale=1):
         return 0
 
 def autocorr2d(sett, dxrange, dyrange):
-    from numpy import zeros, corrcoef, array, mean, std
+    from numpy import zeros, corrcoef
     Nx, Ny = sett.shape
     ret = zeros((len(dxrange), len(dyrange)))
     for kx,dx in enumerate(dxrange):
@@ -399,8 +402,7 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
             path = os.path.join(cur,f)
             recordings += [path]
     recordings = sorted(recordings)
-    
-    from .Recording import Recording, parse_leica
+
     from .utils import get_series_dir, get_filterSizes
     import numpy as np
     import pandas as pd
@@ -433,7 +435,7 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
             if len(os.listdir(os.path.join(analysisFolder, fs)))==0: continue
             if fs[0]=="." : continue
             ############
-            fssplit = fs.split("_")
+            fssplit = fs.split('_')
             if len(fssplit)==1:
                 existingSeries += [fs]
                 continue

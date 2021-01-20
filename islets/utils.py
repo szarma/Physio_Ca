@@ -1,9 +1,11 @@
-import numpy as np
 import os
-import matplotlib.pyplot as plt
+
 import matplotlib
+import matplotlib.pyplot as plt
 import networkx as nx
+import numpy as np
 import pandas as pd
+
 
 def coltrans(x, vmin=None, vmax=None, tilt=1, offset=0.1):
     from .numeric import robust_max
@@ -313,7 +315,6 @@ def order(testlist):
     
 def tally(mylist):
     from collections import Counter
-    import numpy as np
     return sorted(Counter(mylist).most_common(),key=lambda duple: duple[0])
 
 def multi_map(some_function, iterable, processes=1, library="multiprocessing"):
@@ -381,8 +382,7 @@ def show_movie(m_show,
     
     from matplotlib import animation
     if tmax is not None:
-        import matplotlib.patheffects as path_effects
-        from pandas import Timedelta
+        pass
     m_show = m_show.copy()
     if NTimeFrames is not None:
         n_rebin = len(m_show)//NTimeFrames
@@ -671,7 +671,7 @@ def createStaticImage(im,regions,showall=True,color="grey",separate=True, return
 def saveRois(regions,outDir,filename="",movie=None,col=["trace"],formats=["vienna"],add_date=True):
         feedback = []
 #     try:
-        from copy import deepcopy,copy
+        from copy import deepcopy
         from datetime import date
         import pickle
         import pandas as pd

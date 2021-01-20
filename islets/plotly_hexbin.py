@@ -1,15 +1,15 @@
-import matplotlib
 import json
-import numpy as np
-import matplotlib.pyplot as plt
-import plotly.graph_objects as go
-import copy
-from scipy.spatial import distance_matrix
 
-from jupyter_plotly_dash import JupyterDash as  Dash
-from dash.dependencies import Input, Output, State
 import dash_core_components as dcc
 import dash_html_components as html
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import plotly.graph_objects as go
+from dash.dependencies import Input, Output
+from jupyter_plotly_dash import JupyterDash as  Dash
+from scipy.spatial import distance_matrix
+
 
 # def mpl_to_plotly(cmap, N):
 #     h = 1.0/(N-1)

@@ -1,17 +1,13 @@
-import traceback
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from .numeric import rebin
-import plotly.graph_objects as go
-from .utils import getFigure
-import dash
 import json
-from .utils import saveRois
+import traceback
 from sys import exc_info
+
+import numpy as np
 from plotly_express import colors as plc
-from .fitting import generic_function
 from scipy.signal import peak_widths, find_peaks
+
+from .fitting import generic_function
+
 MYCOLORS = plc.qualitative.Plotly
 
 def examine_spikes(self, spikeDF, 

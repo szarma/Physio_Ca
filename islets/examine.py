@@ -1,13 +1,11 @@
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from .numeric import rebin
-import plotly.graph_objects as go
-from .utils import getFigure
-import dash
 import json
-from .utils import saveRois
 from sys import exc_info
+
+import numpy as np
+
+from .numeric import rebin
+from .utils import getFigure
+from .utils import saveRois
 
 
 def examine(self, 
@@ -579,7 +577,7 @@ def examine(self,
                               and len(self.df[c].iloc[0].shape)   \
                              ]
         except:
-            out += exc_info().__repr()
+            out += repr(exc_info())
             options = no_update
         return out, options
 
