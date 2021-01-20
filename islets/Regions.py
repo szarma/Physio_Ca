@@ -24,9 +24,6 @@ from .numeric import rebin, bspline
 from .utils import multi_map
 
 MYCOLORS = plc.qualitative.Plotly
-
-
-
 # MYCOLORS = ["darkred"]
 
 def load_regions(path,
@@ -641,7 +638,7 @@ class Regions:
                 txt += self.metadata["pxUnit"]
             ax.text((x0+x1)/2, y1+.3*(y1-y0), txt, va="center", ha="center", size=scaleFontSize)
             
-    def plotPeaks(self, ix=None, ax=None, image=False, ms=1, labels=False,color=None, imkw_args={},absMarker=True):
+    def plotPeaks(self, ix=None, ax=None, image=False, ms=3, labels=False,color=None, imkw_args={},absMarker=True, marker="."):
         if ax is None:
             ax = plt.subplot(111)
         if image:
@@ -663,7 +660,7 @@ class Regions:
                     c = MYCOLORS[i%len(MYCOLORS)]
             else:
                 c = color
-            ax.plot(*p[::-1],marker="o",mfc="none",ms=ms,c=c)
+            ax.plot(*p[::-1],marker=marker,ms=ms,c=c)
             if labels:
                 ax.text(*p[::-1],s=" "+str(i),color=c)
     
@@ -829,6 +826,7 @@ class Regions:
             ax.set_title("gain inference")
             ax.set_xlabel("window means")
             ax.set_ylabel("window variances")
+            ax.grid()
             
         self.gain = gain
     
@@ -933,9 +931,11 @@ class Regions:
         if "trace" in usecol:
             data = np.vstack([C.loc[i,usecol] for i in C.index])
             trend = np.zeros(len(C))
-        else:
+        elif usecol=="detrended":
             data = np.vstack([C.loc[i,"detrended"] for i in C.index])
             trend = C.trend.values
+        else:
+            raise ValueError("usecol can only be a 'trace' (or 'trace_*' or 'detrended'")
             
         if Nrebin>1:
             freq = freq/Nrebin
@@ -953,6 +953,9 @@ class Regions:
         cutFreq = .5/ironTimeScale
         self.sosFilter = sosFilter(cutFreq, freq, order=order)
         dataFilt = self.sosFilter.run(data)
+        for j in range(len(data)):
+            dataFilt[j] = np.maximum(dataFilt[j]+trend[j],.5)
+            
 
         absSlow = np.vstack([dataFilt[i]*C.loc[ix,"size"] for i,ix in enumerate(C.index)])*Nrebin
         absFast = np.vstack([(data[i]-dataFilt[i])*C.loc[ix,"size"] for i,ix in enumerate(C.index)])*Nrebin
@@ -986,7 +989,7 @@ class Regions:
                 absFast = absFast - dFast
         var = absSlow
         if hasattr(self,"gain"):
-            var = var*self.gain    
+            var = var*self.gain
         std = var**.5
         zScore = absFast/std
         if normalize:
@@ -1067,10 +1070,10 @@ class Regions:
         if smooth is None:
             smooth = int(ts/dt/5)
             if smooth%2==0: smooth += 1
-        if smooth>0:
+        if smooth>1:
             if verbose:
                 print ("smoothing with kernel", smooth)
-            zScores = runningAverage(zScores.T,smooth).T
+            zScores = runningAverage(zScores.T,smooth).T/smooth**.5
         spikes = []
         for i,z in zip(self.df.index,zScores):
             pp = find_peaks(z,
@@ -1094,9 +1097,9 @@ class Regions:
         else:
             return spikes
         
-    def show_scatter_spikes(self,ts,timeWindows=None):
+    def show_scatter_spikes(self,ts,timeWindows=None,log_x=False):
         from plotly_express import scatter
-        spikes = self.spikes["%g"%ts].copy()
+        spikes = self.spikes[str(ts)].copy()
         if timeWindows is None:
             timeWindows = [[0,np.inf]]
         spikes["timeWindow"] = [""]*len(spikes)
@@ -1126,6 +1129,7 @@ class Regions:
 #                       hoverinfo=df["roi"].astype("str"),
                       marginal_x="box",
                       log_y=True,
+                      log_x=log_x,
                       render_mode = "webgl",
                       width=450,
                       height=450,
@@ -1200,9 +1204,9 @@ class Regions:
     def examine3(self, max_rois=10, imagemode=None, debug=False, startShow='',mode="jupyter",name=None,lw=None):
         return "examine3 is deprecated. Please, use examine."
 
-    def examine_spikes(self, timescale, debug=False):
-        from .examine_spikes import examine_spikes
-        return examine_spikes(self, timescale)
+    def examine_spikesdf(self, df, debug=False, log_x=False, **otherkwargs):
+        from .examine_spikesdf import examine_spikes
+        return examine_spikes(self, df, log_x=log_x, debug=debug, **otherkwargs)
     
     def plotTraces(regions, indices, axratios = [1,2], figsize=5, freqShow=2, col="detrended",Offset=5,separate=False):
         if col not in regions.df.columns:
@@ -1310,7 +1314,7 @@ def getGraph_of_ROIs_to_Merge(df,rreg, plot=False, ax=None,lw=.5,arrow_width=.5)
         attractors = np.squeeze([
             list(map(list,nx.attracting_components(Gph.subgraph(el)))) \
                 for el in nx.connected_components(Gph.to_undirected())
-        ])
+        ]).flatten()
         rreg.plotPeaks(ax=ax,ix=attractors,color="c",ms=6)
     return Gph
 

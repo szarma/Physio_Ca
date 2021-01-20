@@ -102,7 +102,10 @@ def fast_filter(absdata,
 def robust_max(a,Nlast=10,absolute=True):
     if absolute:
         a = np.abs(a)
-    return np.nanpercentile(a,100*(1-Nlast/a.size))
+    if Nlast<2:
+        return np.nanmax(a)
+    else:
+        return np.nanpercentile(a,100*(1-Nlast/a.size))
     
     
 def rebin(a,n,axis=0, dtype="float32", func=np.mean):
@@ -347,7 +350,7 @@ def runningMode(x_, filterSize, boundary="reflective"):
         out[i] = v[np.argmax(c)]
     return out
 
-@jit 
+# @jit 
 def runningAverage(x_,filterSize):
     if filterSize%2==0:
         raise ValueError("filter size needs to be odd number")
@@ -355,7 +358,7 @@ def runningAverage(x_,filterSize):
     out = np.zeros_like(x_)
     x_ = np.concatenate((x_[:delta][::-1], x_, x_[-delta:][::-1]))
     for i in range(len(out)):
-        out[i] = np.nanmean(x_[i:i+filterSize],axis=0)
+        out[i] = np.mean(x_[i:i+filterSize],axis=0)
     return out
 
 @jit 
