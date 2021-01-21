@@ -1204,7 +1204,7 @@ class Regions:
     def examine3(self, max_rois=10, imagemode=None, debug=False, startShow='',mode="jupyter",name=None,lw=None):
         return "examine3 is deprecated. Please, use examine."
 
-    def examine_spikesdf(self, df, debug=False, log_x=False, **otherkwargs):
+    def examine_spikes(self, df, debug=False, log_x=False, **otherkwargs):
         from .examine_spikesdf import examine_spikes
         return examine_spikes(self, df, log_x=log_x, debug=debug, **otherkwargs)
     
