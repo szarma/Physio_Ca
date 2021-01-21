@@ -86,7 +86,7 @@ class HBclass:
         plt.switch_backend('Agg')
         fig = plt.figure(figsize=(0.1,0.1))
         HB = plt.hexbin(self.df[xshow], self.df[yshow], **hexbin_kwargs)
-        plt.savefig("/tmp/tmp.png")
+        #plt.savefig("/tmp/tmp.png")
         plt.show()
         plt.switch_backend(currentBackend)
 
