@@ -1,35 +1,38 @@
+from collections import namedtuple
 import numpy as np
 from scipy.stats import distributions as dst
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 import pandas as pd
 
-def myShape(t,loc=0,amplitude=1,decay=1,half_width=1,offset=0,end=None,fillnan=True,bkgsum=True,spike_cut=0.01):
+def generic_function(fname,pars,t,**kwargs):
+    return eval(fname)(*(t,)+pars,**kwargs)
+
+def myShape(t,loc=0,amplitude=1,decay=1,halfwidth=1,offset=0,end=None,fillnan=True,bkgsum=True,spike_cut=0.01):
     if end is None:
         end=offset
-    alpha = (half_width*decay/2)**2+1
-    x0 = alpha-1-half_width*decay/2
-    x1 = alpha-1+half_width*decay/2
+    alpha = (halfwidth*decay/2)**2+1
+    x0 = alpha-1-halfwidth*decay/2
+    x1 = alpha-1+halfwidth*decay/2
     dloc = x0
     dloc /= decay
     yd = dst.gamma.pdf(t,alpha,scale=1./decay,loc=loc-dloc)
     ydmax = dst.gamma.pdf((alpha-1)/decay,alpha,scale=1./decay,)
     Offset = np.zeros_like(yd)
-    try:
-        ibegin = np.where(yd>ydmax*spike_cut)[0][0]
+    good = np.abs(yd)>np.abs(ydmax)*spike_cut
+    if good.any():
+        ibegin = np.where(np.abs(yd)>np.abs(ydmax)*spike_cut)[0][0]
         ibegin = max(0,ibegin-2)
-    except:
-        ibegin = 0
-    try:
-        iend   = np.where(yd>ydmax*spike_cut)[0][-1]
-    except:
-        iend   = len(yd)
+        iend = np.where(good)[0][-1]+1
+        iend = min(iend, len(yd))
+    else:
+        ibegin, iend = 0, len(yd)
     Offset[:ibegin] = np.nan if fillnan else offset
     Offset[iend:] = np.nan if fillnan else end
     Offset[ibegin:iend] = offset + (end-offset)*np.arange(iend-ibegin)/(iend-ibegin)
     yd = amplitude*yd/ydmax
     ysum = yd + Offset
-    offset, end = ysum[ibegin], ysum[iend-1]
+    offset, end = ysum[0], ysum[-1]
     Offset[ibegin:iend] = offset + (end-offset)*np.arange(iend-ibegin)/(iend-ibegin)
     yd = ysum-Offset
     
@@ -62,22 +65,23 @@ def myLogNorm(t,loc=0,amplitude=1,scale=1,s=.2,offset=0,end=None, reshift=True,f
     yd = ds.pdf(t)
     ydmax = ds.pdf(loc+np.exp(-s**2)*scale)
     Offset = np.zeros_like(yd)
-    try:
-        ibegin = np.where(yd>ydmax*spike_cut)[0][0]
+    good = np.abs(yd)>np.abs(ydmax)*spike_cut
+    if good.any():
+        ibegin = np.where(np.abs(yd)>np.abs(ydmax)*spike_cut)[0][0]
         ibegin = max(0,ibegin-2)
-    except:
-        ibegin = 0
-    try:
-        iend   = np.where(yd>ydmax*spike_cut)[0][-1]
-    except:
-        iend = len(yd)
-#     print (ibegin, iend, offset, end)
+        iend = np.where(good)[0][-1]+1
+        iend = min(iend, len(yd))
+    else:
+        ibegin, iend = 0, len(yd)
     Offset[:ibegin] = np.nan if fillnan else offset
     Offset[iend:] = np.nan if fillnan else end
     Offset[ibegin:iend] = offset + (end-offset)*np.arange(iend-ibegin)/(iend-ibegin)
     yd = amplitude*yd/ydmax
     ysum = yd + Offset
-    offset, end = ysum[ibegin], ysum[iend-1]
+    if fillnan:
+        offset, end = ysum[np.isfinite(ysum)][[0,-1]]
+    else:
+        offset, end = ysum[0], ysum[-1]
     Offset[ibegin:iend] = offset + (end-offset)*np.arange(iend-ibegin)/(iend-ibegin)
     try:
         imax = np.nanargmax(yd)+1
@@ -92,30 +96,40 @@ def myLogNorm(t,loc=0,amplitude=1,scale=1,s=.2,offset=0,end=None, reshift=True,f
         yd = ysum-Offset
         return yd, Offset
 
-def getInitialPars(t_,x_,p_,fshape,bkg=None):
-    if bkg is None:
-        bkg = np.percentile(x_,10)
+def getInitialPars(t_,x_,p_,fshape, offset=None, end=None, x_slow=None):
+    if x_slow is None and (offset is None or end is None):
+        pc10 = np.percentile(x_,10)
+        if offset is None:
+            offset = pc10
+        if end is None:
+            end = pc10
+    if x_slow is not None:
+        offset = x_slow[0]
+        end = x_slow[-1]
     from .numeric import guessDecayPars
-    from collections import namedtuple
     imax_ = np.argmax(x_)
+    if len(x_)>5 and imax_>0:
+        amplitude = x_[imax_-1:imax_+1].mean()-offset
+    else:
+        amplitude = x_[imax_]-offset
     if fshape.__name__ == "myShape":
         r_ = guessDecayPars(x_)[-1]
-        myParameters = namedtuple("myParameters", ['loc', 'amplitude', 'decay', 'half_width', 'offset', 'end'])
+        myParameters = namedtuple("myParameters", ['loc', 'amplitude', 'decay', 'halfwidth', 'offset', 'end'])
         pars0 = myParameters(decay      = (t_[1]-t_[0])/r_/10,
-                             half_width = p_["peak half-width [s]"]*.7,
-                             amplitude  = x_[imax_-1:imax_+1].mean()-bkg,
-                             loc        = p_["t0"] + p_["peak half-width [s]"]*.1,
-                             offset     = bkg,
-                             end        = bkg
+                             halfwidth = p_["halfwidth"]*.7,
+                             amplitude  = amplitude,
+                             loc        = p_["t0"] + p_["halfwidth"]*.1,
+                             offset     = offset,
+                             end        = end
                           )
     if fshape.__name__ == "myLogNorm":
         LNParameters = namedtuple("LNParameters", ['loc', 'amplitude', 'scale', 's', 'offset', 'end'])
         pars0 = LNParameters(s         =.2,
-                             scale     = p_["peak half-width [s]"]*1.5,
-                             amplitude = x_[imax_-1:imax_+1].mean()-bkg,
-                             loc       = p_["t0"] + p_["peak half-width [s]"]*.4,
-                             offset    = bkg,
-                             end       = bkg
+                             scale     = p_["halfwidth"]*1.5,
+                             amplitude = amplitude,
+                             loc       = p_["t0"] + p_["halfwidth"]*.4,
+                             offset     = offset,
+                             end        = end
                           )
     return pars0
 
@@ -124,18 +138,22 @@ def toMin(x, t_, y_, shape=myShape):
     return ((yf_-y_)**2).sum()
 
 def fit_spikes(t,y,spikeDf,
+               y_slow=None,
                ifit=None,
                plot=False,
                colorCode = None,
-               rel_amplitude_threshold = .1,
-               half_width_threshold = None,
-               ax=None
+               z_score_th=None,
+               rel_amplitude_threshold = None,
+               halfwidth_threshold = None,
+               ax=None,
+               verbose=False,
+               allowjump=True,
               ):
     from scipy.signal import find_peaks, peak_widths
     from scipy.optimize import minimize, basinhopping
+    if colorCode is None:
+        colorCode = dict(zip(["myShape", "myLogNorm"],["C1","C0"]))
     if plot:
-        if colorCode is None:
-            colorCode = dict(zip(["myShape", "myLogNorm"],["C1","C0"]))
         if ax is None:
             fig, ax = plt.subplots(1,1,figsize=(9,4), sharex=True)
         ax.plot(t, y, lw=.6, color="grey")
@@ -145,50 +163,102 @@ def fit_spikes(t,y,spikeDf,
     iSpike = 0
     parDf = []
     for ip,p in spikeDf.iterrows():
-        i0  = np.searchsorted(t , p.t0-p["peak half-width [s]"]*.7,)
-        ie  = np.searchsorted(t , p.t0+p["peak half-width [s]"]*3)
-        if ie-i0<=2: continue
+        i0  = np.searchsorted(t , p.t0-p["halfwidth"]*.7,)
+        ie  = np.searchsorted(t , p.t0+p["halfwidth"]*3)
         ycur = y[i0:ie]
         tcur = t[i0:ie]
+        if y_slow is None:
+            y_slow_curr = None
+        else:
+            y_slow_curr = y_slow[i0:ie]
+            if z_score_th is not None:
+                dy = ycur-y_slow_curr
+                excursions = ycur>z_score_th*y.std()
+                if not any(excursions):
+                    if verbose: print(f"Rejected @ ix={ip}: the neighbourhood is too variable")
+                    continue
         imax = np.argmax(ycur[:len(ycur)//2+1])
         if plot:
             ax.plot( tcur[imax], ycur[imax], "ko", mfc="w", mew=.5)
-            
-        res = pd.DataFrame(columns=["fshape","pars","score","background","half_width","amplitude"])
+#         res = pd.DataFrame(columns=["fshape","pars","score","background","halfwidth"])
+        res = pd.DataFrame()
 
         for fname in colorCode:
             fshape = eval(fname)
             c = colorCode[fname]
-            pars0 = getInitialPars(tcur,ycur,p,fshape)
+            pars0 = getInitialPars(tcur,ycur,p,fshape,x_slow=y_slow_curr)
             if plot:
                 y0 = fshape(tcur, *pars0, fillnan=False)
                 ax.plot(tcur, y0, c, lw=.7, ls="--", label=fshape.__name__ if iSpike==0 else None)
-#             try:
-#             try:
             lowerB = {"offset":.8}
             parsdict = pars0._asdict()
-            opt = minimize(toMin, np.array(pars0), args=(tcur,ycur,fshape),
-                           bounds = [(parsdict[j]*lowerB.get(j,0.05), parsdict[j]*10) for j in parsdict.keys()])
-#             opt = basinhopping(toMin, np.array(pars0), minimizer_kwargs=dict(
-#                 args=(tcur,ycur,fshape),
-#                 bounds = [(parsdict[j]*lowerB.get(j,0.05), parsdict[j]*10) for j in parsdict.keys()])
-#                               )
-#             except:
-#                 opt = minimize(toMin, np.array(pars0), args=(tcur,ycur,fshape),
-#                                # bounds = [(pars0[j]*.05, pars0[j]*10) for j in range(len(pars0))],
-#                                # method="Nelder-Mead"
-#                               )
-            yf,bkg = fshape(tcur,*opt.x, bkgsum=False, fillnan=True)
-            pars = pars0._replace(**dict(zip(pars0._asdict().keys(), opt.x)))
-            try: hw=peak_widths(yf,find_peaks(yf)[0])[0][0]*(t[1]-t[0])
-            except: hw=np.nan
+            bounds = [(parsdict[j]*lowerB.get(j,0.05), parsdict[j]*10) for j in parsdict.keys()]
+            bounds = [b if b[0]<b[1] else (b[1]/20, b[1]) for b in bounds]
+            x0 = np.array(pars0)
+            if not allowjump:
+                x0 = x0[:-1]
+                bounds = bounds[:-1]
+            try:
+                opt = minimize(toMin, x0, args=(tcur,ycur,fshape),
+                               bounds = bounds
+                              )
+    #             opt = basinhopping(toMin, np.array(pars0), minimizer_kwargs=dict(
+    #                 args=(tcur,ycur,fshape),
+    #                 bounds = [(parsdict[j]*lowerB.get(j,0.05), parsdict[j]*10) for j in parsdict.keys()])
+    #                               )
+    #             except:
+    #                 opt = minimize(toMin, np.array(pars0), args=(tcur,ycur,fshape),
+    #                                # bounds = [(pars0[j]*.05, pars0[j]*10) for j in range(len(pars0))],
+    #                                # method="Nelder-Mead"
+    #                               )
+                pars = pars0._replace(**dict(zip(parsdict.keys(), opt.x)))
+            except ValueError:
+                pars = pars0
+            if not allowjump:
+                pars = pars._replace(end=pars.offset)
+            yf,bkg = fshape(tcur,*pars, bkgsum=False, fillnan=True)
+            if np.isfinite(yf).sum()<3: continue
+            ycur = ycur[np.isfinite(yf)]
+            tcur = tcur[np.isfinite(yf)]
+            bkg  = bkg [np.isfinite(yf)]
+            yf   = yf  [np.isfinite(yf)]
+#             yf_th = yf.max()/10
+#             if bkg[0]>yf_th or bkg[-1]>yf_th:
+#                 if verbose: print(f"Rejected @ ix={ip}: the spike is not prominent enough")
+#                 continue
+            if not np.isfinite(yf).any(): 
+                if verbose: print(f"Rejected @ ix={ip}: all nans(!?)")
+                continue
+#             if (yf<0).any():
+#                 if verbose: print(f"Rejected @ ix={ip}: as negative peak")
+#                 continue
+            pks = find_peaks(yf)[0]
+            if len(pks)==0: 
+                if verbose: print(f"Rejected @ ix={ip}: Could not infer the peak. yf={np.round(yf,3)}")
+                continue
+                hw = p['halfwidth']
+                edges = None
+            else:
+                hw,_,ledge,redge = peak_widths(yf,pks)
+                dt = t[1]-t[0]
+                hw = hw[0]*dt
+                redge = redge[0]*dt+tcur[0]
+                ledge = ledge[0]*dt+tcur[0]
+                edges = (ledge, redge)
+            if np.abs(pars0.loc-pars.loc)>p["halfwidth"]+hw: 
+                if verbose: print(f"Rejected @ ix={ip}: inferred peak too far from the candidate")
+                continue
+            yf += bkg
             res = res.append({
                 "fshape": fshape.__name__,
                 "pars": pars,
-                "score":np.nanmean((ycur-yf)**2),
-                "background": np.nanmean(bkg),
-                "half_width": hw,
-                "amplitude": np.nanmax(yf)
+                "chi2_raw": np.mean((ycur-yf)**2/(yf+yf.min()/100)),
+                "ycur": ycur,
+                "yf": yf,
+                "edges": edges,
+                "time": tcur,
+                "background": bkg,
+                "halfwidth": hw,
             }, ignore_index=True)
             if plot:
                 ax.plot(tcur, yf+bkg, lw=1.5, c=c, label=fshape.__name__ if iSpike==0 else None)
@@ -197,19 +267,14 @@ def fit_spikes(t,y,spikeDf,
 #             except:
 #                 continue
         if len(res):
-            res = res.sort_values("score").iloc[0]
-            
+            res = res.sort_values("chi2_raw").iloc[0]
             if plot:
                 ax.plot(tcur[imax],ycur[imax],"o",c=colorCode[res.fshape],ms=3.5)
             save=True
-            if half_width_threshold is not None:
-                if res.half_width<half_width_threshold:
+            if halfwidth_threshold is not None:
+                if res.halfwidth<halfwidth_threshold:
                     save=False
-            if res.amplitude/res.background<rel_amplitude_threshold:
-                save=False
-#                 print (ip, "will not save because of relative amplitude threshold.")
             if save:
-#                 print (ip, "ok")
                 res.name = ip
                 parDf += [res]
             else:
@@ -228,7 +293,7 @@ def fit_spikes(t,y,spikeDf,
         ax.legend()
     parDF = pd.DataFrame(parDf)
     if len(parDF):
-        parDF["loc"]       = [par.loc       for par in parDF.pars]
+        parDF["t0"]       = [par.loc       for par in parDF.pars]
 #         parDF["amplitude"] = [par.amplitude for par in parDF.pars]
     return parDF
 

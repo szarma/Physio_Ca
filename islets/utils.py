@@ -1,5 +1,185 @@
-import numpy as np
 import os
+
+import matplotlib
+import matplotlib.pyplot as plt
+import networkx as nx
+import numpy as np
+import pandas as pd
+
+
+def coltrans(x, vmin=None, vmax=None, tilt=1, offset=0.1):
+    from .numeric import robust_max
+    try:
+        x[0]
+        iterable = True
+        if vmax is None:
+            vmax = robust_max(x)
+        if vmin is None:
+            vmin = -robust_max(-x)
+    except:
+        iterable = False
+        x = np.array([x])
+    y = np.log(np.clip(x,vmin,vmax))**(1./tilt)
+    if iterable:
+        y -= y.min()
+        y /= y.max()
+#         y = np.minimum(offset+y,y.max())
+        y = np.sqrt(offset**2+y**2)
+        y /= y.max()
+        return y
+    else:
+        return y[0]
+
+def filter_spikes_per_roi(roiSpikes, regions, plot=False, halfwidth_toll=.33, freqShow=5):
+    roi = roiSpikes["roi"].unique()
+    assert len(roi)==1
+    roi = roi[0]
+    origtrace = regions.df.loc[roi,"trace"]
+    tsslows = {ts: regions.df.loc[roi,"slower_%g"%ts] for ts in roiSpikes.ts.unique()}
+    roiSpikes = pd.DataFrame(roiSpikes)
+    t = regions.time
+    roiSpikes["status"] = "ok"
+    
+    if plot:
+#         currentBackend = matplotlib.get_backend()
+#         if plot not in ["interactive","static"]:
+#             raise ValueError("plot can take only three values: None, 'interactive' and 'static'.")
+#         if plot=="interactive" and currentBackend!="nbAgg":
+#             plt.switch_backend("nbAgg")
+#         if plot=="static" and currentBackend!='module://ipykernel.pylab.backend_inline':
+#             plt.switch_backend('module://ipykernel.pylab.backend_inline')
+#         plot = plot is not None
+        fig, axs = plt.subplots(3,1,figsize=(13,14), sharex=True, sharey=True)
+        
+        def draw_spike(row, ax):
+            ax.fill(
+                row.t0+row.halfwidth*np.array([0,0,1,1,0]),
+                row.its+np.array([0,1,1,0,0])*.8-.5,
+                color=row.color,
+                #linewidth=.7,
+            )
+        for ix, row in roiSpikes.iterrows():
+            draw_spike(row, axs[1])
+    colorDict = {}
+    for ix, row in roiSpikes.iterrows():
+        it0 = np.searchsorted(t,row.t0)-1
+        ite = np.searchsorted(t,row.t0+row.halfwidth)+1
+        spikeLength = ite-it0
+        if spikeLength<3:
+            status = "too short"
+            roiSpikes.loc[ix,"status"] = status
+            if status not in colorDict:
+                colorDict[status] = axs[0].plot([],label=status)[0].get_color()
+            row = pd.Series(row)
+            row.color = colorDict[status]
+            if plot: draw_spike(row,axs[0])
+            continue
+        slowtrace = tsslows[row.ts][it0:ite].copy()
+        if row.ts*4 in tsslows:
+            slowtrace-=tsslows[row.ts*4][it0:ite]
+        else:
+            if row.ts*2 in tsslows:
+                slowtrace-=tsslows[row.ts*2][it0:ite]
+        ddslow = np.diff(np.diff(slowtrace))
+        ddorig = np.diff(np.diff(origtrace[it0:ite]))
+        # if ddorig.mean()>0:
+        if spikeLength>20 and ddslow.mean()>0.1 and ddslow.mean()>-ddorig.mean()*.5:
+            print (ddslow.mean(), ddorig.mean())
+            status = "spurious"
+            roiSpikes.loc[ix,"status"] = status
+            if status not in colorDict:
+                colorDict[status] = axs[0].plot([],label=status)[0].get_color()
+            row = pd.Series(row)
+            row.color = colorDict[status]
+            if plot: draw_spike(row, axs[0])
+            if plot: axs[0].text(row.t0+row.halfwidth/2, row.its+.3, "x", va="bottom", ha="center")
+            continue
+            
+        tcur = t[it0:ite]
+        bkg = tsslows[row.ts][it0]+np.arange(spikeLength)*(tsslows[row.ts][ite-1]-tsslows[row.ts][it0])/(spikeLength-1)
+        purePeak = origtrace[it0:ite]-bkg
+        amplitude = np.percentile(purePeak, 95)
+        if amplitude/bkg.mean()<.1:
+#         if amplitude<1.*np.abs(bkg[-1]-bkg[0]):
+            status = "too steep"
+            roiSpikes.loc[ix,"status"] = status
+            if plot:
+                if status not in colorDict:
+                    colorDict[status] = axs[0].plot([],label=status)[0].get_color()
+                row = pd.Series(row)
+                row.color = colorDict[status]
+                draw_spike(row,axs[0])
+                axs[0].text(row.t0+row.halfwidth/2, row.its+.3, ("/" if bkg[-1]>bkg[0] else "\\"), va="bottom", ha="center")
+            
+    if len(colorDict):
+        axs[0].legend()
+    g = nx.DiGraph()
+    for isp, spike in roiSpikes.query("status=='ok'").sort_values("halfwidth").iterrows():
+        conflicts = roiSpikes.query(  f"t0>{spike.t0   - spike.halfwidth*halfwidth_toll}")
+        conflicts = conflicts.query(  f"t0<{spike.t0   + spike.halfwidth*halfwidth_toll}")
+        conflicts = conflicts.query(f"tend>{spike.tend - spike.halfwidth*halfwidth_toll}")
+        conflicts = conflicts.query(f"tend<{spike.tend + spike.halfwidth*halfwidth_toll}")
+        conflicts = conflicts.query(f"index!={spike.name}")
+        g.add_node(isp)
+        for other in list(conflicts.index):
+            g.add_edge(isp, other)
+    if plot:
+        ax = axs[1]
+        nx.draw_networkx(g,
+                         ax=ax,
+                         with_labels=False,
+                         pos={node: (roiSpikes.loc[node, "t0"]+.5*roiSpikes.loc[node, "halfwidth"], roiSpikes.loc[node, "its"]) for node in g.nodes},
+                         node_size=0,
+                         edge_color="grey"
+                        )
+        #ax.set_yticks(np.arange(len(timescales)));
+        #ax.set_yticklabels(timescales);
+        ax.tick_params(left=True, bottom=True, labelleft=True, labelbottom=True)
+    ######################################################
+    df_filt = []
+    for ixs in nx.connected_components(g.to_undirected()):
+        row = pd.Series(roiSpikes.loc[list(ixs)].sort_values("height").iloc[-1])
+        for col in ["t0","tend","height"]:
+            row.col = roiSpikes.loc[list(ixs),col].mean()
+        row.halfwidth = row.tend-row.t0
+        df_filt += [row]
+    df_filt = pd.DataFrame(df_filt)
+    for col in ["loghalfwidth","score","status"]:
+        if col in df_filt.columns:
+            del df_filt[col]
+    if plot:
+#         if len(df_filt):
+#             df_filt["color"] = list(plt.cm.hot(coltrans(df_filt.height, vmax=10)))
+        for ix, row in df_filt.iterrows():
+            draw_spike(row, axs[2])
+        nr = np.round(regions.Freq/freqShow)
+        if nr>1:
+            nr = int(nr)
+            from .numeric import rebin
+            x = rebin(t, nr)
+            y = rebin(origtrace, nr)
+        else:
+            x,y = t, origtrace
+#         y = y - np.percentile(y,1)
+#         y = y / np.percentile(y,99)
+#         y = y * roiSpikes.its.max() + roiSpikes.its.max()/3
+        for ax in axs:
+            ax.set_facecolor("k")
+            axx = ax.twinx()
+            axx.set_ylabel("light intensity")
+            axx.plot(x, y, c="grey", lw=.7)
+            ax.set_ylabel("filtering timescale [s]")
+            ax.set_xlabel("time [s]]")
+            ax.set_ylim(ax.get_ylim()[::-1])
+        axs[0].set_title("discarded")
+        axs[1].set_title("all")
+        axs[2].set_title("filtered")
+        ax.set_yticks(roiSpikes.its.unique());
+        ax.set_yticklabels(["%g"%ts for ts in roiSpikes.ts.unique()]);
+        ax.set_xlim(roiSpikes.t0.min()-1, roiSpikes.tend.max()+1)
+        plt.tight_layout()
+        df_filt, axs
+    return df_filt, None
 
 def save_tiff(movie, movieFilename):
     import PIL
@@ -135,7 +315,6 @@ def order(testlist):
     
 def tally(mylist):
     from collections import Counter
-    import numpy as np
     return sorted(Counter(mylist).most_common(),key=lambda duple: duple[0])
 
 def multi_map(some_function, iterable, processes=1, library="multiprocessing"):
@@ -165,8 +344,6 @@ def multi_map(some_function, iterable, processes=1, library="multiprocessing"):
     return out
 
 def create_preview_image(regions, filepath=None, show=False):
-    import matplotlib.pyplot as plt
-#     import matplotlib.patheffects as path_effects
     from copy import copy
     cmap = copy(plt.cm.Greys)
     cmap.set_bad("lime")
@@ -186,51 +363,6 @@ def create_preview_image(regions, filepath=None, show=False):
     fig.savefig(filepath,dpi=75)
     if not show:
         plt.close(fig)
-# def showMovie(m_show, figsize = (6,6), out="jshtml",fps = 30, saveName=None, NTimeFrames=100,log=True,additionalPlot=None):
-#     import matplotlib.pyplot as plt
-#     from matplotlib import animation
-#     if NTimeFrames is not None:
-#         n_rebin = len(m_show)//NTimeFrames
-#         if n_rebin>1:
-#             from .numeric import rebin
-#             m_show = rebin(m_show, n_rebin)
-#     if log:
-#         for p in range(1,5):
-#             baseline = np.percentile(m_show,p)
-#             m_show = np.maximum(m_show, baseline)
-#             if np.all(m_show>0): break
-#         m_show = np.log(m_show)
-#     fig, ax = plt.subplots(figsize=figsize,dpi=150)
-#     im = ax.imshow(m_show[0].T, cmap="Greys", vmin=0, vmax=m_show.max())
-#     if additionalPlot is not None:
-#         additionalPlot(ax)
-#     plt.close(fig)
-#     def init():
-#         im.set_data(m_show[0].T)
-#         return (im,)
-#     def animate(i):
-#         im.set_data(m_show[i].T)
-#         return (im,)
-#     anim = animation.FuncAnimation(fig, animate, init_func=init,
-#                                    frames=len(m_show),
-#                                    interval=1000/fps,
-#                                    blit=True)
-#     if out=="html5":
-#         from IPython.display import HTML
-#         return HTML(anim.to_html5_video())
-#     if out=="jshtml":
-#         from IPython.display import HTML
-#         return HTML(anim.to_jshtml())
-#     if out=="save" or saveName is not None:
-#         try:
-#             anim.save(saveName)
-#         except:
-#             saveName = input("please enter a valid filename. Otherwise, I'll save it as 'video.mp4'.")
-#             try: anim.save(saveName)
-#             except:
-#                 saveName = "video.mp4"
-#                 anim.save(saveName)
-#         return None
     
 def show_movie(m_show,
                figScale = 1,
@@ -247,11 +379,10 @@ def show_movie(m_show,
                offset=(0,0),
               ):
     from .numeric import rebin
-    import matplotlib.pyplot as plt
+    
     from matplotlib import animation
     if tmax is not None:
-        import matplotlib.patheffects as path_effects
-        from pandas import Timedelta
+        pass
     m_show = m_show.copy()
     if NTimeFrames is not None:
         n_rebin = len(m_show)//NTimeFrames
@@ -266,7 +397,6 @@ def show_movie(m_show,
     if log:
         m_show = np.log(m_show)
     figsize = np.array(m_show.shape[1:3][::-1])/100*figScale
-    import matplotlib
     currentBackend = matplotlib.get_backend()
     plt.switch_backend('agg')
     fig = plt.figure(figsize=figsize,dpi=dpi)
@@ -504,9 +634,7 @@ def createStaticImage(im,regions,showall=True,color="grey",separate=True, return
     if lw is None:
         lw = .1
     from PIL import Image as PilImage
-    import matplotlib
     currentBackend = matplotlib.get_backend()
-    import matplotlib.pyplot as plt
     plt.switch_backend('agg')
     if cmap is None:
         from copy import copy
@@ -543,7 +671,7 @@ def createStaticImage(im,regions,showall=True,color="grey",separate=True, return
 def saveRois(regions,outDir,filename="",movie=None,col=["trace"],formats=["vienna"],add_date=True):
         feedback = []
 #     try:
-        from copy import deepcopy,copy
+        from copy import deepcopy
         from datetime import date
         import pickle
         import pandas as pd

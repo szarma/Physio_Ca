@@ -1,18 +1,19 @@
-import numpy as np
-# import pandas as pd
-# import matplotlib.pyplot as plt
-
-import plotly.graph_objects as go
 import json
-from jupyter_plotly_dash import JupyterDash
-from dash.dependencies import Input, Output, State
+from sys import exc_info
+
 import dash_core_components as dcc
 import dash_html_components as html
-from dash import no_update
-from sys import exc_info
-from .numeric import robust_max
-from .utils import getFigure
+import numpy as np
+import plotly.graph_objects as go
+from dash.dependencies import Input, Output
+from jupyter_plotly_dash import JupyterDash
+
 from .numeric import rebin
+from .utils import getFigure
+
+
+# import pandas as pd
+# import matplotlib.pyplot as plt
 
 
 def take_part(ls, key, extent):    

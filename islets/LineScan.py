@@ -1,12 +1,8 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from itertools import product
-from collections import OrderedDict
-import matplotlib.pyplot as plt
-import networkx as nx
+
 from .numeric import rebin
-from .utils import multi_map
-import plotly.graph_objects as go
 
 
 class LineScan:

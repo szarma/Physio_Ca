@@ -105,7 +105,7 @@ def moving_sum(a, n=3) :
     return ret[n - 1:]
 
 def autocorr2d(sett, dxrange, dyrange):
-    from numpy import zeros, corrcoef, array, mean, std
+    from numpy import zeros, corrcoef
     Nx, Ny = sett.shape
     ret = zeros((len(dxrange), len(dyrange)))
     for kx,dx in enumerate(dxrange):
@@ -158,7 +158,6 @@ def order(testlist):
     
 def tally(mylist):
     from collections import Counter
-    import numpy as np
     return sorted(Counter(mylist).most_common(),key=lambda duple: duple[0])
 
 
@@ -178,27 +177,6 @@ def tally(mylist):
 #     return out
 
 
-from contextlib import contextmanager
-@contextmanager
-def suppress_stdout():
-    import sys, os
-    with open(os.devnull, "w") as devnull:
-        old_stdout = sys.stdout
-        sys.stdout = devnull
-        try:  
-            yield
-        finally:
-            sys.stdout = old_stdout
-@contextmanager
-def suppress_stderr():
-    import sys, os
-    with open(os.devnull, "w") as devnull:
-        old_stderr = sys.stderr
-        sys.stderr = devnull
-        try:  
-            yield
-        finally:
-            sys.sterr = old_stderr
 
 
 
