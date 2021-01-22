@@ -332,6 +332,8 @@ def examine_spikes(self, spikeDF,
                 margin=dict(l=10, r=10, t=30)
             )
             out += [dcc.Graph(figure=fig)]
+            if debug:
+                out += [html.Pre(repr(row), style={"height":"200px", "overflowX":"scroll", "overflowY":"scroll"})]
         except:
             exc_type, exc_value, exc_traceback = exc_info()
             out += [html.Br(), str(exc_type)]
