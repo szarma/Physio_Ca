@@ -901,6 +901,125 @@ class Regions:
     
     
     
+    def prep_filtering(self,
+                       ironTimeScale,
+                       Npoints=None,
+                       write=True,
+                       usecol="trace",
+                       order=5,
+                       verbose=False,
+                       ):
+        from .numeric import sosFilter
+        if Npoints is None: Npoints = 15
+        minDt = np.diff(self.time).mean()
+        freq = 1/minDt
+        try:
+            self.movie
+            if np.abs(freq/self.movie.fr-1)>1e-2:
+                print (f"movie frame rate ({self.movie.fr}) and inferred frame ({freq}) rate are different!")
+        except:
+            pass
+        N_dt = ironTimeScale/minDt
+        Nrebin = max(1,int(np.round(N_dt/Npoints)))
+        if verbose:
+            print (f"Nrebin = {Nrebin}")
+        C = self.df
+        if "trace" in usecol:
+            data = np.vstack([C.loc[i,usecol] for i in C.index])
+            trend = np.zeros(len(C))
+        elif usecol=="detrended":
+            data = np.vstack([C.loc[i,"detrended"] for i in C.index])
+            trend = C.trend.values
+        else:
+            raise ValueError("usecol can only be a 'trace' (or 'trace_*' or 'detrended'")
+            
+        if Nrebin>1:
+            freq = freq/Nrebin
+            data = rebin(data, Nrebin, axis=1)
+            if len(trend.shape)>1:
+                trend = rebin(trend, Nrebin, axis=1)
+        if not hasattr(self,"showTime"):
+            self.showTime = {}
+        if write:
+            if Nrebin>1:
+                self.showTime["%g"%ironTimeScale] = rebin(self.time, Nrebin)
+            else:
+                if "%g"%ironTimeScale in self.showTime:
+                    del self.showTime["%g"%ironTimeScale]
+        cutFreq = .5/ironTimeScale
+        sf = sosFilter(cutFreq, freq, order=order)
+        if write:
+            self.sosFilter = sf
+        return {
+            "trend":   trend,
+            "detrend": data,
+            "Nrebin":  Nrebin,
+            "filter":  sf,
+        }
+    
+    def mean2std_funct(self, absmean, reg=3):
+        absmean = np.maximum(absmean, reg)
+        if hasattr(self, "TwoParFit"):
+            k,n = self.TwoParFit
+            logvar = np.log(absmean)*k+n
+            var = np.exp(logvar)
+        elif hasattr(self, "gain"):
+            var = absmean*self.gain
+        else:
+            var = absmean
+        return var**.5
+    
+    def fast_filter_traces1(self,
+                           ironTimeScale,
+                           z_sp=3,
+                           order=5,
+                           Npoints=None,
+                           write=True,
+                           verbose=False,
+                           usecol="trace",
+                           normalize=True,
+                           npass=3,
+                          ):
+        
+        C = self.df
+        fdata = self.prep_filtering(ironTimeScale,
+                                    Npoints=Npoints,
+                                    write=write,
+                                    usecol=usecol,
+                                    order=5
+                                    )
+        Nrebin = fdata["Nrebin"]
+        dataFilt = fdata["filter"].run(fdata["detrend"])
+        absSlow = Nrebin * np.vstack([ (fdata[  "trend"][i]+dataFilt[i])*C.loc[ix,"size"] for i,ix in enumerate(C.index) ])
+        absFast = Nrebin * np.vstack([ (fdata["detrend"][i]-dataFilt[i])*C.loc[ix,"size"] for i,ix in enumerate(C.index) ])
+        z = absFast/self.mean2std_funct(absSlow)
+        if z_sp>0:
+            detrend = fdata["detrend"].copy()
+            xr = np.arange(len(detrend[0]))
+            for i in range(npass):
+                slower = np.array([absSlow[i]/C["size"].iloc[i]/Nrebin for i in range(len(C))])
+                #detrend[z>z_sp] = slower[z>z_sp]
+                ff = z>z_sp
+                for i in range(len(detrend)):
+                    ffi = ff[i]
+                    detrend[i,ffi] = np.interp(xr[ffi], xr[~ffi], slower[i,~ffi])
+                dataFilt = fdata["filter"].run(detrend)
+                absSlow = Nrebin * np.vstack([ (fdata[  "trend"][i]+dataFilt[i])*C.loc[ix,"size"] for i,ix in enumerate(C.index) ])
+                absFast = Nrebin * np.vstack([ (fdata["detrend"][i]-dataFilt[i])*C.loc[ix,"size"] for i,ix in enumerate(C.index) ])
+                z = absFast/self.mean2std_funct(absSlow)
+        if normalize:
+            slower = [absSlow[i]/C["size"].iloc[i]/Nrebin for i in range(len(C))]
+            faster = [absFast[i]/C["size"].iloc[i]/Nrebin for i in range(len(C))]
+        else:
+            slower = list(absSlow)
+            faster = list(absFast)
+        if write:
+            self.df["slower_%g"%ironTimeScale] = slower
+            self.df["faster_%g"%ironTimeScale] = faster
+            self.df["zScore_%g"%ironTimeScale] = list(z)
+        else:
+            return np.array(slower), np.array(faster), z
+    
     def fast_filter_traces(self,
                            ironTimeScale,
                            z_sp=3,
