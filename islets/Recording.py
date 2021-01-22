@@ -14,6 +14,10 @@ def parse_leica(rec,
                 index=False,
                 verbose=False,
                ):
+    if not hasattr(rec,"metadata"):
+        if verbose>0:
+            print("Recording has no metadata.")
+        return []
     if skipTags is None:
         skipTags = ["crop", "split", "frame", "every", "half", "snapshot", "-", "proj", "max", "resize"]
 
@@ -42,7 +46,7 @@ def parse_leica(rec,
                 [rec.metadata["Frequency"].diff().abs()/rec.metadata["Frequency"]>.02],
             axis=0)
         sers = np.split(rec.metadata.Name.values, np.where(ff)[0])[1:]
-        idxs = np.split(rec.metadata.index.asarray(), np.where(ff)[0])[1:]
+        idxs = np.split(rec.metadata.index.values, np.where(ff)[0])[1:]
     else:
         sers = [rec.metadata.Name.values]
         idxs = [list(rec.metadata.index)]
@@ -136,6 +140,8 @@ class Recording:
                 stdout.flush()
             except:
                 warn(f"Could not parse metadata. {exc_info()}")
+            finally:
+                print("")
         if hasattr(self, "metadata"):
             self.nSeries = len(self.metadata)
             if "Name" in self.metadata:
