@@ -136,7 +136,7 @@ class Recording:
                 stdout.flush()
                 self.parse_metadata()
                 self.save_metadata()
-                print (f"Finished.")
+                print (f"Finished.", end="")
                 stdout.flush()
             except:
                 warn(f"Could not parse metadata. {exc_info()}")
