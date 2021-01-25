@@ -6,6 +6,9 @@ from numba import jit, prange
 from scipy.optimize import curve_fit  # ,minimize,basinhopping
 
 
+def hillCurve(x, h=1, xc=3):
+    return (x/xc)**h/(1+(x/xc)**h)
+
 def bspline(cv, n=100, degree=3):
     """ Calculate n samples on a bspline
 
@@ -127,22 +130,6 @@ def rebin(a,n,axis=0, dtype="float32", func=np.mean):
         return out
 
 
-def nan_helper(y):
-    """Helper to handle indices and logical indices of NaNs.
-
-    Input:
-        - y, 1d numpy array with possible NaNs
-    Output:
-        - nans, logical indices of NaNs
-        - index, a function, with signature indices= index(logical_indices),
-          to convert logical indices of NaNs to 'equivalent' indices
-    Example:
-        >>> # linear interpolation of NaNs
-        >>> nans, x= nan_helper(y)
-        >>> y[nans]= np.interp(x(nans), x(~nans), y[~nans])
-    """
-
-    return np.isnan(y), lambda z: z.nonzero()[0]
 
 class sosFilter:
     def __init__(self, cutoff, frequency, order=5, btype="low"):
