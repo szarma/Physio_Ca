@@ -213,6 +213,7 @@ def examine_spikes(self, spikeDF,
                     line=dict(width=.7 if col=="trace" else 1,
 #                               color=color
                              ),
+                    visible="%g"%row.ts in col or col=="trace",
                     name=col
                 ))
                 if col=="trace":
