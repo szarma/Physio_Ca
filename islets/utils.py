@@ -6,6 +6,22 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
+def plot_events(events, ax, ypos=0, transparency=True,**hillkwargs):
+    events = pd.DataFrame(events)
+    if "coltrans" not in events.columns:
+        from .numeric import hillCurve
+        events["coltrans"] = hillCurve(events.halfwidth,**hillkwargs)
+
+    if "color" not in events.columns:
+        events["color"] = list(plt.cm.rainbow(events.coltrans))
+
+    for ix,row in events.sort_values("halfwidth", ascending=False).iterrows():
+        ax.fill(
+            row.t0+row.halfwidth*np.array([0,0,1,1,0]),
+            -(-.5+np.array([0,1,1,0,0]))*(row.coltrans+.3)/1.3+ypos,
+            color=row.color,
+            alpha = min(1,1-row.coltrans+.1) if transparency else 1
+        )
 
 def sequential_filtering(
         regions,
@@ -210,6 +226,7 @@ def distill_events_per_roi(roiSpikes,
         axs[1].set_title("all")
         axs[2].set_title("filtered")
         if hasattr(regions, "timescales"):
+            timescales = regions.timescales
             ax.set_yticks(np.arange(len(timescales)))
             ax.set_yticklabels(["%g"%ts for ts in timescales]);
         else:
