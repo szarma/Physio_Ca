@@ -70,23 +70,28 @@ def coltrans(x, vmin=None, vmax=None, tilt=1, offset=0.1):
         return y[0]
 
 
-def filter_events(candidateEvents, regions, halfwidth_toll=.25,minconfidence=4):
+def distill_events(
+        candidateEvents,
+        regions,
+        halfwidth_toll=.25,
+        minconfidence=4
+                   ):
     from tqdm.notebook import tqdm
     # tqdm().pandas()
     DF_filt = []
     for roi,dfroi in tqdm(candidateEvents.groupby("roi")):
-        df_filt = filter_spikes_per_roi_simpler(dfroi, regions, halfwidth_toll=halfwidth_toll, minconfidence=minconfidence)[0]
+        df_filt = distill_events_per_roi(dfroi, regions, halfwidth_toll=halfwidth_toll, minconfidence=minconfidence)[0]
         DF_filt += [df_filt]
     return pd.concat(DF_filt)
 
-def filter_spikes_per_roi_simpler(roiSpikes,
-                                  regions,
-                                  plot=False,
-                                  halfwidth_toll=.25,
-                                  freqShow=5,
-                                  plotSlows=None,
-                                  minconfidence=4,
-                                  ):
+def distill_events_per_roi(roiSpikes,
+                          regions,
+                          plot=False,
+                          halfwidth_toll=.25,
+                          freqShow=5,
+                          plotSlows=None,
+                          minconfidence=4,
+                          ):
     roi = roiSpikes["roi"].unique()
     assert len(roi) == 1
     roi = roi[0]
