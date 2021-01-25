@@ -57,10 +57,11 @@ def load_regions(path,
     return regions
 
 def crawlDict_restr(image, pixels, diag=False, processes=10, verbose=False):
-    global iterf
-    def iterf(ij):
+    global iterfcd
+    # noinspection PyRedeclaration
+    def iterfcd(ij):
         return climb((ij[0],ij[1]), image, diag=diag,)
-    R_ = multi_map(iterf,pixels, processes=processes)
+    R_ = multi_map(iterfcd,pixels, processes=processes)
     A_ = [ij+r for ij,r in zip(pixels,R_) if r in pixels]
     A_ = [el for el in A_ if el[-1] is not None]
     B_ = OrderedDict()
@@ -781,7 +782,7 @@ class Regions:
         freq = 1/minDt
 #         ts = min(50/freq,10)
         ts = 30/freq
-        absSlow, absFast, _ = self.fast_filter_traces(ts,write=False, normalize=False,z_sp=0)
+        absSlow, absFast, _ = self.fast_filter_traces(ts,write=False, normalize=False,filt_cutoff=0)
         di = 30
         slow_est, fast_vars = [],[]
         for i in range(absFast.shape[0]):
@@ -793,7 +794,9 @@ class Regions:
         logbs = np.log(np.logspace(np.log10(np.percentile(slow_est,2)),np.log10(np.percentile(slow_est,98))))
         d = np.digitize(np.log(slow_est), logbs)
         x = np.array([slow_est[d==i].mean() for i in np.unique(d)])
-        y = np.array([np.median(fast_vars[d==i]) for i in np.unique(d)])
+        y = np.array([np.median(fast_vars[d==i]) if (d==i).sum()>10 else np.nan for i in np.unique(d)])
+        x = x[np.isfinite(y)]
+        y = y[np.isfinite(y)]
         if ret_points:
             return x,y
         gain = np.mean(y/x)
@@ -910,7 +913,7 @@ class Regions:
                        verbose=False,
                        ):
         from .numeric import sosFilter
-        if Npoints is None: Npoints = 15
+        if Npoints is None: Npoints = 100
         minDt = np.diff(self.time).mean()
         freq = 1/minDt
         try:
@@ -969,17 +972,17 @@ class Regions:
             var = absmean
         return var**.5
     
-    def fast_filter_traces1(self,
-                           ironTimeScale,
-                           z_sp=3,
-                           order=5,
-                           Npoints=None,
-                           write=True,
-                           verbose=False,
-                           usecol="trace",
-                           normalize=True,
-                           npass=3,
-                          ):
+    def fast_filter_traces(self,
+                            ironTimeScale,
+                            filt_cutoff=3,
+                            Npoints=None,
+                            write=True,
+                            verbose=False,
+                            usecol="trace",
+                            normalize=True,
+                            npass=3,
+                            test_plotting_kwargs=None
+                            ):
         
         C = self.df
         fdata = self.prep_filtering(ironTimeScale,
@@ -989,24 +992,45 @@ class Regions:
                                     order=5
                                     )
         Nrebin = fdata["Nrebin"]
+        if verbose:
+            print(f"Nrebin={Nrebin}")
         dataFilt = fdata["filter"].run(fdata["detrend"])
         absSlow = Nrebin * np.vstack([ (fdata[  "trend"][i]+dataFilt[i])*C.loc[ix,"size"] for i,ix in enumerate(C.index) ])
         absFast = Nrebin * np.vstack([ (fdata["detrend"][i]-dataFilt[i])*C.loc[ix,"size"] for i,ix in enumerate(C.index) ])
         z = absFast/self.mean2std_funct(absSlow)
-        if z_sp>0:
+        if test_plotting_kwargs is not None:
+            ax = test_plotting_kwargs["ax"]
+            iplot = test_plotting_kwargs["i"]
+            if Nrebin>1:
+                t = self.showTime["%g"%ironTimeScale]
+            else:
+                t = self.time
+            ax.plot(t, fdata["detrend"][iplot], lw=.5,c="k")
+        if filt_cutoff>0:
             detrend = fdata["detrend"].copy()
             xr = np.arange(len(detrend[0]))
             for i in range(npass):
-                slower = np.array([absSlow[i]/C["size"].iloc[i]/Nrebin for i in range(len(C))])
-                #detrend[z>z_sp] = slower[z>z_sp]
-                ff = z>z_sp
+                if verbose:
+                    if i==0:
+                        print ("passing through traces: 0", end=" ")
+                    else:
+                        print (i, end=" ")
+                slower = np.array([absSlow[i]/C["size"].iloc[i]/Nrebin - fdata[  "trend"][i] for i in range(len(C))])
+                #detrend[z>filt_cutoff] = slower[z>filt_cutoff]
+                ff = z > filt_cutoff
+                ff[:,[0,1,-2,-1]] = False
                 for i in range(len(detrend)):
                     ffi = ff[i]
                     detrend[i,ffi] = np.interp(xr[ffi], xr[~ffi], slower[i,~ffi])
+                if test_plotting_kwargs is not None:
+                    ax.plot(t, slower[iplot] , c="darkred")
+                    ax.plot(t, detrend[iplot], c="grey")
                 dataFilt = fdata["filter"].run(detrend)
                 absSlow = Nrebin * np.vstack([ (fdata[  "trend"][i]+dataFilt[i])*C.loc[ix,"size"] for i,ix in enumerate(C.index) ])
                 absFast = Nrebin * np.vstack([ (fdata["detrend"][i]-dataFilt[i])*C.loc[ix,"size"] for i,ix in enumerate(C.index) ])
                 z = absFast/self.mean2std_funct(absSlow)
+            if verbose:
+                print("")
         if normalize:
             slower = [absSlow[i]/C["size"].iloc[i]/Nrebin for i in range(len(C))]
             faster = [absFast[i]/C["size"].iloc[i]/Nrebin for i in range(len(C))]
@@ -1020,108 +1044,108 @@ class Regions:
         else:
             return np.array(slower), np.array(faster), z
     
-    def fast_filter_traces(self,
-                           ironTimeScale,
-                           z_sp=3,
-                           order=5,
-                           Npoints=None,
-                           write=True,
-                           verbose=False,
-                           usecol="trace",
-                           normalize=True
-#                            meanSlow2Var=None
-                          ):
-        from .numeric import sosFilter
-        if Npoints is None: Npoints = 15
-        minDt = np.diff(self.time).mean()
-        freq = 1/minDt
-        try:
-            self.movie
-            if np.abs(freq/self.movie.fr-1)>1e-2:
-                print (f"movie frame rate ({self.movie.fr}) and inferred frame ({freq}) rate are different!")
-        except:
-            pass
-        N_dt = ironTimeScale/minDt
-        Nrebin = max(1,int(np.round(N_dt/Npoints)))
-        if verbose:
-            print (f"Nrebin = {Nrebin}")
-        C = self.df
-        if "trace" in usecol:
-            data = np.vstack([C.loc[i,usecol] for i in C.index])
-            trend = np.zeros(len(C))
-        elif usecol=="detrended":
-            data = np.vstack([C.loc[i,"detrended"] for i in C.index])
-            trend = C.trend.values
-        else:
-            raise ValueError("usecol can only be a 'trace' (or 'trace_*' or 'detrended'")
-            
-        if Nrebin>1:
-            freq = freq/Nrebin
-            data = rebin(data, Nrebin, axis=1)
-            if len(trend.shape)>1:
-                trend = rebin(trend, Nrebin, axis=1)
-        if not hasattr(self,"showTime"):
-            self.showTime = {}
-        if write:
-            if Nrebin>1:
-                self.showTime["%g"%ironTimeScale] = rebin(self.time, Nrebin)
-            else:
-                if "%g"%ironTimeScale in self.showTime:
-                    del self.showTime["%g"%ironTimeScale]
-        cutFreq = .5/ironTimeScale
-        self.sosFilter = sosFilter(cutFreq, freq, order=order)
-        dataFilt = self.sosFilter.run(data)
-        for j in range(len(data)):
-            dataFilt[j] = np.maximum(dataFilt[j]+trend[j],.5)
-            
-
-        absSlow = np.vstack([dataFilt[i]*C.loc[ix,"size"] for i,ix in enumerate(C.index)])*Nrebin
-        absFast = np.vstack([(data[i]-dataFilt[i])*C.loc[ix,"size"] for i,ix in enumerate(C.index)])*Nrebin
-
-        if z_sp>0:
-            from cv2 import dilate
-            from .numeric import nan_helper
-            var = absSlow
-            if hasattr(self,"gain"):
-                var = var*self.gain    
-            std = var**.5
-            ff = (absFast > z_sp*std).astype("uint8")
-            if ff.any():
-                dilateKernelSize = int(ironTimeScale/minDt/Nrebin*.2)#*.03)
-                if dilateKernelSize%2==0:
-                    dilateKernelSize+=1
-                if dilateKernelSize>=3:
-                    if verbose:
-                        print ("dilating by", dilateKernelSize)
-                    ff = dilate(ff, np.ones(dilateKernelSize, dtype = np.uint8).reshape(1,-1)).astype("bool")
-                absFast_tmp = absFast.copy()
-                absFast_tmp[ff] = np.nan
-                for j in range(C.shape[0]):
-                    y = absFast_tmp[j]
-                    nans, x= nan_helper(y)
-                    if nans.any() and nans.mean()<.5: 
-                        y[nans]= np.interp( x(nans), x(~nans), y[~nans] )
-#                         y[nans]= np.interp( x(nans), x(~nans), absSlow[j][~nans] )
-                dFast = self.sosFilter.run(absFast_tmp)
-                absSlow = absSlow + dFast
-                absFast = absFast - dFast
-        var = absSlow
-        if hasattr(self,"gain"):
-            var = var*self.gain
-        std = var**.5
-        zScore = absFast/std
-        if normalize:
-            slower = [absSlow[i]/C["size"].iloc[i]/Nrebin for i in range(len(C))]
-            faster = [absFast[i]/C["size"].iloc[i]/Nrebin for i in range(len(C))]
-        else:
-            slower = absSlow
-            faster = absFast
-        if write:
-            C["slower_%g"%ironTimeScale] = slower
-            C["faster_%g"%ironTimeScale] = faster
-            C["zScore_%g"%ironTimeScale] = list(zScore)
-        else:
-            return np.array(slower), np.array(faster), zScore
+#     def fast_filter_traces(self,
+#                            ironTimeScale,
+#                            filt_cutoff=3,
+#                            order=5,
+#                            Npoints=None,
+#                            write=True,
+#                            verbose=False,
+#                            usecol="trace",
+#                            normalize=True
+# #                            meanSlow2Var=None
+#                           ):
+#         from .numeric import sosFilter
+#         if Npoints is None: Npoints = 15
+#         minDt = np.diff(self.time).mean()
+#         freq = 1/minDt
+#         try:
+#             self.movie
+#             if np.abs(freq/self.movie.fr-1)>1e-2:
+#                 print (f"movie frame rate ({self.movie.fr}) and inferred frame ({freq}) rate are different!")
+#         except:
+#             pass
+#         N_dt = ironTimeScale/minDt
+#         Nrebin = max(1,int(np.round(N_dt/Npoints)))
+#         if verbose:
+#             print (f"Nrebin = {Nrebin}")
+#         C = self.df
+#         if "trace" in usecol:
+#             data = np.vstack([C.loc[i,usecol] for i in C.index])
+#             trend = np.zeros(len(C))
+#         elif usecol=="detrended":
+#             data = np.vstack([C.loc[i,"detrended"] for i in C.index])
+#             trend = C.trend.values
+#         else:
+#             raise ValueError("usecol can only be a 'trace' (or 'trace_*' or 'detrended'")
+#
+#         if Nrebin>1:
+#             freq = freq/Nrebin
+#             data = rebin(data, Nrebin, axis=1)
+#             if len(trend.shape)>1:
+#                 trend = rebin(trend, Nrebin, axis=1)
+#         if not hasattr(self,"showTime"):
+#             self.showTime = {}
+#         if write:
+#             if Nrebin>1:
+#                 self.showTime["%g"%ironTimeScale] = rebin(self.time, Nrebin)
+#             else:
+#                 if "%g"%ironTimeScale in self.showTime:
+#                     del self.showTime["%g"%ironTimeScale]
+#         cutFreq = .5/ironTimeScale
+#         self.sosFilter = sosFilter(cutFreq, freq, order=order)
+#         dataFilt = self.sosFilter.run(data)
+#         for j in range(len(data)):
+#             dataFilt[j] = np.maximum(dataFilt[j]+trend[j],.5)
+#
+#
+#         absSlow = np.vstack([dataFilt[i]*C.loc[ix,"size"] for i,ix in enumerate(C.index)])*Nrebin
+#         absFast = np.vstack([(data[i]-dataFilt[i])*C.loc[ix,"size"] for i,ix in enumerate(C.index)])*Nrebin
+#
+#         if filt_cutoff>0:
+#             from cv2 import dilate
+#             from .numeric import nan_helper
+#             var = absSlow
+#             if hasattr(self,"gain"):
+#                 var = var*self.gain
+#             std = var**.5
+#             ff = (absFast > filt_cutoff*std).astype("uint8")
+#             if ff.any():
+#                 dilateKernelSize = int(ironTimeScale/minDt/Nrebin*.2)#*.03)
+#                 if dilateKernelSize%2==0:
+#                     dilateKernelSize+=1
+#                 if dilateKernelSize>=3:
+#                     if verbose:
+#                         print ("dilating by", dilateKernelSize)
+#                     ff = dilate(ff, np.ones(dilateKernelSize, dtype = np.uint8).reshape(1,-1)).astype("bool")
+#                 absFast_tmp = absFast.copy()
+#                 absFast_tmp[ff] = np.nan
+#                 for j in range(C.shape[0]):
+#                     y = absFast_tmp[j]
+#                     nans, x= nan_helper(y)
+#                     if nans.any() and nans.mean()<.5:
+#                         y[nans]= np.interp( x(nans), x(~nans), y[~nans] )
+# #                         y[nans]= np.interp( x(nans), x(~nans), absSlow[j][~nans] )
+#                 dFast = self.sosFilter.run(absFast_tmp)
+#                 absSlow = absSlow + dFast
+#                 absFast = absFast - dFast
+#         var = absSlow
+#         if hasattr(self,"gain"):
+#             var = var*self.gain
+#         std = var**.5
+#         zScore = absFast/std
+#         if normalize:
+#             slower = [absSlow[i]/C["size"].iloc[i]/Nrebin for i in range(len(C))]
+#             faster = [absFast[i]/C["size"].iloc[i]/Nrebin for i in range(len(C))]
+#         else:
+#             slower = absSlow
+#             faster = absFast
+#         if write:
+#             C["slower_%g"%ironTimeScale] = slower
+#             C["faster_%g"%ironTimeScale] = faster
+#             C["zScore_%g"%ironTimeScale] = list(zScore)
+#         else:
+#             return np.array(slower), np.array(faster), zScore
 
     def calc_raster(self, ts, z_th = 3, Npoints=None, smooth = 0):
         from .numeric import runningAverage
@@ -1186,7 +1210,7 @@ class Regions:
                 t = self.time
         dt = np.diff(t).mean()
         if smooth is None:
-            smooth = int(ts/dt/5)
+            smooth = int(ts/dt/10)
             if smooth%2==0: smooth += 1
         if smooth>1:
             if verbose:
@@ -1195,13 +1219,14 @@ class Regions:
         spikes = []
         for i,z in zip(self.df.index,zScores):
             pp = find_peaks(z,
-                            width=(ts/dt*.1,ts/dt*.7),
+                            width=(ts/dt/8,ts/dt),
                             height=z_th
                               )
-            w,h,x0 = peak_widths(z, pp[0], rel_height=.5)[:3]
+            w,h,x0,xe = peak_widths(z, pp[0], rel_height=.5)
             w = w*dt
             x0 = x0*dt + t[0]
-            df = pd.DataFrame({"height":z[pp[0]],"halfwidth":w, "t0":x0})
+            xe = xe*dt + t[0]
+            df = pd.DataFrame({"height":z[pp[0]],"halfwidth":w, "t0":x0, "peakpoint":pp[0]*dt+t[0]})
             df["roi"] = i
             spikes += [df]
         spikes = pd.concat(spikes,ignore_index=True)
@@ -1311,6 +1336,7 @@ class Regions:
             pass
         return protocol
 
+    # noinspection PyUnresolvedReferences
     def examine(self, max_rois=10, imagemode=None, debug=False, startShow='',mode="jupyter",name=None,lw=None, test=False):
         if test:
             from .examine_test import examine
