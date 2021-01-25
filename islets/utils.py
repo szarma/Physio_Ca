@@ -386,6 +386,7 @@ def filter_spikes_per_roi(roiSpikes,
         axs[1].set_title("all")
         axs[2].set_title("filtered")
         if hasattr(regions, "timescales"):
+            timescales=regions.timescales
             ax.set_yticks(np.arange(len(timescales)))
             ax.set_yticklabels(["%g"%ts for ts in timescales]);
         else:
