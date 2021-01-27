@@ -5,21 +5,18 @@ from sys import exc_info
 import numpy as np
 from plotly_express import colors as plc
 from scipy.signal import peak_widths, find_peaks
-
+from .numeric import rebin
 from .fitting import generic_function
 
 MYCOLORS = plc.qualitative.Plotly
 
-def examine_spikes(self, spikeDF, 
-                log_x=False,
-                debug=False,
-                mode="jupyter",
-                name=None,
-                cols=None,
-                cols2show=None,
-                fitDF=None,
-                show_diagonal=False,
-           ):
+def examine_spikes(self, spikeDF, x, y,
+    debug=False,
+    mode="jupyter",
+    name=None,
+    fitDF=None,
+    show_diagonal=False,
+    ):
     if name is None:
         name = __name__
         
@@ -46,7 +43,7 @@ def examine_spikes(self, spikeDF,
     
 #     time = self.time
     from .plotly_hexbin import HBclass
-    self.hb = HBclass(spikeDF,x=cols[0],y=cols[1])
+    self.hb = HBclass(spikeDF,x=x,y=y)
     scatterImage = self.hb._hexbin(gridsize=50,return_figure=True)
     
     if fitDF is None:
@@ -64,19 +61,12 @@ def examine_spikes(self, spikeDF,
         maxv = np.nanmax(self.hb.df.iloc[:,:2].values)
         minv = np.nanmin(self.hb.df.iloc[:,:2].values)
         scatterImage.add_trace(go.Scatter(x=[minv,maxv], y=[minv,maxv], mode="lines",line_color="grey", line_width=.7,showlegend=False,name="y=x"))
-#     prevCol = "trace_%.1g"%(timescale/3)
-#     if prevCol not in self.df.columns:
-#         prevCol = "trace"
-#     currCol = "trace_%.1g"%(timescale)
-#     cols2show = [prevCol, currCol, currCol.replace("trace","slower")]
-#     if "trace" not in cols2show:
-#         cols2show = ["trace"] + cols2show
-    if cols2show is None:
-        cols2show = [
-            c for c in self.df.columns if \
-            "trace" in c \
-            or "slower" in c
-                    ]
+#     if cols2show is None:
+#         cols2show = [
+#             c for c in self.df.columns if \
+#             "trace" in c \
+#             or "slower" in c
+#                     ]
     if mode=="jupyter":
         app = Dash(name,
                   width=1500,
@@ -192,8 +182,10 @@ def examine_spikes(self, spikeDF,
             roi = int(row.roi)
             roiInd = "roi: %i @ %.1fs"%(roi, row.t0)
             fig = go.Figure()
+            cols2show = ["trace"]
+            if "slower_%g"%row.ts in self.df.columns:
+                cols2show += ["slower_%g"%row.ts]
             for col in cols2show:
-                if col not in self.df.columns: continue
                 dim = self.df[col][roi].shape[0]
                 for kt in [""] + list(self.showTime.keys()):
                     time = self.showTime.get(kt, self.time)
@@ -204,7 +196,16 @@ def examine_spikes(self, spikeDF,
                 t = time[i0:ie]
                 x = self.df[col][roi][i0:ie]
                 mode = "lines+markers" if (ie-i0<50 and col=="trace") else "lines"
-                if "slow" in col: mode="lines"
+                name=col
+                if "slow" in col:
+                    mode="lines"
+                    nr=0
+                else:
+                    nr = int(row.halfwidth*self.Freq/50)
+                    if nr>1:
+                        t = rebin(t, nr)
+                        x = rebin(x, nr)
+                        name += f" (@ %.3gHz)"%(self.Freq/nr)
                 fig.add_trace(go.Scatter(
                     x=t,
                     y=x,
@@ -213,8 +214,7 @@ def examine_spikes(self, spikeDF,
                     line=dict(width=.7 if col=="trace" else 1,
 #                               color=color
                              ),
-                    visible="%g"%row.ts in col or col=="trace",
-                    name=col
+                    name=name
                 ))
                 if col=="trace":
                     dh = (x.max()-x.min())*1.2
