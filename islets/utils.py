@@ -1,36 +1,57 @@
 import os
-
 import matplotlib
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
 
-def plot_events(events, ax, ypos=0, transparency=True,**hillkwargs):
+
+def event_diff(events_0, events_1, hw_toll=.2):
+    indexmap = {}
+    remainder = []
+    for i0, row0 in events_0.iterrows():
+        df = events_1.query(f"roi=={row0.roi}")
+        df = df.query(f"t0>{row0.t0-hw_toll*row0.halfwidth}")
+        df = df.query(f"t0<{row0.t0+hw_toll*row0.halfwidth}")
+        df = df.query(f"tend>{row0.tend-hw_toll*row0.halfwidth}")
+        df = df.query(f"tend<{row0.tend+hw_toll*row0.halfwidth}")
+        if len(df):
+            indexmap[i0] = set(df.index)
+        else:
+            remainder += [i0]
+    return indexmap, remainder
+
+def plot_events(events, ax, transparency=True,min_height=.3,**hillkwargs):
     events = pd.DataFrame(events)
     if "coltrans" not in events.columns:
         from .numeric import hillCurve
         events["coltrans"] = hillCurve(events.halfwidth,**hillkwargs)
 
     if "color" not in events.columns:
-        events["color"] = list(plt.cm.rainbow(events.coltrans))
-
-    for ix,row in events.sort_values("halfwidth", ascending=False).iterrows():
-        ax.fill(
-            row.t0+row.halfwidth*np.array([0,0,1,1,0]),
-            -(-.5+np.array([0,1,1,0,0]))*(row.coltrans+.3)/1.3+ypos,
-            color=row.color,
-            alpha = min(1,1-row.coltrans+.1) if transparency else 1
-        )
+        cmap = plt.cm.turbo
+        events["color"] = list(cmap(events.coltrans))
+    ir=0
+    for roi,evroi in events.groupby("roi"):
+        for ix,row in evroi.sort_values("halfwidth", ascending=False).iterrows():
+            h = (row.coltrans+min_height*(1+min_height))/(1+min_height)
+            h = min(1,h)
+            ax.fill(
+                row.t0+row.halfwidth*np.array([0,0,1,1,0]),
+                -(-.5+np.array([0,1,1,0,0]))*h+ir,
+                color=row.color,
+                alpha = min(1,1-row.coltrans+.1) if transparency else 1
+            )
+        ir+=1
 
 def sequential_filtering(
         regions,
         timescales=None,
         verbose=True,
-        smooth=None,
-        filt_cutoff = 3,
-        z_th = 3,
-        npass = 3,
+        smooth=0,
+        filt_cutoff=3,
+        z_th=3,
+        npass=3,
+        rescale_z=False
         ):
     if timescales is None:
         timescales = 2. ** np.arange(-1, 20, .25)
@@ -39,7 +60,7 @@ def sequential_filtering(
     if verbose:
         print("defined:", "  ".join(["%g" % ts for ts in timescales]))
     regions.timescales = timescales
-    allSpikes = []
+    allEvents = []
     for its in range(len(timescales)):
         ts = timescales[its]
         k = "%g"%ts
@@ -47,20 +68,27 @@ def sequential_filtering(
             print ("#"*30+f"\t {its}:  ts = {ts}s")
         regions.fast_filter_traces(ts,
                                    filt_cutoff=filt_cutoff,
-                                    verbose=verbose,
-                                    npass=npass,
+                                   verbose=verbose,
+                                   npass=npass,
                                   )
         if "correctZ" in regions.df.columns:
             regions.df["zScore_"+k] = [regions.df.loc[ix,"zScore_"+k]/regions.df.loc[ix,"correctZ"] for ix in regions.df.index]
-        regions.calc_spikes(ts,z_th=z_th, smooth=smooth, verbose=verbose)
-        spikeDF = regions.spikes[k]
+        if rescale_z:
+            mad2std = 1.4826
+#             from scipy.stats import median_abs_deviation
+#             regions.df["zScore_"+k] = [z/median_abs_deviation(z,  scale="normal") for z in regions.df["zScore_"+k]]
+#             regions.df["zScore_"+k] = [z/np.median(z[z<=0])/mad2std for z in regions.df["zScore_"+k]]
+            regions.df["zScore_"+k] = [z/np.median(z[z<=0]) for z in regions.df["zScore_"+k]]
+        regions.calc_events(ts,z_th=z_th, smooth=smooth, verbose=verbose)
+        spikeDF = regions.events[k]
         spikeDF["ts"] = ts
         spikeDF["its"] = its
-        for ttmp in allSpikes:
+        for ttmp in allEvents:
             spikeDF.index += len(ttmp.index)
-        allSpikes += [spikeDF]
-    allSpikes = pd.concat(allSpikes)
-    return allSpikes
+        allEvents += [spikeDF]
+    allEvents = pd.concat(allEvents)
+    if verbose: print ("#"*30+"\n"+"#"*10+"   DONE   "+"#"*10+"\n"+"#"*30)
+    return allEvents
 
 def coltrans(x, vmin=None, vmax=None, tilt=1, offset=0.1):
     from .numeric import robust_max
@@ -92,7 +120,8 @@ def distill_events(
         halfwidth_toll=.25,
         minconfidence=4
                    ):
-    from tqdm.notebook import tqdm
+#     from tqdm.notebook import tqdm
+    from tqdm import tqdm
     # tqdm().pandas()
     DF_filt = []
     for roi,dfroi in tqdm(candidateEvents.groupby("roi")):
@@ -100,21 +129,26 @@ def distill_events(
         DF_filt += [df_filt]
     return pd.concat(DF_filt)
 
-def distill_events_per_roi(roiSpikes,
-                          regions,
-                          plot=False,
-                          halfwidth_toll=.25,
-                          freqShow=5,
-                          plotSlows=None,
-                          minconfidence=4,
-                          ):
-    roi = roiSpikes["roi"].unique()
+def distill_events_per_roi(roiEvents,
+                           regions,
+                           #roi=None,
+                           plot=False,
+                           halfwidth_toll=.25,
+                           freqShow=5,
+                           plotSlows=None,
+                           minconfidence=5,
+                           small_timescale=2,
+                           movement_pvalue_threshold=.0,
+                           require_contingency=True,
+                           ):
+    from scipy.stats import ttest_1samp
+    roi = roiEvents["roi"].unique()
     assert len(roi) == 1
     roi = roi[0]
     origtrace = regions.df.loc[roi, "trace"]
     tsslows = {float(col.split("_")[1]): regions.df.loc[roi, col] for col in regions.df.columns if "slower" in col}
-    roiSpikes = pd.DataFrame(roiSpikes)
-    roiSpikes["status"] = "ok"
+    roiEvents = pd.DataFrame(roiEvents)
+    roiEvents["status"] = "ok"
 
     if plot:
         fig, axs = plt.subplots(3, 1, figsize=(13, 14), sharex=True, sharey=True)
@@ -125,33 +159,47 @@ def distill_events_per_roi(roiSpikes,
                 color=row.color,
                 # linewidth=.7,
             )
-        for ix, row in roiSpikes.iterrows():
+        for ix, row in roiEvents.iterrows():
             draw_spike(row, axs[1])
     colorDict = {}
-    for ix, row in roiSpikes.iterrows():
+    for ix, row in roiEvents.iterrows():
         t = regions.showTime.get("%g" % row.ts, regions.time)
         it0 = np.searchsorted(t, row.t0) - 1
         ite = np.searchsorted(t, row.t0 + row.halfwidth) + 1
         spikeLength = ite - it0
         if spikeLength < 3:
             status = "too short"
-            roiSpikes.loc[ix, "status"] = status
-            if status not in colorDict:
-                colorDict[status] = axs[0].plot([], label=status)[0].get_color()
-            row = pd.Series(row)
-            row.color = colorDict[status]
-            if plot: draw_spike(row, axs[0])
-            continue
+            roiEvents.loc[ix, "status"] = status
+            if plot: 
+                if status not in colorDict:
+                    colorDict[status] = axs[0].plot([], label=status)[0].get_color()
+                row = pd.Series(row)
+                row.color = colorDict[status]
+                draw_spike(row, axs[0])
+                continue
+        if row.t0-row.halfwidth/2 < regions.time[0]:
+            status = "too early"
+            roiEvents.loc[ix, "status"] = status
+            if plot: 
+                if status not in colorDict:
+                    colorDict[status] = axs[0].plot([], label=status)[0].get_color()
+                row = pd.Series(row)
+                row.color = colorDict[status]
+                draw_spike(row, axs[0])
+                continue
     g = nx.DiGraph()
-    for isp, spike in roiSpikes.query("status=='ok'").sort_values("halfwidth").iterrows():
-        conflicts = roiSpikes.query(f"t0>{spike.t0 - spike.halfwidth * halfwidth_toll}")
-        conflicts = conflicts.query(f"t0<{spike.t0 + spike.halfwidth * halfwidth_toll}")
+    for isp, spike in roiEvents.query("status=='ok'").sort_values("halfwidth").iterrows():
+        conflicts = roiEvents.query(f"t0>{spike.t0 - spike.halfwidth * halfwidth_toll}")
+        if require_contingency and row.halfwidth>small_timescale:
+            conflicts = conflicts.query(f"its>={spike.its-1}")
+            conflicts = conflicts.query(f"its<={spike.its+1}")
+            
         conflicts = conflicts.query(f"tend>{spike.tend - spike.halfwidth * halfwidth_toll}")
         conflicts = conflicts.query(f"tend<{spike.tend + spike.halfwidth * halfwidth_toll}")
         conflicts = conflicts.query(f"index!={spike.name}")
         if len(conflicts.index)==0:
             status = "unique"
-            roiSpikes.loc[isp, "status"] = status
+            roiEvents.loc[isp, "status"] = status
             if plot:
                 if status not in colorDict:
                     colorDict[status] = axs[0].plot([], label=status)[0].get_color()
@@ -166,7 +214,7 @@ def distill_events_per_roi(roiSpikes,
                          ax=ax,
                          with_labels=False,
                          pos={node: (
-                         roiSpikes.loc[node, "t0"] + .5 * roiSpikes.loc[node, "halfwidth"], roiSpikes.loc[node, "its"])
+                         roiEvents.loc[node, "t0"] + .5 * roiEvents.loc[node, "halfwidth"], roiEvents.loc[node, "its"])
                               for node in g.nodes},
                          node_size=0,
                          edge_color="grey"
@@ -177,10 +225,28 @@ def distill_events_per_roi(roiSpikes,
     ######################################################
     df_filt = []
     for ixs in nx.connected_components(g.to_undirected()):
-        row = pd.Series(roiSpikes.loc[list(ixs)].sort_values("height").iloc[-1])
-        if len(ixs)<minconfidence and row.ts>1:
+        row = pd.Series(roiEvents.loc[list(ixs)].sort_values("height").iloc[-1])
+        for ix in ixs:
+            if ix != row.name:
+                roiEvents.loc[ix,"status"]="merged"
+                roiEvents.loc[ix,"attractor"]=row.name
+        dt = roiEvents.loc[ixs].sort_values("its")[["t0","tend"]].diff(axis=0).dropna().values.flatten()
+        if row.halfwidth>small_timescale:
+            tstat = ttest_1samp(dt,popmean=0)
+            if tstat.pvalue<movement_pvalue_threshold:
+                status = "movement"
+                roiEvents.loc[row.name,"status"] = status
+                if plot:
+                    if status not in colorDict:
+                        colorDict[status] = axs[0].plot([], label=status)[0].get_color()
+                    row = pd.Series(row)
+                    row.color = colorDict[status]
+                    draw_spike(row, axs[0])
+                continue
+            
+        if len(ixs)<minconfidence and row.ts>small_timescale:
             status = "too few calls at large timescale"
-            roiSpikes.loc[row.name, "status"] = status
+            roiEvents.loc[row.name, "status"] = status
             if plot:
                 if status not in colorDict:
                     colorDict[status] = axs[0].plot([], label=status)[0].get_color()
@@ -189,7 +255,7 @@ def distill_events_per_roi(roiSpikes,
                 draw_spike(row, axs[0])
             continue
         for col in ["t0", "tend", "height"]:
-            row.col = roiSpikes.loc[list(ixs), col].mean()
+            row.col = roiEvents.loc[list(ixs), col].mean()
         row.halfwidth = row.tend - row.t0
         df_filt += [row]
     df_filt = pd.DataFrame(df_filt)
@@ -211,49 +277,51 @@ def distill_events_per_roi(roiSpikes,
             x, y = regions.time, origtrace
         for ax in axs:
             # ax.set_facecolor("k")
+            ax.set_ylabel("filtering timescale [s]")
+            ax.set_xlabel("time [s]]")
+            ax.set_ylim(ax.get_ylim()[::-1])
+            if hasattr(regions, "timescales"):
+                timescales = regions.timescales
+                ax.set_yticks(np.arange(len(timescales)))
+                ax.set_yticklabels(["%g"%ts for ts in timescales]);
+            else:
+                ax.set_yticks(roiEvents.its.unique());
+                ax.set_yticklabels(["%g"%ts for ts in roiEvents.ts.unique()]);
+            ax.set_xlim(roiEvents.t0.min() - 1, roiEvents.tend.max() + 1)
             axx = ax.twinx()
             axx.set_ylabel("light intensity")
             axx.plot(x, y, c="grey", lw=.7)
             if plotSlows is not None:
                 for ts in plotSlows:
                     axx.plot(regions.showTime.get("%g" % ts, regions.time), tsslows[ts])
-            ax.set_ylabel("filtering timescale [s]")
-            ax.set_xlabel("time [s]]")
-            ax.set_ylim(ax.get_ylim()[::-1])
         axs[0].set_title("discarded")
         if len(colorDict):
             axs[0].legend()
         axs[1].set_title("all")
         axs[2].set_title("filtered")
-        if hasattr(regions, "timescales"):
-            timescales = regions.timescales
-            ax.set_yticks(np.arange(len(timescales)))
-            ax.set_yticklabels(["%g"%ts for ts in timescales]);
-        else:
-            ax.set_yticks(roiSpikes.its.unique());
-            ax.set_yticklabels(["%g"%ts for ts in roiSpikes.ts.unique()]);
-        ax.set_yticks(roiSpikes.its.unique());
-        ax.set_yticklabels(["%g" % ts for ts in roiSpikes.ts.unique()]);
-        ax.set_xlim(roiSpikes.t0.min() - 1, roiSpikes.tend.max() + 1)
+        
         plt.tight_layout()
-        return df_filt, axs
-    return df_filt, None
+    else:
+        axs = None
+    if "attractor" in roiEvents.columns:
+        roiEvents['attractor']= roiEvents['attractor'].astype(pd.Int64Dtype())
+    return df_filt, None, roiEvents
 
 
-def filter_spikes_per_roi(roiSpikes,
+def filter_events_per_roi(roiEvents,
                           regions,
                           plot=False,
                           halfwidth_toll=.33,
                           freqShow=5,
                           plotSlows=None,
                           ):
-    roi = roiSpikes["roi"].unique()
+    roi = roiEvents["roi"].unique()
     assert len(roi)==1
     roi = roi[0]
     origtrace = regions.df.loc[roi,"trace"]
     tsslows = {float(col.split("_")[1]): regions.df.loc[roi,col] for col in regions.df.columns if "slower" in col}
-    roiSpikes = pd.DataFrame(roiSpikes)
-    roiSpikes["status"] = "ok"
+    roiEvents = pd.DataFrame(roiEvents)
+    roiEvents["status"] = "ok"
     
     if plot:
         fig, axs = plt.subplots(3,1,figsize=(13,14), sharex=True, sharey=True)
@@ -265,17 +333,17 @@ def filter_spikes_per_roi(roiSpikes,
                 color=row.color,
                 #linewidth=.7,
             )
-        for ix, row in roiSpikes.iterrows():
+        for ix, row in roiEvents.iterrows():
             draw_spike(row, axs[1])
     colorDict = {}
-    for ix, row in roiSpikes.iterrows():
+    for ix, row in roiEvents.iterrows():
         t = regions.showTime.get("%g"%row.ts, regions.time)
         it0 = np.searchsorted(t,row.t0)-1
         ite = np.searchsorted(t,row.t0+row.halfwidth)+1
         spikeLength = ite-it0
         if spikeLength<3:
             status = "too short"
-            roiSpikes.loc[ix,"status"] = status
+            roiEvents.loc[ix,"status"] = status
             if status not in colorDict:
                 colorDict[status] = axs[0].plot([],label=status)[0].get_color()
             row = pd.Series(row)
@@ -294,7 +362,7 @@ def filter_spikes_per_roi(roiSpikes,
         if spikeLength>20 and ddslow.mean()>0.1 and ddslow.mean()>-ddorig.mean()*.5:
             print (ddslow.mean(), ddorig.mean())
             status = "spurious"
-            roiSpikes.loc[ix,"status"] = status
+            roiEvents.loc[ix,"status"] = status
             if status not in colorDict:
                 colorDict[status] = axs[0].plot([],label=status)[0].get_color()
             row = pd.Series(row)
@@ -310,7 +378,7 @@ def filter_spikes_per_roi(roiSpikes,
         if amplitude/bkg.mean()<.1:
 #         if amplitude<1.*np.abs(bkg[-1]-bkg[0]):
             status = "too steep"
-            roiSpikes.loc[ix,"status"] = status
+            roiEvents.loc[ix,"status"] = status
             if plot:
                 if status not in colorDict:
                     colorDict[status] = axs[0].plot([],label=status)[0].get_color()
@@ -322,8 +390,8 @@ def filter_spikes_per_roi(roiSpikes,
     if len(colorDict):
         axs[0].legend()
     g = nx.DiGraph()
-    for isp, spike in roiSpikes.query("status=='ok'").sort_values("halfwidth").iterrows():
-        conflicts = roiSpikes.query(  f"t0>{spike.t0   - spike.halfwidth*halfwidth_toll}")
+    for isp, spike in roiEvents.query("status=='ok'").sort_values("halfwidth").iterrows():
+        conflicts = roiEvents.query(  f"t0>{spike.t0   - spike.halfwidth*halfwidth_toll}")
         conflicts = conflicts.query(  f"t0<{spike.t0   + spike.halfwidth*halfwidth_toll}")
         conflicts = conflicts.query(f"tend>{spike.tend - spike.halfwidth*halfwidth_toll}")
         conflicts = conflicts.query(f"tend<{spike.tend + spike.halfwidth*halfwidth_toll}")
@@ -336,7 +404,7 @@ def filter_spikes_per_roi(roiSpikes,
         nx.draw_networkx(g,
                          ax=ax,
                          with_labels=False,
-                         pos={node: (roiSpikes.loc[node, "t0"]+.5*roiSpikes.loc[node, "halfwidth"], roiSpikes.loc[node, "its"]) for node in g.nodes},
+                         pos={node: (roiEvents.loc[node, "t0"]+.5*roiEvents.loc[node, "halfwidth"], roiEvents.loc[node, "its"]) for node in g.nodes},
                          node_size=0,
                          edge_color="grey"
                         )
@@ -346,9 +414,9 @@ def filter_spikes_per_roi(roiSpikes,
     ######################################################
     df_filt = []
     for ixs in nx.connected_components(g.to_undirected()):
-        row = pd.Series(roiSpikes.loc[list(ixs)].sort_values("height").iloc[-1])
+        row = pd.Series(roiEvents.loc[list(ixs)].sort_values("height").iloc[-1])
         for col in ["t0","tend","height"]:
-            row.col = roiSpikes.loc[list(ixs),col].mean()
+            row.col = roiEvents.loc[list(ixs),col].mean()
         row.halfwidth = row.tend-row.t0
         df_filt += [row]
     df_filt = pd.DataFrame(df_filt)
@@ -370,7 +438,7 @@ def filter_spikes_per_roi(roiSpikes,
             x,y = regions.time, origtrace
 #         y = y - np.percentile(y,1)
 #         y = y / np.percentile(y,99)
-#         y = y * roiSpikes.its.max() + roiSpikes.its.max()/3
+#         y = y * roiEvents.its.max() + roiEvents.its.max()/3
         for ax in axs:
             ax.set_facecolor("k")
             axx = ax.twinx()
@@ -390,9 +458,9 @@ def filter_spikes_per_roi(roiSpikes,
             ax.set_yticks(np.arange(len(timescales)))
             ax.set_yticklabels(["%g"%ts for ts in timescales]);
         else:
-            ax.set_yticks(roiSpikes.its.unique());
-            ax.set_yticklabels(["%g"%ts for ts in roiSpikes.ts.unique()]);
-        ax.set_xlim(roiSpikes.t0.min()-1, roiSpikes.tend.max()+1)
+            ax.set_yticks(roiEvents.its.unique());
+            ax.set_yticklabels(["%g"%ts for ts in roiEvents.ts.unique()]);
+        ax.set_xlim(roiEvents.t0.min()-1, roiEvents.tend.max()+1)
         plt.tight_layout()
         df_filt, axs
     return df_filt, None
