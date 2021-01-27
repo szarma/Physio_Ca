@@ -66,6 +66,8 @@ def sequential_filtering(
         k = "%g"%ts
         if verbose:
             print ("#"*30+f"\t {its}:  ts = {ts}s")
+            print ("inferring mean2std parameters...")
+        regions.infer_TwoParFit(ts=ts, verbose=verbose)
         regions.fast_filter_traces(ts,
                                    filt_cutoff=filt_cutoff,
                                    verbose=verbose,

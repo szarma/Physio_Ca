@@ -148,9 +148,7 @@ class Regions:
                     print ("Initiating from another Regions object.")
                 setattr(self, k, movie_.__dict__[k])
             self.update()
-            
-        self.mode = mode
-        if isinstance(movie_, (np.ndarray,)):
+        elif isinstance(movie_, (np.ndarray,)):
             if len(movie_.shape)==2:
                 if verbose:
                     print ("Initiating from an image, with a mode", mode)
@@ -186,7 +184,7 @@ class Regions:
                 raise ValueError("Initializing Regions from a dictionary is only supported for a dictionary of images representing movie statistics, or a pixel crawling dictionary.")
         else:
             raise ValueError("Regions can initialize either from a movie, or an image, or a dictionary. You supplied %s"%str(type(movie_)))
-        
+        self.mode = mode
         if full and not hasattr(self,"df"):
             self.constructRois(mode=mode, img_th=img_th, diag=diag, gSig_filt=gSig_filt, processes=processes, excludePixels=excludePixels, verbose=verbose, use_restricted=use_restricted)
 
@@ -779,8 +777,62 @@ class Regions:
         self.df = self.df.loc[idxsort]
         self.df.index = np.arange(len(self.df))
         self.calcNNmap()
-    
+
     def infer_gain(self, ts=None, plot=False, verbose=False, ret_points=False):
+        if ts is None:
+            minDt = np.diff(self.time).mean()
+            freq = 1 / minDt
+            ts = 30 / freq
+        absSlow, absFast, _ = self.fast_filter_traces(ts, write=False, normalize=False, filt_cutoff=0)
+        di = 30
+        slow_est, fast_vars = [], []
+        for i in range(absFast.shape[0]):
+            for j in range(di, absFast.shape[1] - di, absFast.shape[1] // 30):
+                slow_est += [absSlow[i, j]]
+                fast_vars += [absFast[i, j - di:j + di].var()]
+        fast_vars = np.array(fast_vars)
+        slow_est = np.array(slow_est)
+        logbs = np.log(np.logspace(np.log10(np.percentile(slow_est, 2)), np.log10(np.percentile(slow_est, 98))))
+        d = np.digitize(np.log(slow_est), logbs)
+        x = np.array([slow_est[d == i].mean() for i in np.unique(d)])
+        y = np.array([np.median(fast_vars[d == i]) if (d == i).sum() > 10 else np.nan for i in np.unique(d)])
+        x = x[np.isfinite(y)]
+        y = y[np.isfinite(y)]
+        if ret_points:
+            return x, y
+        gain = np.mean(y / x)
+        slow_est[slow_est <= 0] = np.nan
+        if plot:
+            ax = plt.subplot(111)
+            ax.hexbin(slow_est, fast_vars, bins="log",
+                      xscale="log",
+                      yscale="log",
+                      cmap="Greys",
+                      mincnt=1
+                      )
+            c = ax.plot(x, y, "o", mfc="none")[0].get_color()
+            ax.plot(x, x * gain, c=c)
+
+        if verbose: print("initial estimate of the gain is", gain)
+
+        for _ in range(5):
+            fast_vars[fast_vars > 10 * gain * slow_est] = np.nan
+            if np.isnan(fast_vars).any():
+                y = np.array([np.nanmedian(fast_vars[d == i]) for i in np.unique(d)])
+                y[y <= 0] = y[y > 0].min()
+                gain = np.nanmean(y / x)
+                if verbose: print("revised estimate of the gain", gain)
+                if plot:
+                    c = ax.plot(x, y, "o", mfc="none")[0].get_color()
+                    ax.plot(x, x * gain, c=c)
+        if plot:
+            ax.set_title("gain inference")
+            ax.set_xlabel("window means")
+            ax.set_ylabel("window variances")
+            ax.grid()
+        self.gain = gain
+
+    def infer_TwoParFit(self, ts=None, plot=False, verbose=False, ret_points=False):
         if ts is None:
             minDt = np.diff(self.time).mean()
             freq = 1/minDt
@@ -794,15 +846,17 @@ class Regions:
                 fast_vars += [absFast[i,j-di:j+di].var()]
         fast_vars = np.array(fast_vars)
         slow_est = np.array(slow_est)
-        logbs = np.log(np.logspace(np.log10(np.percentile(slow_est,2)),np.log10(np.percentile(slow_est,98))))
-        d = np.digitize(np.log(slow_est), logbs)
-        x = np.array([slow_est[d==i].mean() for i in np.unique(d)])
-        y = np.array([np.median(fast_vars[d==i]) if (d==i).sum()>10 else np.nan for i in np.unique(d)])
+        binedges = np.geomspace(np.percentile(slow_est,1), np.percentile(slow_est,99))
+        d = np.digitize( slow_est, binedges)
+        irange = range(len(binedges)+1)
+        x = np.array([slow_est[d==i].mean() for i in irange])
+        y = np.array([np.median(fast_vars[d==i]) if (d==i).sum()>10 else np.nan for i in irange])
         x = x[np.isfinite(y)]
         y = y[np.isfinite(y)]
         if ret_points:
             return x,y
-        gain = np.mean(y/x)
+        n = np.mean(y/x)
+        k = 1
         slow_est[slow_est<=0] = np.nan
         if plot:
             ax = plt.subplot(111)
@@ -813,27 +867,38 @@ class Regions:
                       mincnt=1
                      )
             c = ax.plot(x,y,"o",mfc="none")[0].get_color()
-            ax.plot(x,x*gain,c=c)
-            
-        if verbose: print ("initial estimate of the gain is", gain)
-        
-        for _ in range(5):    
-            fast_vars[fast_vars>10*gain*slow_est] = np.nan
+            ax.plot(x,n*x**k,c=c)
+
+        if verbose: print ("initial estimate of the k,n is", (k,n))
+
+        for _ in range(10):
+            fast_vars[fast_vars>10*n*slow_est**k] = np.nan
             if np.isnan(fast_vars).any():
-                y = np.array([np.nanmedian(fast_vars[d==i]) for i in np.unique(d)])
+                x = np.array([slow_est[d==i].mean() for i in irange])
+                y = np.array([np.nanmedian(fast_vars[d==i]) if (d==i).sum()>10 else np.nan for i in irange])
                 y[y<=0] = y[y>0].min()
-                gain = np.nanmean(y/x)
-                if verbose: print ("revised estimate of the gain", gain)
+                x = x[np.isfinite(y)]
+                y = y[np.isfinite(y)]
+                k1, n1 = np.polyfit(np.log(x),np.log(y),1)
+                n1 = np.exp(n1)
+                if np.abs(k1/k-1)<1e-5 and np.abs(n1/n-1)<1e-5:
+                    if verbose: print ("converged")
+                    break
+                else:
+                    k,n = k1,n1
+                if verbose:
+                    print ("revised estimate of k,n", (k,n))
                 if plot:
-                    c = ax.plot(x,y,"o",mfc="none")[0].get_color()
-                    ax.plot(x,x*gain,c=c)
+                    # c = ax.plot(x,y,"o",mfc="none")[0].get_color()
+                    c = ax.plot([],"o",mfc="none")[0].get_color()
+                    ax.plot(x,n*x**k,c=c)
         if plot:
             ax.set_title("gain inference")
             ax.set_xlabel("window means")
             ax.set_ylabel("window variances")
             ax.grid()
-            
-        self.gain = gain
+
+        self.TwoParFit = k,n
     
     def slow_filter_traces(self,ironScale, n_processes=10, percentile = [10.], calcStd=False,
                            avg=True, verbose=False, write=True, indices=None, autorebin=True):
@@ -967,8 +1032,7 @@ class Regions:
         absmean = np.maximum(absmean, reg)
         if hasattr(self, "TwoParFit"):
             k,n = self.TwoParFit
-            logvar = np.log(absmean)*k+n
-            var = np.exp(logvar)
+            var = n*absmean**k
         elif hasattr(self, "gain"):
             var = absmean*self.gain
         else:
