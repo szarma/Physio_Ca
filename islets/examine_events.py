@@ -10,7 +10,7 @@ from .fitting import generic_function
 
 MYCOLORS = plc.qualitative.Plotly
 
-def examine_spikes(self, spikeDF, x, y,
+def examine_events(self, spikeDF, x, y,
     debug=False,
     mode="jupyter",
     name=None,

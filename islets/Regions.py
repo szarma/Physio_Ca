@@ -1,3 +1,4 @@
+import warnings
 import json
 import os
 import pickle
@@ -146,7 +147,7 @@ class Regions:
                 if verbose:
                     print ("Initiating from another Regions object.")
                 setattr(self, k, movie_.__dict__[k])
-            return None
+            self.update()
             
         self.mode = mode
         if isinstance(movie_, (np.ndarray,)):
@@ -758,9 +759,11 @@ class Regions:
             self.df["trend"]     = self.df["slower_%g"%timescale]
             del self.df["faster_%g"%timescale], self.df["slower_%g"%timescale]
         elif method=="debleach":
-            from .numeric import fit_bleaching
-            self.df["trend"] = multi_map(fit_bleaching, self.df.trace, processes=5)
-            self.df["detrended"] = [self.df.trace[i] - self.df.trend[i] for i in self.df.index]
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                from .numeric import fit_bleaching
+                self.df["trend"] = multi_map(fit_bleaching, self.df.trace, processes=5)
+                self.df["detrended"] = [self.df.trace[i] - self.df.trend[i] for i in self.df.index]
         else:
             raise NotImplementedError()
 
@@ -777,11 +780,11 @@ class Regions:
         self.df.index = np.arange(len(self.df))
         self.calcNNmap()
     
-    def infer_gain(self, plot=False, verbose=False, ret_points=False):
-        minDt = np.diff(self.time).mean()
-        freq = 1/minDt
-#         ts = min(50/freq,10)
-        ts = 30/freq
+    def infer_gain(self, ts=None, plot=False, verbose=False, ret_points=False):
+        if ts is None:
+            minDt = np.diff(self.time).mean()
+            freq = 1/minDt
+            ts = 30/freq
         absSlow, absFast, _ = self.fast_filter_traces(ts,write=False, normalize=False,filt_cutoff=0)
         di = 30
         slow_est, fast_vars = [],[]
@@ -1162,13 +1165,13 @@ class Regions:
             self.raster = {}
         self.raster[k] = zScores>z_th
         
-    def spikes2raster(self, ts, npoints = 1000, onlyRaster=True, z_th = 3):
+    def events2raster(self, ts, npoints = 1000, onlyRaster=True, z_th = 3):
         k = "%g"%ts
         try:
-            self.spikes[k]
+            self.events[k]
         except:
-            self.calc_spikes(ts, z_th = z_th)
-        df = self.spikes[k]
+            self.calc_events(ts, z_th = z_th)
+        df = self.events[k]
         C = self.df
         rr = np.zeros((len(C),npoints))
         tt = pd.Series(np.linspace(0,self.time.max(),npoints))
@@ -1194,7 +1197,7 @@ class Regions:
             # fig.update_xaxes(showticklabels=False)
         return rr, fig
         
-    def calc_spikes(self, ts, z_th=3, Npoints=None, smooth=None, verbose=False, save=True, t=None, zScores=None):
+    def calc_events(self, ts, z_th=3, Npoints=None, smooth=None, verbose=False, save=True, t=None, zScores=None, min_rel_hw=0.05):
         from .numeric import runningAverage
         from scipy.signal import find_peaks, peak_widths
         if zScores is None:
@@ -1216,10 +1219,10 @@ class Regions:
             if verbose:
                 print ("smoothing with kernel", smooth)
             zScores = runningAverage(zScores.T,smooth).T
-        spikes = []
+        events = []
         for i,z in zip(self.df.index,zScores):
             pp = find_peaks(z,
-                            width=(ts/dt/8,ts/dt),
+                            width=(ts/dt*min_rel_hw,ts/dt),
                             height=z_th
                               )
             w,h,x0,xe = peak_widths(z, pp[0], rel_height=.5)
@@ -1228,37 +1231,37 @@ class Regions:
             xe = xe*dt + t[0]
             df = pd.DataFrame({"height":z[pp[0]],"halfwidth":w, "t0":x0, "peakpoint":pp[0]*dt+t[0]})
             df["roi"] = i
-            spikes += [df]
-        spikes = pd.concat(spikes,ignore_index=True)
+            events += [df]
+        events = pd.concat(events,ignore_index=True)
         if save:
             k = "%g"%(ts)
             try:
-                self.spikes
+                self.events
             except:
-                self.spikes = {}
-            self.spikes[k] = spikes
+                self.events = {}
+            self.events[k] = events
         else:
-            return spikes
+            return events
         
-    def show_scatter_spikes(self,ts,timeWindows=None,log_x=False):
+    def show_scatter_events(self,ts,timeWindows=None,log_x=False):
         from plotly_express import scatter
-        spikes = self.spikes[str(ts)].copy()
+        events = self.events[str(ts)].copy()
         if timeWindows is None:
             timeWindows = [[0,np.inf]]
-        spikes["timeWindow"] = [""]*len(spikes)
+        events["timeWindow"] = [""]*len(events)
         for i,tw in enumerate(timeWindows):
 #                 print (tw)
             if tw[1]<=tw[0]:continue
-            iis = np.where(spikes["t0"].between(*tw) & (spikes["t0"]+spikes[spikes.columns[1]]).between(*tw))[0]
+            iis = np.where(events["t0"].between(*tw) & (events["t0"]+events[events.columns[1]]).between(*tw))[0]
             for j in iis:
-                if spikes.loc[j,"timeWindow"]=="":
-                    spikes.loc[j,"timeWindow"] = str(i)
+                if events.loc[j,"timeWindow"]=="":
+                    events.loc[j,"timeWindow"] = str(i)
                 else:
-                    j1 = len(spikes)
-                    spikes.loc[j1] = spikes.loc[j]
-                    spikes.loc[j1,"timeWindow"] = str(i)
-#             spikes["timeWindow"][ff] = str(i+1)
-        df = spikes.query("timeWindow!=''")
+                    j1 = len(events)
+                    events.loc[j1] = events.loc[j]
+                    events.loc[j1,"timeWindow"] = str(i)
+#             events["timeWindow"][ff] = str(i+1)
+        df = events.query("timeWindow!=''")
         from plotly.colors import DEFAULT_PLOTLY_COLORS
         fig = scatter(df,
                       x=df.columns[1],
@@ -1349,9 +1352,9 @@ class Regions:
     def examine3(self, max_rois=10, imagemode=None, debug=False, startShow='',mode="jupyter",name=None,lw=None):
         return "examine3 is deprecated. Please, use examine."
 
-    def examine_spikes(self, df, debug=False, log_x=False, **otherkwargs):
-        from .examine_spikesdf import examine_spikes
-        return examine_spikes(self, df, log_x=log_x, debug=debug, **otherkwargs)
+    def examine_events(self, df, x, y, debug=False, **otherkwargs):
+        from .examine_events import examine_events
+        return examine_events(self, df, x, y, debug=debug, **otherkwargs)
     
     def plotTraces(regions, indices, axratios = [1,2], figsize=5, freqShow=2, col="detrended",Offset=5,separate=False):
         if col not in regions.df.columns:
