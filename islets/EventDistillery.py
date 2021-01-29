@@ -91,6 +91,7 @@ def distill_events_per_roi(roiEvents,
                            plot=False,
                            halfwidth_toll=.2,
                            freqShow=5,
+                           take_best=False,
                            plotSlows=None,
                            minconfidence=4,
                            small_halfwidth=2,
@@ -104,11 +105,17 @@ def distill_events_per_roi(roiEvents,
     if len(roi)==0:
         return pd.DataFrame()
     roi = roi[0]
+    if "tend" not in roiEvents.columns:
+        roiEvents["tend"] = roiEvents["t0"] + roiEvents["halfwidth"]
     origtrace = regions.df.loc[roi, "trace"]
     tsslows = {float(col.split("_")[1]): regions.df.loc[roi, col] for col in regions.df.columns if "slower" in col}
     roiEvents = pd.DataFrame(roiEvents)
     roiEvents["status"] = "ok"
-
+    if minconfidence==1:
+        take_best=True
+    if take_best:
+        require_contingency = False
+        small_halfwidth = np.inf
     if plot:
         fig, axs = plt.subplots(3, 1, figsize=figsize, sharex=True, sharey=True)
         def draw_spike(row, ax):
@@ -127,7 +134,7 @@ def distill_events_per_roi(roiEvents,
         it0 = np.searchsorted(t, row.t0) - 1
         ite = np.searchsorted(t, row.t0 + row.halfwidth) + 1
         spikeLength = ite - it0
-        if spikeLength < 3:
+        if spikeLength < 3 and not take_best:
             status = "too short"
             roiEvents.loc[ix, "status"] = status
             if plot:
@@ -137,7 +144,7 @@ def distill_events_per_roi(roiEvents,
                 row.color = colorDict[status]
                 draw_spike(row, axs[0])
                 continue
-        if row.t0-row.halfwidth/2 < regions.time[0]:
+        if row.t0-row.halfwidth/2 < regions.time[0] and not take_best:
             status = "too early"
             roiEvents.loc[ix, "status"] = status
             if plot:
@@ -159,7 +166,7 @@ def distill_events_per_roi(roiEvents,
         conflicts = conflicts.query(f"tend>{spike.tend - toll}")
         conflicts = conflicts.query(f"tend<{spike.tend + toll}")
         conflicts = conflicts.query(f"index!={spike.name}")
-        if len(conflicts.index)==0:
+        if len(conflicts.index)==0 and not take_best:
             status = "unique"
             roiEvents.loc[isp, "status"] = status
             if plot:
@@ -273,17 +280,35 @@ def distill_events_per_roi(roiEvents,
     return df_filt, None, roiEvents
 
 
-def plot_events(events, ax, transparency=True,min_height=.3,**hillkwargs):
-    events = pd.DataFrame(events)
+def plot_events(events,
+                ax=None,
+                min_height=.3,
+                allrois=None,
+                cmap="turbo",
+                modify=False,
+                **hillkwargs):
+    if not modify:
+        events = events.copy()
+    if "tend" not in events.columns:
+        events["tend"] = events["t0"]+events['halfwidth']
     if "coltrans" not in events.columns:
         from .numeric import hillCurve
         events["coltrans"] = hillCurve(events.halfwidth,**hillkwargs)
-
+    if ax is None:
+        h = .15 * len(events.roi.unique())+1
+        fig = plt.figure(figsize=(15,h))
+        ax = fig.add_axes([0,1/h,1,1-1/h])
+        ax.set_facecolor("k")
+        ax.set_yticks([])
+        ax.set_xlabel("time [s]")
+        for sp in ["left","right","top"]: ax.spines[sp].set_visible(False)
     if "color" not in events.columns:
-        cmap = plt.cm.turbo
-        events["color"] = list(cmap(events.coltrans))
+        events["color"] = list(plt.cm.get_cmap(cmap)(events.coltrans))
+    if allrois is None:
+        allrois = events.roi.unique()
     ir=0
-    for roi,evroi in events.groupby("roi"):
+    for roi in allrois:
+        evroi = events.query(f"roi=={roi}")
         for ix,row in evroi.sort_values("halfwidth", ascending=False).iterrows():
             h = (row.coltrans+min_height*(1+min_height))/(1+min_height)
             h = min(1,h)
@@ -291,6 +316,7 @@ def plot_events(events, ax, transparency=True,min_height=.3,**hillkwargs):
                 row.t0+row.halfwidth*np.array([0,0,1,1,0]),
                 -(-.5+np.array([0,1,1,0,0]))*h+ir,
                 color=row.color,
-                alpha = min(1,1-row.coltrans+.1) if transparency else 1
+                alpha = row.alpha if "alpha" in row.index else 1
             )
         ir+=1
+    return ax
