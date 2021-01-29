@@ -5,7 +5,7 @@ with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=FutureWarning, )
     from caiman import movie as cmovie
     from caiman import load as cload
-
+from . import EventDistillery
 from .examine import examine
 from .CrossfilterApp import crossfilterApp
 from .LineScan import LineScan
