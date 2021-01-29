@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numba import jit, prange
 from scipy.optimize import curve_fit  # ,minimize,basinhopping
-
+mad2std = 1.4826 # https://en.wikipedia.org/wiki/Median_absolute_deviation#Relation_to_standard_deviation
 
 def hillCurve(x, h=1, xc=3):
     return (x/xc)**h/(1+(x/xc)**h)
