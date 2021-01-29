@@ -819,7 +819,10 @@ class Regions:
         for _ in range(5):
             fast_vars[fast_vars > 5 * gain * slow_est] = np.nan
             if np.isnan(fast_vars).any():
-                y = np.array([np.nanmedian(fast_vars[d == i]) for i in np.unique(d)])
+                x = np.array([slow_est[d == i].mean() for i in np.unique(d)])
+                y = np.array([np.nanmedian(fast_vars[d == i]) if (d == i).sum() > 10 else np.nan for i in np.unique(d)])
+                x = x[np.isfinite(y)]
+                y = y[np.isfinite(y)]
                 y[y <= 0] = y[y > 0].min()
                 gain = np.nanmean(y / x)
                 if verbose: print("revised estimate of the gain", gain)
@@ -1299,6 +1302,7 @@ class Regions:
             df["roi"] = i
             events += [df]
         events = pd.concat(events,ignore_index=True)
+        events["ts"] = ts
         if save:
             k = "%g"%(ts)
             try:
@@ -1565,7 +1569,7 @@ class Regions:
                     plt.plot(x,y,color="grey",)
                 plt.text(df.t_begin.min(),y[:-1].mean(),comp+" ",va="center", ha="right")
                 offset -= 1.3*dy/20
-        return axs
+        return axs if axs[0] is not None else axs[1]
     
 def getGraph_of_ROIs_to_Merge(df,rreg, plot=False, ax=None,lw=.5,arrow_width=.5):
     C = rreg.df

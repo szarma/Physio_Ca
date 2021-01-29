@@ -51,10 +51,11 @@ def sequential_filtering(
                                    verbose=verbose,
                                    npass=npass
                                   )
+        from .numeric import mad2std
         if "correctZ" in regions.df.columns:
             regions.df["zScore_"+k] = [regions.df.loc[ix,"zScore_"+k]/regions.df.loc[ix,"correctZ"] for ix in regions.df.index]
         if rescale_z:
-            corr = regions.df["zScore_" + k].apply(median_abs_deviation).median()*np.mad2std
+            corr = regions.df["zScore_" + k].apply(median_abs_deviation).median()*mad2std
             if verbose:
                 print("correcting z by", corr)
             regions.df["zScore_" + k] = [z / corr for z in regions.df["zScore_" + k]]
@@ -73,15 +74,13 @@ def sequential_filtering(
 def distill_events(
         candidateEvents,
         regions,
-        halfwidth_toll=.25,
-        minconfidence=4
-                   ):
+        **kwargs):
 #     from tqdm.notebook import tqdm
     from tqdm import tqdm
     # tqdm().pandas()
     DF_filt = []
     for roi,dfroi in tqdm(candidateEvents.groupby("roi")):
-        df_filt = distill_events_per_roi(dfroi, regions, halfwidth_toll=halfwidth_toll, minconfidence=minconfidence)[0]
+        df_filt = distill_events_per_roi(dfroi, regions, **kwargs)[0]
         DF_filt += [df_filt]
     return pd.concat(DF_filt)
 
@@ -165,8 +164,8 @@ def distill_events_per_roi(roiEvents,
 
         conflicts = conflicts.query(f"tend>{spike.tend - toll}")
         conflicts = conflicts.query(f"tend<{spike.tend + toll}")
-        conflicts = conflicts.query(f"index!={spike.name}")
-        if len(conflicts.index)==0 and not take_best:
+        # conflicts = conflicts.query(f"index!={spike.name}")
+        if len(conflicts.index)==1 and not take_best:
             status = "unique"
             roiEvents.loc[isp, "status"] = status
             if plot:
@@ -201,7 +200,7 @@ def distill_events_per_roi(roiEvents,
             if ix != row.name:
                 roiEvents.loc[ix,"status"]="merged"
                 roiEvents.loc[ix,"attractor"]=row.name
-        dt = roiEvents.loc[ixs].sort_values("its")[["t0","tend"]].diff(axis=0).dropna().values.flatten()
+        dt = roiEvents.loc[ixs].sort_values("ts")[["t0","tend"]].diff(axis=0).dropna().values.flatten()
         # TODO: movement detection
         # if row.halfwidth>small_halfwidth and p:
         #     tstat = ttest_1samp(dt,popmean=0)
@@ -230,7 +229,7 @@ def distill_events_per_roi(roiEvents,
             row.col = roiEvents.loc[list(ixs), col].mean()
         row.halfwidth = row.tend - row.t0
         df_filt += [row]
-    df_filt = pd.DataFrame(df_filt)
+    df_filt = pd.DataFrame(df_filt).sort_index()
     for col in ["loghalfwidth", "score", "status"]:
         if col in df_filt.columns:
             del df_filt[col]
