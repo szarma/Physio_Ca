@@ -15,6 +15,7 @@ import networkx as nx
 import numpy as np
 import orjson
 import pandas as pd
+from scipy.stats import median_abs_deviation
 import plotly.graph_objects as go
 from matplotlib.colors import LogNorm
 from plotly_express import colors as plc
@@ -816,7 +817,7 @@ class Regions:
         if verbose: print("initial estimate of the gain is", gain)
 
         for _ in range(5):
-            fast_vars[fast_vars > 10 * gain * slow_est] = np.nan
+            fast_vars[fast_vars > 5 * gain * slow_est] = np.nan
             if np.isnan(fast_vars).any():
                 y = np.array([np.nanmedian(fast_vars[d == i]) for i in np.unique(d)])
                 y[y <= 0] = y[y > 0].min()
@@ -837,6 +838,8 @@ class Regions:
             minDt = np.diff(self.time).mean()
             freq = 1/minDt
             ts = 30/freq
+        if verbose:
+            print(f"inferring mean2std parameters for timescale {ts}...")
         absSlow, absFast, _ = self.fast_filter_traces(ts,write=False, normalize=False,filt_cutoff=0)
         di = 30
         slow_est, fast_vars = [],[]
@@ -872,7 +875,7 @@ class Regions:
         if verbose: print ("initial estimate of the k,n is", (k,n))
 
         for _ in range(10):
-            fast_vars[fast_vars>10*n*slow_est**k] = np.nan
+            fast_vars[fast_vars>3*n*slow_est**k] = np.nan
             if np.isnan(fast_vars).any():
                 x = np.array([slow_est[d==i].mean() for i in irange])
                 y = np.array([np.nanmedian(fast_vars[d==i]) if (d==i).sum()>10 else np.nan for i in irange])
@@ -893,7 +896,7 @@ class Regions:
                     c = ax.plot([],"o",mfc="none")[0].get_color()
                     ax.plot(x,n*x**k,c=c)
         if plot:
-            ax.set_title("gain inference")
+            ax.set_title("2-parameter mean-to-variance inference")
             ax.set_xlabel("window means")
             ax.set_ylabel("window variances")
             ax.grid()
@@ -981,15 +984,12 @@ class Regions:
                        verbose=False,
                        ):
         from .numeric import sosFilter
-        if Npoints is None: Npoints = 100
+        if Npoints is None: Npoints = 30
         minDt = np.diff(self.time).mean()
         freq = 1/minDt
-        try:
-            self.movie
+        if hasattr(self, "movie"):
             if np.abs(freq/self.movie.fr-1)>1e-2:
                 print (f"movie frame rate ({self.movie.fr}) and inferred frame ({freq}) rate are different!")
-        except:
-            pass
         N_dt = ironTimeScale/minDt
         Nrebin = max(1,int(np.round(N_dt/Npoints)))
         if verbose:
@@ -1234,7 +1234,7 @@ class Regions:
         try:
             self.events[k]
         except:
-            self.calc_events(ts, z_th = z_th)
+            self.detect_events(ts, z_th = z_th)
         df = self.events[k]
         C = self.df
         rr = np.zeros((len(C),npoints))
@@ -1261,7 +1261,7 @@ class Regions:
             # fig.update_xaxes(showticklabels=False)
         return rr, fig
         
-    def calc_events(self, ts, z_th=3, Npoints=None, smooth=None, verbose=False, save=True, t=None, zScores=None, min_rel_hw=0.05):
+    def detect_events(self, ts, z_th=3, Npoints=None, smooth=None, verbose=False, save=True, t=None, zScores=None, min_rel_hw=0.1, debug=False):
         from .numeric import runningAverage
         from scipy.signal import find_peaks, peak_widths
         if zScores is None:
@@ -1283,6 +1283,8 @@ class Regions:
             if verbose:
                 print ("smoothing with kernel", smooth)
             zScores = runningAverage(zScores.T,smooth).T
+        if debug:
+            self.df["zScore_%g"%ts] = list(zScores)
         events = []
         for i,z in zip(self.df.index,zScores):
             pp = find_peaks(z,
@@ -1485,7 +1487,85 @@ class Regions:
 
             plt.text(df.t_begin.min(),y[:-1].mean(),comp+" ",va="center", ha="right")
             offset -= 1.3*dy/20
-
+            
+    def plot_trace(regions, indices, axratios = [1,2.5], figsize=5, freqShow=2, cols=["trace"], Offset=10, separate=False):
+        for col in cols:
+            if col not in regions.df.columns:
+                raise ValueError(f"{col} not found in the dataframe.")
+        if hasattr(indices, "__iter__"):
+            Offset *= regions.df.loc[indices, cols[0]].apply(median_abs_deviation).mean()
+            if "color" in regions.df.columns:
+                colors = regions.df.loc[indices, "color"]
+            else:
+                colors = [MYCOLORS[ix % len(MYCOLORS)] for ix in indices]
+            xratios = np.array([.1, axratios[0], .1, axratios[1], .1])
+            yratios = xratios[:3]
+            xr = xratios / sum(xratios)
+            yr = yratios / sum(yratios)
+            fig = plt.figure(figsize=(xratios.sum() * figsize, yratios.sum() * figsize))
+            axs = [
+                fig.add_axes([xr[0], yr[0], xr[1], yr[1]]),
+                fig.add_axes([xr[:3].sum(), yr[0], xr[3], yr[1]]),
+            ]
+            regions.plotEdges(ax=axs[0],lw=.5,separate=separate)
+            regions.plotEdges(ax=axs[0],ix=indices, separate=True, fill=True, alpha=.5, image=False)
+            regions.plotPeaks(ax=axs[0],ix=indices, labels=True)
+            axs[0].set_yticks([])
+            axs[0].set_xticks([])
+        else:
+            Offset = 0
+            indices = [indices]
+            colors = [None]
+            fig, ax = plt.subplots(1,1,figsize=(3*figsize,figsize))
+            axs = [None, ax]
+        for ic,col in enumerate(cols):
+            xs = np.vstack(regions.df.loc[indices,col])
+            # if "trace" in col:
+            #     t = regions.time
+            # else:
+            t = regions.time
+            for k in regions.showTime:
+                if len(t) == xs.shape[1]:
+                    break
+                t = regions.showTime[k]
+            freq = 1/(t[1]-t[0])
+            nr = int(np.round(freq/freqShow))
+            if nr>1:
+                t = rebin(t, nr)
+                xs = rebin(xs,nr,1)
+            offset = 0
+            for x,ix,c in zip(xs, indices, colors):
+                if c is None:
+                    axs[1].plot(t,x+offset,lw=1.2 if "slow" in col else .7, color="C%i"%ic, label=col)
+                else:
+                    axs[1].plot(t,x+offset,lw=.5,color=c)
+                    axs[1].text(0,offset+np.median(x[:len(x)//20+1]),str(ix)+" ",color=c,ha="right")
+                offset += Offset
+        axs[1].set_xlabel("time [s]")
+        if c is None:
+            axs[1].legend()
+        else:
+            axs[1].set_yticks([])
+            for sp in ["left","right","top"]:
+                axs[1].spines[sp].set_visible(False)
+        if hasattr(regions,"protocol"):
+            yl = axs[1].get_ylim()
+            dy = yl[1]-yl[0]
+            offset = yl[0]/2 - dy/20
+            for comp, df in regions.protocol.groupby("compound"):
+                for ii in df.index:
+                    t0,t1 = df.loc[ii].iloc[-2:]
+                    conc = df.loc[ii,"concentration"]
+                    x,y = [t0,t1,t1,t0,t0],[-1,-1,-2,-2,-1]
+                    y = np.array(y)
+                    y = y*dy/20 + offset
+                    plt.fill(x,y,color="grey",alpha =.3)
+                    plt.text(t0,y[:-1].mean(), " "+conc,va="center", ha="left")
+                    plt.plot(x,y,color="grey",)
+                plt.text(df.t_begin.min(),y[:-1].mean(),comp+" ",va="center", ha="right")
+                offset -= 1.3*dy/20
+        return axs
+    
 def getGraph_of_ROIs_to_Merge(df,rreg, plot=False, ax=None,lw=.5,arrow_width=.5):
     C = rreg.df
     Gph = nx.DiGraph()
