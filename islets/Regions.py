@@ -1524,10 +1524,11 @@ class Regions:
             #     t = regions.time
             # else:
             t = regions.time
-            for k in regions.showTime:
-                if len(t) == xs.shape[1]:
-                    break
-                t = regions.showTime[k]
+            if hasattr(regions, "showTime"):
+                for k in regions.showTime:
+                    if len(t) == xs.shape[1]:
+                        break
+                    t = regions.showTime[k]
             freq = 1/(t[1]-t[0])
             nr = int(np.round(freq/freqShow))
             if nr>1:
