@@ -1,0 +1,53 @@
+% Event detection and processing
+% Srdjan Sarikas
+% 29 Jan 2021
+
+# Simple case: events of similar durations
+
+So, we have a trace with events to detect:
+```python, echo=False
+import islets
+regions = islets.load_regions("notebooks/receptors/bull_rois.pkl", baremin=True, calcInterest=False )
+ff = (regions.time>700) & (regions.time<1500)
+regions.df.trace = [x[ff] for x in regions.df.trace]
+regions.time = regions.time[:ff.sum()]
+```
+
+```python
+regions.plot_traces([226]);
+```
+We estimate the events to be a few seconds long. So, filtering at a timescale of say 10s could produce a nice separation between the uninteresting component slower with features slower than 10s and a faster interesting one.
+
+```python
+ts = 10  # timescale
+regions.fast_filter_traces(ts)
+regions.plot_traces([226], cols=["trace","slower_10","faster_10"]);
+```
+
+Filtering also provides a z-score, aka [_standard score_](https://en.wikipedia.org/wiki/Standard_score), of the signal. This measures the significance of a particular event in the units of standard deviation $\sigma$. For example, $z=2$ corresponds to a p-value of 0.025, while for $z=3$, $p_v\sim 0.015$.
+
+```python
+regions.fast_filter_traces(ts)
+regions.plot_traces([226], cols=["zScore_10"]);
+```
+
+To detect the excursion which we see in the plot, we need to choose a threshold value for the z_score. This trace is particularly prominent, so we can choose quite a high value, say $z_{th} = 5$.
+
+```python
+regions.detect_events(ts, z_th=5)
+```
+
+The result of this command is saved within the object itself and is just a [pandas DataFrame](https://pythonbasics.org/pandas-dataframe/):
+
+```python
+regions.events["10"].head()
+```
+The table of course contains events from all the traces, so we need to restrict to the one we are interested in
+
+```python, echo=False
+my_events = regions.events["10"].query("roi==226")
+my_events
+```
+```python, 
+my_events.to_markdown()
+```
