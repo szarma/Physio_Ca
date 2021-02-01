@@ -197,11 +197,12 @@ def distill_events_per_roi(roiEvents,
     ######################################################
     df_filt = []
     for ixs in nx.connected_components(g.to_undirected()):
-        if len(ixs)==1: continue
+        if len(ixs)==1 and not take_best: continue
         row = pd.Series(roiEvents.loc[list(ixs)].sort_values("height").iloc[-1])
-        for col in ["t0","tend","height","color","coltrans"]:
-            if col in row.index:
-                row[col] = np.mean(roiEvents.loc[list(ixs), col],axis=0)
+        if not take_best:
+            for col in ["t0","tend","height","color","coltrans"]:
+                if col in row.index:
+                    row[col] = np.mean(roiEvents.loc[list(ixs), col],axis=0)
         row.halfwidth = row.tend-row.t0
         for ix in ixs:
             if ix != row.name:
