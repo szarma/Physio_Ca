@@ -33,9 +33,10 @@ def sequential_filtering(
         rescale_z=True
         ):
     if timescales is None:
-        timescales = 2. ** np.arange(0, 20, .25)
+        timescales = 2. ** np.arange(-1, 20, .25)
     timescales = np.unique([float("%.3g" % ts) for ts in timescales])
-    timescales = timescales[timescales < regions.time[-1] / 5]
+    timescales = timescales[timescales < regions.time[-1] / 3]
+    timescales = timescales[timescales > 5/regions.Freq]
     if verbose:
         print("defined:", "  ".join(["%g" % ts for ts in timescales]))
     regions.timescales = timescales
@@ -117,6 +118,7 @@ def distill_events_per_roi(roiEvents,
         small_halfwidth = np.inf
     if plot:
         fig, axs = plt.subplots(3, 1, figsize=figsize, sharex=True, sharey=True)
+        from matplotlib.ticker import MultipleLocator
         def draw_spike(row, ax):
             ax.fill(
                 row.t0 + row.halfwidth * np.array([0, 0, 1, 1, 0]),
@@ -143,8 +145,8 @@ def distill_events_per_roi(roiEvents,
                 row.color = colorDict[status]
                 draw_spike(row, axs[0])
                 continue
-        if row.t0-row.halfwidth/2 < regions.time[0] and not take_best:
-            status = "too early"
+        if (row.t0-row.halfwidth/2 < regions.time[0]) or (row.tend+row.halfwidth/2 > regions.time[-1]):
+            status = "too close to begging/end"
             roiEvents.loc[ix, "status"] = status
             if plot:
                 if status not in colorDict:
@@ -195,13 +197,18 @@ def distill_events_per_roi(roiEvents,
     ######################################################
     df_filt = []
     for ixs in nx.connected_components(g.to_undirected()):
+        if len(ixs)==1: continue
         row = pd.Series(roiEvents.loc[list(ixs)].sort_values("height").iloc[-1])
+        for col in ["t0","tend","height","color","coltrans"]:
+            if col in row.index:
+                row[col] = np.mean(roiEvents.loc[list(ixs), col],axis=0)
+        row.halfwidth = row.tend-row.t0
         for ix in ixs:
             if ix != row.name:
                 roiEvents.loc[ix,"status"]="merged"
                 roiEvents.loc[ix,"attractor"]=row.name
-        dt = roiEvents.loc[ixs].sort_values("ts")[["t0","tend"]].diff(axis=0).dropna().values.flatten()
         # TODO: movement detection
+        # dt = roiEvents.loc[ixs].sort_values("ts")[["t0","tend"]].diff(axis=0).dropna().values.flatten()
         # if row.halfwidth>small_halfwidth and p:
         #     tstat = ttest_1samp(dt,popmean=0)
         #     if tstat.pvalue<movement_pvalue_threshold:
@@ -225,12 +232,9 @@ def distill_events_per_roi(roiEvents,
                 row.color = colorDict[status]
                 draw_spike(row, axs[0])
             continue
-        for col in ["t0", "tend", "height"]:
-            row.col = roiEvents.loc[list(ixs), col].mean()
-        row.halfwidth = row.tend - row.t0
         df_filt += [row]
     df_filt = pd.DataFrame(df_filt).sort_index()
-    for col in ["loghalfwidth", "score", "status"]:
+    for col in ["loghalfwidth", "score", "status","attractor"]:
         if col in df_filt.columns:
             del df_filt[col]
     if plot:
@@ -259,8 +263,10 @@ def distill_events_per_roi(roiEvents,
             ax.set_ylabel("filtering timescale [s]")
             if hasattr(regions, "timescales"):
                 timescales = regions.timescales
-                ax.set_yticks(np.arange(len(timescales)))
-                ax.set_yticklabels(["%g"%ts for ts in timescales]);
+                # ax.set_yticks(np.arange(len(timescales)))
+                # ax.set_yticklabels(["%g"%ts if int(np.log2(ts))==np.log2(ts) else "" for ts in timescales]);
+                ax.set_yticks([jt for jt,ts in enumerate(timescales) if int(np.log2(ts))==np.log2(ts)])
+                ax.set_yticklabels(["%g"%ts for ts in timescales if int(np.log2(ts))==np.log2(ts)]);
             else:
                 ax.set_yticks(roiEvents.its.unique());
                 ax.set_yticklabels(["%g"%ts for ts in roiEvents.ts.unique()]);
@@ -268,9 +274,13 @@ def distill_events_per_roi(roiEvents,
             ax.set_ylim(yl)
         axs[2].set_xlabel("time [s]")
         if len(colorDict):
-            axs[0].legend()
+            lg = axs[0].legend(loc=1)
+            fr = lg.get_frame()
+            fr.set_facecolor("w")
+            fr.set_alpha(.7)
         for ax, txt in zip(axs, ["discarded","all","distilled"]):
-            ax.text(.01,.9,txt, transform=ax.transAxes, bbox=dict(facecolor="w",alpha=.5))
+            ax.text(.01,.9,txt, fontsize=14, transform=ax.transAxes, bbox=dict(facecolor="w",alpha=.7,linewidth=0))
+            ax.yaxis.set_minor_locator(MultipleLocator(1))
         plt.subplots_adjust(hspace=0.01)
     else:
         axs = None
