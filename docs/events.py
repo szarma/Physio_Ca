@@ -59,7 +59,7 @@ islets.EventDistillery.plot_events(my_events, ax=ax_trace, cmap="Greys_r")
 
 #' The same function can be used to plot all detected events (my example here has only <%=len(regions.df)%> rois, in general, it has much more)
 #+width='1200',results='hidden'
-islets.EventDistillery.plot_events((regions.events["10"]))
+islets.EventDistillery.plot_events(regions.events["10"])
 
 #' You may want to examine the events more closely using the interactive app
 #+evaluate=False
@@ -119,15 +119,24 @@ candidateEvents = islets.EventDistillery.sequential_filtering(regions)
 my_events_big = candidateEvents.query(f"roi=={roi}").copy()
 islets.EventDistillery.plot_events(my_events_big, modify=True)
 #'
-#' And let us see close up what can the distillation now do (run `%matplotlib notebook` first if you wish an interactive plot):
+#' The added columns are `color` and `coltrans` (short for _color transform_).
+#' Namely, I wish the color to be representative of the halfwidth.
+#' For this, I first perform a non-linear transformation of the halfwidth onto a [0,1] interval, and then use that to define color.
+#+results='hidden'
+my_events_big.plot.scatter(x="halfwidth",y="coltrans", c="color")
+#' If you imported `plt`, you may also want to see the above graph in lin-log scale, by running `plt.xscale("log")`.
+#' (If you define `coltrans` and `color` yoursefl, running `plot_events` will use those values, and will not overwrite them.)
+
+#' Let us see close up what can the distillation now do (run `%matplotlib notebook` first if you wish an interactive plot):
 #+width='1200'
 my_events_big_distilled = islets.EventDistillery.distill_events_per_roi(
     my_events_big,
     regions,
     plot=True,
 )
-#' It uncovers events at all scales simultaneusly. #' The top plot shows discarded events in categorical color, depending on the reason they were discarded.
-# The middle plot shows all events, and the bottom plot the distilled ones, plotted at the height of the timescale they were discovered at.
+#' It uncovers events at all scales simultaneusly.
+#' The top plot shows discarded events in categorical color, depending on the reason they were discarded.
+#' The middle plot shows all events, and the bottom plot the distilled ones, plotted at the height of the timescale they were discovered at.
 #' First, if there are events happening too close the boundaries of the time frame (within half the duration), they are discarded.
 #' The events are then connected according the procedure explained above.
 #' If the duration is shorter than 2s, all unconnected events are discarded; above that threshold there needs to be at least 4 connected events, for it not to be discarded.
@@ -143,7 +152,7 @@ Events = islets.EventDistillery.distill_events(candidateEvents, regions)
 
 #' Finally, you may want to plot events
 #+results='hidden',width='1200'
-islets.EventDistillery.plot_events(Events, modify=True)
+islets.EventDistillery.plot_events(Events)
 #' and save
 #+evaluate=False
 # as csv
