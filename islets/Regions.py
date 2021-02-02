@@ -49,7 +49,9 @@ def load_regions(path,
             pass
         if not baremin:
             regions.detrend_traces()
-            regions.infer_gain(plot=plot)
+            regions.infer_TwoParFit(plot=plot)
+            if hasattr(regions,"gain"):
+                del regions.gain
         regions.merge_closest(mergeSizeTh=mergeSizeTh, mergeDist=mergeDist, plot=plot, Niter=15, verbose=verbose)
         if calcInterest:
             regions.calc_interest()
