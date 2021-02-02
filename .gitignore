@@ -16,3 +16,4 @@ build
 /notebooks/receptors/scan/
 /docs/tmp*
 /docs/*ipynb
+/docs/figures/tmp*
