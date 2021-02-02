@@ -5,6 +5,15 @@ from matplotlib import pyplot as plt
 from scipy.stats import median_abs_deviation
 
 
+def define_legs(events, legs):
+    if "tend" not in events.columns:
+        events["tend"] = events['t0']+events["halfwidth"]
+    for leg in legs:
+        t0,tend = legs[leg]
+        indices = events.query(f"t0>{t0} and tend<{tend}").index
+        events.loc[indices,"leg"] = leg
+    events['leg'] = events['leg'].astype("category")
+
 def event_diff(events_0, events_1, hw_toll=.2):
     indexmap = {}
     remainder = []
