@@ -13,3 +13,6 @@ data/*
 *.egg-info
 dist
 build
+/notebooks/receptors/scan/
+/docs/tmp*
+/docs/*ipynb
