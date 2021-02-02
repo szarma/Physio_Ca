@@ -160,3 +160,43 @@ def filter_events_per_roi(roiEvents,
         plt.tight_layout()
         df_filt, axs
     return df_filt, None
+
+
+def showEventEdges(ks, evIndices, dims, resc=0):
+    imm = putRois(ks,evIndices,dims)
+    return getEdges(imm)
+
+def getEdges(image,rescale=0):
+    from scipy.ndimage import binary_fill_holes
+    from skimage.feature import canny
+    from skimage.morphology import remove_small_objects
+    edges = canny(image)
+    fill_coins = binary_fill_holes(edges)
+    roiEdges = ndi.label(remove_small_objects(fill_coins, 21))[0]
+    return mark_boundaries(image*rescale, roiEdges)
+
+
+def getEvents(tfMatrix_,DistMatrix_):
+    import networkx as nx
+    G = nx.from_scipy_sparse_matrix(getEvents_(tfMatrix_,DistMatrix_))
+    events = [cmp for cmp in nx.connected_components(G)
+              if len(cmp)>1 or allGraph[tuple(cmp)*2]]
+    return events
+
+@jit
+def runningMode(x_, filterSize, boundary="reflective"):
+    if filterSize%2==0:
+        raise ValueError("filter size needs to be odd number")
+    delta = filterSize//2
+    out = np.zeros_like(x_)
+    allowedBoundaries = ["reflective","equal"]
+    if boundary not in allowedBoundaries:
+        raise ValueError(f"boundary {boundary} not recognized. Allowed values are: "+repr(allowedBoundaries))
+    if boundary=="reflective":
+        x_ = np.concatenate((x_[:delta][::-1], x_, x_[-delta:][::-1]))
+    if boundary=="equal":
+        x_ = np.concatenate(([x_[0]]*delta, x_, [x_[-1]]*delta))
+    for i in range(len(out)):
+        c,v = np.histogram(x_[i:i+filterSize], nbins)
+        out[i] = v[np.argmax(c)]
+    return out
