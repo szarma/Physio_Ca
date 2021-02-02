@@ -135,7 +135,7 @@ class Regions:
                  gSig_filt=None,
                  mode="highperc+mean",
                  full=True,
-                 img_th=0.01,
+                 img_th=0.1,
                  FrameRange=None,
                  processes=7,
                  excludePixels=None,
@@ -610,6 +610,7 @@ class Regions:
                 points = self.df.loc[i,"boundary"]+self.df.loc[i,"boundary"][:3]
                 if spline:
                     points = bspline(points, n=30)
+                points = [(p-points.mean(0))*.9+points.mean(0) for p in points]
                 y,x = np.array(points).T
                 ax.plot(x,y,"-",lw=lw,c=c,alpha=alpha)
                 if fill:
@@ -626,8 +627,8 @@ class Regions:
             y,x = np.array(tmp).T
             ax.plot(x,y,color,lw=lw,alpha=alpha)
         dim = self.image.shape
-        ax.set_xlim(dim[1]-.5,-.5)
-        ax.set_ylim(dim[0]-.5,-.5)
+        ax.set_xlim(-.5,dim[1]-.5)
+        ax.set_ylim(-.5,dim[0]-.5)
             
         if scaleFontSize<=0: return None
         if hasattr(self, "metadata") and "pxSize" in self.metadata:
