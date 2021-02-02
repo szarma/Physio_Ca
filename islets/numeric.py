@@ -9,29 +9,20 @@ mad2std = 1.4826 # https://en.wikipedia.org/wiki/Median_absolute_deviation#Relat
 def hillCurve(x, h=2, xc=4):
     return (x/xc)**h/(1+(x/xc)**h)
 
-def bspline(cv, n=100, degree=3):
-    """ Calculate n samples on a bspline
-
-        cv :      Array ov control vertices
-        n  :      Number of samples to return
-        degree:   Curve degree
-        taken from https://stackoverflow.com/a/39262872/2043500
+def bspline(cv, n=100, smoothness=3):
+    """ Calculate n samples on a period spline
+        cv :        Array ov control vertices
+        n  :        Number of samples to return
+        smoothness: Degree of smoothness
+        taken from https://stackoverflow.com/a/33962986/2043500
     """
-    from scipy.interpolate import splev
+    from scipy.interpolate import splev, splprep
     cv = np.asarray(cv)
-    count = cv.shape[0]
-
-    # Prevent degree from exceeding count-1, otherwise splev will crash
-    degree = np.clip(degree,1,count-1)
-
-    # Calculate knot vector
-    kv = np.array([0]*degree + list(range(count-degree+1)) + [count-degree]*degree,dtype='int')
-
+    tck = splprep(cv.T, s=smoothness, per=True, quiet=3)[0]
     # Calculate query range
-    u = np.linspace(0,(count-degree),n)
-
+    u = np.linspace(0,1,n)
     # Calculate result
-    return np.array(splev(u, (kv,cv.T,degree))).T
+    return np.array(splev(u, tck)).T
 
 
 def fast_filter(absdata,
@@ -110,8 +101,7 @@ def robust_max(a,Nlast=10,absolute=True):
         return np.nanmax(a)
     else:
         return np.nanpercentile(a,100*(1-Nlast/a.size))
-    
-    
+
 def rebin(a,n,axis=0, dtype="float32", func=np.mean):
     if type(axis)==int and type(n)==int:
         ashape = a.shape
@@ -128,8 +118,6 @@ def rebin(a,n,axis=0, dtype="float32", func=np.mean):
         for i in range(1, len(n)):
             out = rebin(out,n[i],axis[i],func=func,dtype=dtype)
         return out
-
-
 
 class sosFilter:
     def __init__(self, cutoff, frequency, order=5, btype="low"):
@@ -150,8 +138,6 @@ class sosFilter:
         from scipy.signal import sosfreqz
         w, h = sosfreqz(self.sos_pars, worN=worN)
         return 0.5*self.frequency*w/np.pi, np.abs(h)
-        
-    
 
 def power_spectrum(x, fr, mean=True):
     from scipy.fft import rfft, rfftfreq
@@ -162,7 +148,6 @@ def power_spectrum(x, fr, mean=True):
         if ndim>1:
             FA = FA.mean(axis=tuple(range(ndim-1)))
     return freq, np.abs(FA)
-
 
 def get_sep_th(x_,ax=None,plot=False,thMax=None,log=False):
     from scipy.stats import gaussian_kde
@@ -207,19 +192,9 @@ def get_sep_th(x_,ax=None,plot=False,thMax=None,log=False):
         return 10**(th)
     return th
 
-
 def decay(time,top,bottom,rate):
 #     top,bottom,rate = p
     return bottom+(top-bottom)*np.exp(-time*rate)
-
-# def guessDecayPars(y):
-#     b0 = np.nanpercentile(y,1)
-#     with np.errstate(divide='ignore', invalid="ignore"):
-#         y  = np.log(y-b0)
-#     r0 = .1/len(y)
-#     t0 = np.nanpercentile(y[:len(y)//10+1],99)
-#     p0 = (np.exp(t0)+b0,b0,r0)
-#     return p0
 
 def guessDecayPars(y):
     r0 = 1e-6
@@ -319,23 +294,6 @@ def percFilter(x_,perc,filterSize):
     x_ = np.concatenate((x_[:delta][::-1], x_, x_[-delta:][::-1]))
     for i in prange(len(out)):
         out[i] = np.nanpercentile(x_[i:i+filterSize],perc,axis=0)
-    return out
-@jit 
-def runningMode(x_, filterSize, boundary="reflective"):
-    if filterSize%2==0:
-        raise ValueError("filter size needs to be odd number")
-    delta = filterSize//2
-    out = np.zeros_like(x_)
-    allowedBoundaries = ["reflective","equal"]
-    if boundary not in allowedBoundaries:
-        raise ValueError(f"boundary {boundary} not recognized. Allowed values are: "+repr(allowedBoundaries))
-    if boundary=="reflective":
-        x_ = np.concatenate((x_[:delta][::-1], x_, x_[-delta:][::-1]))
-    if boundary=="equal":
-        x_ = np.concatenate(([x_[0]]*delta, x_, [x_[-1]]*delta))
-    for i in range(len(out)):
-        c,v = np.histogram(x_[i:i+filterSize], nbins)
-        out[i] = v[np.argmax(c)]
     return out
 
 # @jit 
@@ -471,14 +429,6 @@ def getEvents(tfMatrix_,DistMatrix_=None, offset=(0,0,0)):
               
     return events
 
-# def getEvents(tfMatrix_,DistMatrix_):
-#     import networkx as nx
-#     G = nx.from_scipy_sparse_matrix(getEvents_(tfMatrix_,DistMatrix_))
-#     events = [cmp for cmp in nx.connected_components(G) 
-#               if len(cmp)>1 or allGraph[tuple(cmp)*2]]
-#     return events
-
-
 def blurInTime(original_, k, s=-1):
     from caiman import movie
     from cv2 import GaussianBlur
@@ -547,18 +497,6 @@ def putRois(ks, evIndices, dims):
         M[x,y] = 1
     return M # Laplacian(M.T.astype(float),CV_64F,)>0
 
-def getEdges(image,rescale=0):
-    from scipy.ndimage import binary_fill_holes
-    from skimage.feature import canny
-    from skimage.morphology import remove_small_objects
-    edges = canny(image)
-    fill_coins = binary_fill_holes(edges)
-    roiEdges = ndi.label(remove_small_objects(fill_coins, 21))[0]
-    return mark_boundaries(image*rescale, roiEdges)
-
-def showEventEdges(ks, evIndices, dims, resc=0):
-    imm = putRois(ks,evIndices,dims)
-    return getEdges(imm)
 
 def clusterCutAndPlot(Xdata,
                       mode = "simple",
