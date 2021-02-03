@@ -610,7 +610,7 @@ class Regions:
                     c = MYCOLORS[i%len(MYCOLORS)]
                 points = self.df.loc[i,"boundary"]+self.df.loc[i,"boundary"][:3]
                 if spline:
-                    points = bspline(points, n=30)
+                    points = bspline(points)
                 points = [(p-points.mean(0))*.9+points.mean(0) for p in points]
                 y,x = np.array(points).T
                 ax.plot(x,y,"-",lw=lw,c=c,alpha=alpha)
@@ -620,7 +620,7 @@ class Regions:
             tmp = []
             for el in self.df.loc[ix,"boundary"]:
                 if spline:
-                    el = list(bspline(el, n=30))
+                    el = list(bspline(el))
                 tmp += el
                 tmp += el[:3]
                 tmp += [(np.nan,)*2]
