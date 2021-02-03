@@ -1,6 +1,6 @@
 \documentclass[a4paper,11pt,final]{article}
 \usepackage{fancyvrb, color, graphicx, hyperref, amsmath, url}
-\usepackage{palatino}
+%\usepackage{palatino}
 \usepackage{pygments}
 \usepackage[a4paper,text={16.5cm,25.2cm},centering]{geometry}
 
@@ -38,10 +38,23 @@ It also requires laborious and long human engagement.
 We have developed a set of interdependent tools to automatize as much as possible the pipeline.
 The crucial elements of our are the following:
 \begin{itemize}
-\item First
-\item Second
+\item (Semi-)automatic detection of regions of interest (ROIs);
+\item Transformation of ROI time traces into standard score ("z-score");
+\item Quantification of the phenotype for each ROI in terms of the distribution of events of different durations.
 \end{itemize}
 
+\begin{figure}[h]
+\centering
+\includegraphics[width=17cm]{figures/pipeline.pdf}
+\label{fig:pipeline}
+\caption{
+An illustration of our processing and analysis pipeline:
+{\it (i)}  From a full movie ($T{\times}x{\times}y$), we calculate the mean (or other statistic) across all frames.
+{\it (ii)} We pass the mean image through a band-pass filter and define ROIs by detecting local peaks.
+{\it (iii)} We save ROIs with all the important information (time traces, ROI coordinates, movie statistics, recording frequency, pixel size, etc.).
+{\it (iv)} Traces contain features at very different time scales---with different timescales presumably important for different cell types. We collect them into separable events for analysis.
+}
+\end{figure}
 
 \section{(Semi-)Automatic Detection of Regions of Interest}
 
