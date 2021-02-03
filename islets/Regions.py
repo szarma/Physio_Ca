@@ -137,7 +137,7 @@ class Regions:
                  gSig_filt=None,
                  mode="highperc+mean",
                  full=True,
-                 img_th=0.1,
+                 img_th=0.01,
                  FrameRange=None,
                  processes=7,
                  excludePixels=None,
@@ -371,7 +371,6 @@ class Regions:
                 tmp += im
             image0 = tmp/len(norm)*np.mean(norm)
             self.statImages[mode] = image0
-#             toMin=image0<img_th
             
         from cv2 import GaussianBlur,dilate
         if gSig_filt is None:
