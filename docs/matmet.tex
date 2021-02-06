@@ -122,7 +122,16 @@ is called standard transformation, with $z$
 
 \begin{figure}[t]
 \centering
-\includegraphics[scale=.4]{figures/z_score.png}
+
+\begin{minipage}{.49\textwidth}
+    \vskip 2mm
+    {\fontfamily{phv}\selectfont A} \includegraphics[scale=.5,trim=10mm 0 0 0,clip,align=t]{figures/z_score_1.png}
+\end{minipage}
+\begin{minipage}{.49\textwidth}
+    \vskip 7mm
+    {\fontfamily{phv}\selectfont B} \includegraphics[scale=.5]{figures/z_score_2.pdf}
+\end{minipage}
+
 \caption{
 \emph{Left}: Simulated traces with Poisson noise (blue) around different means (red) with different temporal features. The shaded area represents one standard deviation interval around mean. 
 \emph{Right}: Irrespective of the shape of the mean, z-score transformation behaves exactly as a Gaussian variable with zero mean and unit standard deviation.
