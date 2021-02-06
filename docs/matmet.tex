@@ -112,8 +112,15 @@ By default, we choose an average of the mean and high percentile as a representa
 \subsubsection{Z-score}
 
 In an ideal detector, recording a time trace of a single pixel in absence of any signal would consist of independent values of the number of photons detected during the dwell time on that pixel.
-The values ($x$) are then distributed according to the Poisson distribution, with standard deviation ($\sigma_1$) being equal to the square root of the mean $\mu_1$, $\sigma_1=\sqrt{\mu_1}$ (fig.\ref{fig:z_score}).
-\begin{figure}
+The values ($x$) are then distributed according to the Poisson distribution, with standard deviation ($\sigma_1$) being equal to the square root of the mean $\mu_1$, $\sigma_1=\sqrt{\mu_1}$.
+
+It is often useful to transform a set of numbers to a new 
+A transformation to a new variable $x\rightarrow z$
+$$z=\frac{x-\mu}{\sigma}$$
+is called standard transformation, with $z$ 
+
+
+\begin{figure}[t]
 \centering
 \includegraphics[scale=.4]{figures/z_score.png}
 \caption{
@@ -122,6 +129,8 @@ The values ($x$) are then distributed according to the Poisson distribution, wit
 \label{fig:z_score}
 }
 \end{figure}
+
+In fig.\ref{fig:z_score}, we illustrate the tr
 
 
 If we were to rebin a trace by a factor of $N$, the relationship between standard deviation and mean remains, but for the summed quantities $\sigma_N=\mu_N=N\mu_1$.
