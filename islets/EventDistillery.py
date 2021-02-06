@@ -211,7 +211,10 @@ def distill_events_per_roi(roiEvents,
         if not take_best:
             for col in ["t0","tend","height","color","coltrans"]:
                 if col in row.index:
-                    row[col] = np.mean(roiEvents.loc[list(ixs), col],axis=0)
+                    row[col] = np.median(np.vstack(roiEvents.loc[list(ixs), col]),axis=0)
+                    if len(row[col])==1:
+                        row[col] = row[col][0]
+                    #row[col] = np.mean(roiEvents.loc[list(ixs), col],axis=0)
         row.halfwidth = row.tend-row.t0
         for ix in ixs:
             if ix != row.name:
