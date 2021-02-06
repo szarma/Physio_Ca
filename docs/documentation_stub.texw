@@ -1,9 +1,8 @@
 \documentclass[a4paper,11pt,]{article}
 \usepackage{fancyvrb, color, graphbox, hyperref, amsmath, url}
-\usepackage{palatino}
-\usepackage{graphicx}
-% \usepackage{pygments}
-% \usepackage{minted}
+%\usepackage{palatino}
+\usepackage{pygments}
+
 \usepackage[a4paper,text={16.5cm,25.2cm},centering]{geometry}
 \usepackage{lipsum}
 \usepackage[labelformat=simple,position=top]{subcaption}
@@ -16,6 +15,8 @@
   citecolor=red,
   urlcolor=green
 }
+\usepackage{minted}
+\newcommand{\py}[1]{{\mintinline{python}{#1}}}
 \newcommand{\Regions}{{\texttt{Regions}}}
 
 %\setlength{\parindent}{0pt}
@@ -36,9 +37,7 @@
 %from islets import load_regions
 %@
 
-\section{General pipeline}
-
-A typical experiment involving imaging of pancreatic slices in our lab concerns a single field of view
+A typical experiment involving imaging of pancreatic slices in our lab concerns a single field of view (FOV)
 showing 10s--100s of cells, in a recording of at least several, often dozens, of gigabytes.
 Current tools (ImageJ, \dots) rely on loading the recording, or its part, into memory, for viewing, analysis, and processing.
 It also requires laborious and long human engagement.
@@ -50,7 +49,7 @@ The crucial elements of our pipeline are the following:
 \item Quantification of the phenotype for each ROI in terms of the distribution of events of different durations.
 \end{itemize}
 
-Our toolset is inspired and relies on CaImAn \cite{giovannucci2019caiman}, a similar package developed for the purposes in neuroscience research.
+Our toolset is inspired and relies on CaImAn \cite{giovannucci2019caiman}, a similar package developed for the purposes in neuroscience reseach.
 
 \begin{figure}[h]
 \centering
@@ -65,15 +64,15 @@ An illustration of our processing and analysis pipeline:
 }
 \end{figure}
 
-\subsection{(Semi-)Automatic Detection of Regions of Interest}
+\section{(Semi-)Automatic Detection of Regions of Interest}
 
 Once imported, a recording is stored as a 3-dimensional ($T{\times}x{\times}y$) numpy array \cite{2020NumPy-Array}.
-When the recording is stable, obtaining a mean image, or any other statistic over frame, is rather trivial. 
+When the recording is stable, obtainaing a mean image, or any other statistic over frame, is rather trivial. 
 In case there is horizontal movement, it can be corrected for by aligning the frames to a template. 
 For this we use the functionality present in CaImAn \cite{giovannucci2019caiman}, except that high frequency recordings need to be rebinned to some moderate frequency (a few Hz), before correcting, in order to reduce the noise level. 
 Once the translation offsets are obtained, we use them to correct the recording in original frequency.
 
-To define regions of interest, we blur the representative image by a kernel of the size we expect cells to be, 
+To define regions of interest, we blurr the representative image by a kernel of the size we expect cells to be, 
 and at the scale double of that.
 The difference between these two images represents a band-pass filter of the original, where the local intensity variation are emphasized (fig.\ref{fig:regions}).
 We then pass through all pixels where the value of the filtered image is positive (or larger than a small positive threshold), and for each pixel we search for a local peak in its vicinity. 
@@ -85,7 +84,7 @@ All the pixels that lead to the same local peak are then grouped into a single R
 \begin{minipage}{.25\textwidth}
     \vskip 2mm
     {\fontfamily{phv}\selectfont A} \includegraphics[scale=.5,align=t,trim=25mm 15mm 130mm 72mm, clip]{figures/regions_ideal_real.pdf}\\
-    {\fontfamily{phv}\selectfont C} \includegraphics[scale=.33,align=t,trim={-5mm -1mm -1mm -10mm}]{figures/regions_stars.pdf}
+    {\fontfamily{phv}\selectfont C} \includegraphics[scale=.33,align=t,trim={-5mm 0 0 -10mm}]{figures/regions_stars.pdf}
 \end{minipage}
 \begin{minipage}{.6\textwidth}
     \vskip 7mm
@@ -94,48 +93,37 @@ All the pixels that lead to the same local peak are then grouped into a single R
 \caption{
 (A) Computationally created template $64{\times}64$ image with uniform spherical cells, and with Poisson noise added.
 (B) Band-pass filtering of the "realistic" image from A, with different kernel sizes. The size of the kernel determines the approximate size of the ROIs obtained.
-In thick red contours we emphasize misidentified ROIs; the dots indicate the real locations of the cells.
+We in red we emphasize misidentified ROIs; the dots indicate the real locations of the cells.
 (C) Each ROI is constructed by explicitly searching for a closest peak in intensity. A pixel can only be part of a single ROI.
 \label{fig:regions}}
 \end{figure}
 
 Representative image can be a mean over all frames or any other statistic.
 In addition our code supports standard deviation, mean and standard deviation of the first derivative of the movie, and a ``robust maximum'' of the movie.
-As "robust maximum`` we define a very high percentile of the set absolute values of a set, essentially a value close to its maximum, by default it is 10th largest. 
-We avoid the maximum as a means to make analysis robust to outliers.
-This statistic is sensitive to cells which fire extremely rarely during a recording, so that the mean of those pixels is negligible.
+As "robust maximum`` we define a very high percentile of the set absolute values of a set, essentially a value close to its maximum, by default it is 10th largest.
+This statistic is sensitive to cells which fire extremely rarily during a recording, so that the mean of those pixels is negligible.
 By default, we choose an average of the mean and high percentile as a representative image for band-pass filtering and ROI extraction.
 
-\subsection{Trace processing}
-
-
-\subsubsection{Z-score}
-
-In an ideal detector, recording a time trace of a single pixel in absence of any signal would consist of independent values of the number of photons detected during the dwell time on that pixel.
-The values ($x$) are then distributed according to the Poisson distribution, with standard deviation ($\sigma_1$) being equal to the square root of the mean $\mu_1$, $\sigma_1=\sqrt{\mu_1}$ (fig.\ref{fig:z_score}).
-\begin{figure}
-\centering
-\includegraphics[scale=.4]{figures/z_score.png}
-\caption{
-\emph{Left}: Simulated traces with Poisson noise (blue) around different means (red) with different temporal features. The shaded area represents one standard deviation interval around mean. 
-\emph{Right}: Irrespective of the shape of the mean, z-score transformation behaves exactly as a Gaussian variable with zero mean and unit standard deviation.
-\label{fig:z_score}
-}
-\end{figure}
-
-
-If we were to rebin a trace by a factor of $N$, the relationship between standard deviation and mean remains, but for the summed quantities $\sigma_N=\mu_N=N\mu_1$.
-Normalization to the same mean as before $\tilde{\mu} = \mu_1$, results in the standard deviation $\sqrt{N}$ times lower $\tilde{\sigma} = \sigma_1/\sqrt{N}$.
-
-Similarly, if we were to sum independent pixels ($a, b, c\dots$), 
-the resulting trace would have a mean which is a simple sum of the means of individual trace, and standard deviation 
-$\sigma_{a+b+\dots} = \sqrt{\mu_a+\mu_b+\dots}$
-
-
-
-
-
-\section{Analyses}
+% \subsection{\Regions~object}
+% 
+% The object \Regions~contains all the information about ROIs and the recording for which they are defined. 
+% For example, say \py{regions} is a \Regions~object, \py{regions.Freq} is the frequency of the recording ROIs were inferred from, and \py{regions.time} is a numpy array of timepoints in steps of \py{regions.Freq}${}^{-1}$.
+% \py{regions.statImages} is a dictionary of different statistics of the recording, \py{regions.mode} indicates which of them is used for filtering with kernel of size \py{regions.filterSize} to obtain the filtered image for ROI extraction (\py{regions.image}).
+% 
+% Information about the individual ROIs is stored in \py{regions.df} as pandas dataframe~\cite{reback2020pandas, mckinney-proc-scipy-2010}.
+% Its most important columns are \py{pixels} and \py{peak} and \py{trace}. 
+% ROIs are identified by the index in the dataframe. 
+% For each row, \py{pixels} contain all the pixels that belong to the local peak, with coordinates \py{peak}. 
+% Column \py{trace} contains arrays of an average light intensity over the appropriate pixels per frame.
+% 
+% The above mentioned \Regions's attributes and \py{Regions.df} columns are essential and are defined and saved when processing.
+% 
+% Other useful columns of the \Regions's dataframe include \py{size} --- number of pixels within ROI; \py{neighbors} --- list of other ROIs that are in immediate contact with the actual; \py{peakValue} --- value of the local peak in the band-filtered image.
+% 
+% Sometimes it is useful to define \py{movie} as a attribute of the \Regions object and make it point to the actual recording.
+% 
+% 
+% Other useful columns of the \Regions's dataframe include \py{size} --- number of pixels within ROI; \py{neighbors} --- list of other ROIs that are in immediate contact with the actual; \py{peakValue} --- value of the local peak in the band-filtered image.
 
 \bibliographystyle{plain}% E-Life prefers apa
 \bibliography{matmet}
