@@ -1056,9 +1056,10 @@ class Regions:
                             usecol="trace",
                             normalize=True,
                             npass=3,
-                            test_plotting_kwargs=None
+                            test_plotting_kwargs=None,
+                            dilate=True,
                             ):
-        
+        from cv2 import dilate as cvdilate
         C = self.df
         fdata = self.prep_filtering(ironTimeScale,
                                     Npoints=Npoints,
@@ -1073,13 +1074,12 @@ class Regions:
         absSlow = Nrebin * np.vstack([ (fdata[  "trend"][i]+dataFilt[i])*C.loc[ix,"size"] for i,ix in enumerate(C.index) ])
         absFast = Nrebin * np.vstack([ (fdata["detrend"][i]-dataFilt[i])*C.loc[ix,"size"] for i,ix in enumerate(C.index) ])
         z = absFast/self.mean2std_funct(absSlow)
+        t = self.time
+        if Nrebin>1:
+            t = rebin(t,Nrebin)
         if test_plotting_kwargs is not None:
             ax = test_plotting_kwargs["ax"]
             iplot = test_plotting_kwargs["i"]
-            if Nrebin>1:
-                t = self.showTime["%g"%ironTimeScale]
-            else:
-                t = self.time
             ax.plot(t, fdata["detrend"][iplot], lw=.5,c="k")
         if filt_cutoff>0:
             detrend = fdata["detrend"].copy()
@@ -1093,6 +1093,19 @@ class Regions:
                 slower = np.array([absSlow[i]/C["size"].iloc[i]/Nrebin - fdata[  "trend"][i] for i in range(len(C))])
                 #detrend[z>filt_cutoff] = slower[z>filt_cutoff]
                 ff = z > filt_cutoff
+                if dilate and ff.any():
+                    dt = t[1]-t[0]
+                    dilts = ironTimeScale/dt*.1
+                    dilateKernelSize = int(dilts)#*.03)
+                    if dilateKernelSize%2==0:
+                        dilateKernelSize+=1
+                    if dilateKernelSize>=3:
+                        if verbose:
+                            print ("dilating by", dilateKernelSize)
+                        ff = cvdilate(ff.astype(np.uint8), np.ones(dilateKernelSize, dtype = np.uint8).reshape(1,-1)).astype("bool")
+                    # else:
+                        # if verbose:
+                        #     print (f"dilation timescale {dilts} is too small")
                 ff[:,[0,1,-2,-1]] = False
                 for i in range(len(detrend)):
                     ffi = ff[i]
