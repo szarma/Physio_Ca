@@ -123,12 +123,14 @@ is called {\it standard transformation}, and the new variable standard score or 
         {\fontfamily{phv}\selectfont A} \includegraphics[scale=.5,trim=15mm 0 0 0,clip,align=t]{figures/z_score_1.png}
     \end{minipage}
     \begin{minipage}{.49\textwidth} 
-        {\fontfamily{phv}\selectfont B} \includegraphics[scale=.5,trim=15mm 0mm 0 0,clip,align=t]{figures/z_score_2.pdf}
+        {\fontfamily{phv}\selectfont B} \includegraphics[scale=.5,trim=15mm 30mm 0 0,clip,align=t]{figures/z_score_2.pdf}
+        {\fontfamily{phv}\selectfont C} \includegraphics[scale=.48,trim=5mm 0mm 0 0,clip,align=t]{figures/z_score_3.pdf}
     \end{minipage}
     \caption{
     (A) \emph{Left}: Simulated traces with Poisson noise (blue) around different means (grey) with different temporal features. The shaded area represents one standard deviation interval around mean. 
     \emph{Right}: Irrespective of the shape of the mean, z-score transformation behaves exactly as a Gaussian variable with zero mean and unit standard deviation.\\
-    (B) The values of s$z$-score depends on the reference. In subfigure (A), the reference curves are known, but in general they need to be inferred, typically by low-pass filtering. The cut-off frequency $f_{cut}$ of a filter determines the timescale of the events that can be detected in $z$-score. If filtered at with too high cut-off (orange), the resulting smooth curve follows too closely the trace and the event is not visible in $z$. With $f_{cut}=1/50$Hz, the resulting $z$-score has obvious outliers ($z\geq 3$), visible both in trace and in the histogram.
+    (B) The values of s$z$-score depends on the reference. In subfigure (A), the reference curves are known, but in general they need to be inferred, typically by low-pass filtering. The cut-off frequency $f_{cut}$ of a filter determines the timescale of the events that can be detected in $z$-score. If filtered at with too high cut-off (orange), the resulting smooth curve follows too closely the trace and the event is not visible in $z$. With $f_{cut}=1/50$Hz, the resulting $z$-score has obvious outliers ($z\geq 3$), visible both in trace and in the histogram.\\
+    (C) Zoom to the indicated regions form B. The original (blue) and the filtered trace and $z$-score (red), and the filtered trace and $z$-score corrected for distortion (black).
     \label{fig:z_score}
     }
 \end{figure}
