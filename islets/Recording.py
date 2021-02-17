@@ -395,7 +395,7 @@ class Recording:
 
 def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
     from .general_functions import td2str
-    from tqdm.notebook import tqdm
+    from tqdm import tqdm
 #     tqdm().pandas()
     recordings = []
     for cur,ds,fs in os.walk(mainFolder):
@@ -449,7 +449,8 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
             if len(trange)>1:
                 fs = "_".join(fssplit[:-1])
             existingSeries += [fs]
-        print (existingSeries)
+        if verbose>1:
+            print (existingSeries)
         sers = np.unique(sers+existingSeries)
         for series in sers:
             subdirs = get_series_dir(pathToRecording, series)
@@ -476,11 +477,11 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
                 saveDir = os.path.join(analysisFolder, ser)
                 for k,v in rec.Series[series]["metadata"].items(): 
                     md[k] = v
-                print ("Hi!")
                 if "_" in ser:
                     fssplit = ser.split("_")
                     trange = fssplit[-1].split("-")
-                    print(trange)
+                    if verbose>2:
+                        print(trange)
                     if len(trange)>=2:
                         try:
                             t0,t1 = [float(t.strip("s")) for t in fssplit[-1].split("-", maxsplit=1)]
