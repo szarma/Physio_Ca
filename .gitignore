@@ -17,3 +17,9 @@ build
 /docs/tmp*
 /docs/*ipynb
 /docs/figures/tmp*
+/notebooks/receptors/images/
+/docs/matmet.aux
+/docs/matmet.bbl
+/docs/matmet.blg
+/docs/matmet.log
+/docs/matmet.out
