@@ -1,7 +1,8 @@
-\documentclass[a4paper,11pt,]{article}
+\documentclass[a4paper,11pt,oneside]{article}
 \usepackage{fancyvrb, color, graphbox, hyperref, amsmath, url}
 \usepackage{palatino}
 \usepackage{graphicx}
+\usepackage{xcolor}
 % \usepackage{pygments}
 % \usepackage{minted}
 \usepackage[a4paper,text={16.5cm,25.2cm},centering]{geometry}
@@ -16,7 +17,7 @@
   citecolor=red,
   urlcolor=green
 }
-\newcommand{\Regions}{{\texttt{Regions}}}
+% \newcommand{\Regions}{{\texttt{Regions}}}
 
 %\setlength{\parindent}{0pt}
 %\setlength{\parskip}{1.2ex}
@@ -116,11 +117,14 @@ The values ($x$) are then distributed according to the Poisson distribution, wit
 % It is often useful to transform a set of numbers to a new 
 A transformation to a new variable %$x\rightarrow z$
 $$z=\frac{x-\mu}{\sigma}$$
-is called {\it standard transformation}, and the new variable standard score or $z$-score (fig.\ref{fig:z_score}). Essentially, it recasts the initial quantity $x$ in the units of standard deviation from the expected mean. So, $z$ spends 95\% of the time between $-2$ and 2, and 99.7\% between -3 and 3. Probability of $z>3$ is very small $p<0.0013$, which is why it is often considered a threshold value for pointing out the outliers.
+is called {\it standard transformation}, and the new variable standard score or $z$-score (fig.\ref{fig:z_score}). Essentially, it recasts the initial quantity $x$ in the units of standard deviation from the expected mean. So, $z$ spends $95$\% of the time between $-2$ and $2$, and $99.7$\% between $-3$ and $3$. Probability of $z>3$ is very small $p<0.0013$, which is why it is often considered a threshold value for pointing out the outliers.
+
+In general, the mean slow component needs to be inferred, typically by low-pass filtering. Throughout this project, we use cascaded second-order section (sos) filtering, implemented in \verb|scipy.signal| module. The cut-off frequency $f_{cut}$ of a filter determines the timescale of the events that can be detected in $z$-score. 
+
 \begin{figure}[t]
     \centering
     \begin{minipage}{.49\textwidth}
-        {\fontfamily{phv}\selectfont A} \includegraphics[scale=.5,trim=15mm 0 0 0,clip,align=t]{figures/z_score_1.png}
+        {\fontfamily{phv}\selectfont A} \includegraphics[scale=.5,trim=15mm 0 0 0,clip,align=t]{figures/z_score_1.pdf}
     \end{minipage}
     \begin{minipage}{.49\textwidth} 
         {\fontfamily{phv}\selectfont B} \includegraphics[scale=.5,trim=15mm 30mm 0 0,clip,align=t]{figures/z_score_2.pdf}
@@ -135,18 +139,29 @@ is called {\it standard transformation}, and the new variable standard score or 
     }
 \end{figure}
 
-If we were to rebin a trace by a factor of $N$, the relationship between standard deviation and mean remains, but for the summed quantities $\sigma_N=\mu_N=N\mu_1$.
-Normalization to the same mean as before $\tilde{\mu} = \mu_1$, results in the standard deviation $\sqrt{N}$ times lower $\tilde{\sigma} = \sigma_1/\sqrt{N}$.
 
-Similarly, if we were to sum independent pixels ($a, b, c\dots$), 
-the resulting trace would have a mean which is a simple sum of the means of individual trace, and standard deviation 
-$\sigma_{a+b+\dots} = \sqrt{\mu_a+\mu_b+\dots}$. We use this when estimating the traces for ROIs, which by definition consist of multiple pixels.
+\paragraph{Correcting for the filtering distortion} 
+Fast Fourier transform naturally distorts signals, but the inferred $z$-score can be used to correct for it. We constructed an iterative filtering algorithm, where at each iteration, we set the outlier values of the original trace to the slow component, and reapply the filter. At each iteration, the distortion is less prominent, increasing the $z$-score.
+In fig.~\ref{fig:z_score}C, we show the result after 10 iterations, though we find three iterations is a more conservative choice, and a reasonable compromise between results and computing time.
 
-\paragraph{Correcting for the filtering distortion} \lipsum[1]
+
+\paragraph{ROI traces}
+All above refers also to a sum of pixel traces, but, crucially, not to their mean. A sum of two pixels $a$ and $b$ ($x=x_a+x_b$), with means $\mu_a$ and $\mu_b$, would have a standard deviation as expected $\sigma = \sqrt{\mu} = \sqrt{\mu_a+\mu_b}$. But, if were to consider the average $\tilde x = x/2$, standard deviation would be $\sqrt{2}$ times smaller $\tilde \sigma = \sigma/\sqrt{2}$.
+Therefore, when calculating $z$ score for a ROI trace, we always consider the sum, rather than the average trace of the underlying pixels. When we show and compare traces, we show them averaged, to keep the scales comparable.
+
+The same reasoning holds for rebinning a single trace, where the resulting trace, rebinned by a factor of $n$,  has a standard deviation $\sqrt{n}$ times smaller than the original.
+
 
 \subsubsection{Realistic detectors}
+All {\color{red}?} the experiments discussed in this manuscript were recorded on a Leica setup with Hybrid detector in photon counting mode. In this case, our arguments hold with no modification.
 
-means vs variance plot for photon counting and for some nikon experiment
+\begin{figure}
+%  \includegraphics{}
+ \caption{Variance $\sigma^2$ vs $\mu$ of 1000 second long regions from ROIs inferred from {\color{red} ElToro)}
+\end{figure}
+
+
+
 
 \subsection{Identification of Events}
 
