@@ -504,7 +504,7 @@ def createStaticImage(im,regions,showall=True,color="grey",separate=True, return
             pass
     plt.xticks([])
     plt.yticks([])
-    plt.ylim(plt.ylim()[::-1])
+    # plt.ylim(plt.ylim()[::-1])
     plt.savefig(bkg_img_file,dpi=150)
     plt.close(fig)
     plt.switch_backend(currentBackend)

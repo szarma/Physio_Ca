@@ -629,7 +629,7 @@ class Regions:
             ax.plot(x,y,color,lw=lw,alpha=alpha)
         dim = self.image.shape
         ax.set_xlim(-.5,dim[1]-.5)
-        ax.set_ylim(-.5,dim[0]-.5)
+        ax.set_ylim(dim[0]-.5, -.5,)
             
         if scaleFontSize<=0: return None
         if hasattr(self, "metadata") and "pxSize" in self.metadata:
