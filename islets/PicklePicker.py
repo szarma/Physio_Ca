@@ -8,7 +8,7 @@ import numpy as np
 from IPython.core.display import HTML
 
 from sys import exc_info
-from caiman import movie as cmovie
+from islets import cmovie
 import json
 import pickle
 
