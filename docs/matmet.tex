@@ -1,4 +1,4 @@
-\documentclass[a4paper,11pt,oneside]{article}
+\documentclass[a4paper,11pt,oneside,]{article}
 \usepackage{fancyvrb, color, graphbox, hyperref, amsmath, url}
 \usepackage{palatino}
 \usepackage{graphicx}
@@ -111,20 +111,20 @@ By default, we choose an average of the mean and high percentile as a representa
 
 \subsubsection{$z$-score and filtering}
 
-In an ideal detector, recording a time trace of a single pixel in absence of any signal would consist of independent values of the number of photons detected during the dwell time on that pixel.
+In an ideal detector, recording a time trace of a single pixel in absence of any signal would consist of independent values of the number of photons detected during the dwell time.
 The values ($x$) are then distributed according to the Poisson distribution, with standard deviation ($\sigma_1$) being equal to the square root of the mean $\mu_1$, $\sigma_1=\sqrt{\mu_1}$.
 
 % It is often useful to transform a set of numbers to a new 
 A transformation to a new variable %$x\rightarrow z$
 $$z=\frac{x-\mu}{\sigma}$$
-is called {\it standard transformation}, and the new variable standard score or $z$-score (fig.\ref{fig:z_score}). Essentially, it recasts the initial quantity $x$ in the units of standard deviation from the expected mean. So, $z$ spends $95$\% of the time between $-2$ and $2$, and $99.7$\% between $-3$ and $3$. Probability of $z>3$ is very small $p<0.0013$, which is why it is often considered a threshold value for pointing out the outliers.
+is called {\it standard transformation}, and the new variable standard score or $z$-score (fig.\ref{fig:z_score}). It recasts the initial quantity $x$ in the units of standard deviation from the expected mean. A noisy trace in $z$ spends $95$\% of the time between $-2$ and $2$, and $99.7$\% between $-3$ and $3$. Probability of $z>3$ is very small $p<0.0013$, which is why it is often considered a threshold value for pointing out the outliers.
 
-In general, the mean slow component needs to be inferred, typically by low-pass filtering. Throughout this project, we use cascaded second-order section (sos) filtering, implemented in \verb|scipy.signal| module. The cut-off frequency $f_{cut}$ of a filter determines the timescale of the events that can be detected in $z$-score. 
+In general, the mean slow component needs to be inferred, typically by low-pass filtering. Throughout this project, we use cascaded second-order section (sos) filtering, implemented in \verb|scipy.signal| module~\cite{2020SciPy-NMeth}. The cut-off frequency $f_{cut}$ of a filter determines the timescale of the events that can be detected in $z$-score. 
 
 \begin{figure}[t]
     \centering
     \begin{minipage}{.49\textwidth}
-        {\fontfamily{phv}\selectfont A} \includegraphics[scale=.5,trim=15mm 0 0 0,clip,align=t]{figures/z_score_1.pdf}
+        {\fontfamily{phv}\selectfont A} \includegraphics[scale=.5,trim=13mm 0 0 0,clip,align=t]{figures/z_score_1.pdf}
     \end{minipage}
     \begin{minipage}{.49\textwidth} 
         {\fontfamily{phv}\selectfont B} \includegraphics[scale=.5,trim=15mm 30mm 0 0,clip,align=t]{figures/z_score_2.pdf}
@@ -133,7 +133,7 @@ In general, the mean slow component needs to be inferred, typically by low-pass 
     \caption{
     (A) \emph{Left}: Simulated traces with Poisson noise (blue) around different means (grey) with different temporal features. The shaded area represents one standard deviation interval around mean. 
     \emph{Right}: Irrespective of the shape of the mean, z-score transformation behaves exactly as a Gaussian variable with zero mean and unit standard deviation.\\
-    (B) The values of s$z$-score depends on the reference. In subfigure (A), the reference curves are known, but in general they need to be inferred, typically by low-pass filtering. The cut-off frequency $f_{cut}$ of a filter determines the timescale of the events that can be detected in $z$-score. If filtered at with too high cut-off (orange), the resulting smooth curve follows too closely the trace and the event is not visible in $z$. With $f_{cut}=1/50$Hz, the resulting $z$-score has obvious outliers ($z\geq 3$), visible both in trace and in the histogram.\\
+    (B) The values of $z$-scores depends on the reference. In subfigure (A), the reference curves are known, but in general they need to be inferred, typically by low-pass filtering. The cut-off frequency $f_{cut}$ of a filter determines the timescale of the events that can be detected in $z$-score. If filtered with too high cut-off (orange), the resulting smooth curve follows too closely the trace and the event is not visible in $z$. With $f_{cut}=1/50$~Hz, the resulting $z$-score has obvious outliers ($z\geq 3$), visible both in trace and in the histogram.\\
     (C) Zoom to the indicated regions form B. The original (blue) and the filtered trace and $z$-score (red), and the filtered trace and $z$-score corrected for distortion (black).
     \label{fig:z_score}
     }
@@ -141,23 +141,29 @@ In general, the mean slow component needs to be inferred, typically by low-pass 
 
 
 \paragraph{Correcting for the filtering distortion} 
-Fast Fourier transform naturally distorts signals, but the inferred $z$-score can be used to correct for it. We constructed an iterative filtering algorithm, where at each iteration, we set the outlier values of the original trace to the slow component, and reapply the filter. At each iteration, the distortion is less prominent, increasing the $z$-score.
+Fast Fourier transform naturally distorts signals, but the inferred $z$-score can be used to correct for it. We constructed an iterative filtering algorithm, where at each iteration, we neglect the outlier values of the original trace, substitute them with the values of the slow component, and reapply the filter. At each iteration, the distortion is less prominent, increasing the $z$-score.
 In fig.~\ref{fig:z_score}C, we show the result after 10 iterations, though we find three iterations is a more conservative choice, and a reasonable compromise between results and computing time.
 
 
 \paragraph{ROI traces}
-All above refers also to a sum of pixel traces, but, crucially, not to their mean. A sum of two pixels $a$ and $b$ ($x=x_a+x_b$), with means $\mu_a$ and $\mu_b$, would have a standard deviation as expected $\sigma = \sqrt{\mu} = \sqrt{\mu_a+\mu_b}$. But, if were to consider the average $\tilde x = x/2$, standard deviation would be $\sqrt{2}$ times smaller $\tilde \sigma = \sigma/\sqrt{2}$.
-Therefore, when calculating $z$ score for a ROI trace, we always consider the sum, rather than the average trace of the underlying pixels. When we show and compare traces, we show them averaged, to keep the scales comparable.
+All above refers also to a sum of pixel traces, but, crucially, not to their mean. A sum of two pixels $a$ and $b$ ($x=x_a+x_b$), with means $\mu_a$ and $\mu_b$, would have a standard deviation as expected $\sigma = \sqrt{\mu} = \sqrt{\mu_a+\mu_b}$. But, if we were to consider the average $\tilde x = x/2$, standard deviation would be $\sqrt{2}$ times smaller $\tilde \sigma = \sigma/\sqrt{2}$.
+Therefore, when calculating $z$ score for a ROI trace, we always consider the sum, rather than the average trace of the underlying pixels. When we visualize traces, we show them averaged, only to keep the scales comparable.
 
 The same reasoning holds for rebinning a single trace, where the resulting trace, rebinned by a factor of $n$,  has a standard deviation $\sqrt{n}$ times smaller than the original.
 
 
 \subsubsection{Realistic detectors}
-All {\color{red}?} the experiments discussed in this manuscript were recorded on a Leica setup with Hybrid detector in photon counting mode. In this case, our arguments hold with no modification.
+All{\color{red}?} the experiments discussed in this manuscript were recorded on a Leica setup with Hybrid detector in photon counting mode.
+In this case, we see no significant departure from our assumption of Poisson distribution at short timescales (fig.~\ref{fig:mean_vs_var}).
 
-\begin{figure}
-%  \includegraphics{}
- \caption{Variance $\sigma^2$ vs $\mu$ of 1000 second long regions from ROIs inferred from {\color{red} ElToro)}
+
+\begin{figure}[t]
+ \centering
+ \includegraphics{figures/mean_vs_var.pdf}
+ \caption{
+ Variance $\sigma^2$ vs $\mu$ of 1000 second long regions from ROIs inferred from {\color{red} ElToro)}
+ }
+ \label{fig:mean_vs_var}
 \end{figure}
 
 
