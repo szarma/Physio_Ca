@@ -159,9 +159,14 @@ In this case, we see no significant departure from our assumption of Poisson dis
 
 \begin{figure}[t]
  \centering
- \includegraphics{figures/mean_vs_var.pdf}
+ \includegraphics[trim=25mm 0 20mm 10mm, clip]{figures/mean_vs_var.pdf}
  \caption{
- Variance $\sigma^2$ vs $\mu$ of 1000 second long regions from ROIs inferred from {\color{red} ElToro)}
+ {\it Left}: Regions of interest for the two experiments recorded using the raw photon-counting mode ({\it top}, used for {\color{red} Fig.1} in the main text), and the standard mode with large gain ({\it bottom}). Pixels which had at least 10 saturated values are shown in green. In thick red contours we emphasize ROIs with at least 30 green pixels.
+ \\
+ For each recording, we filter the ROI traces at $1$s ({\it middle}) and $10$s ({\it right}) to separate the trace into slow and fast component. For each ROI we then randomly choose $100$ values of the slow component together with the variance of the fast component from a window around the same timepoint, where the window size same as the timescale.
+ timepoints, and collect the 
+ In {\it middle} and {\it right} panels we show varience
+ Variance vs value of the slow component of 1000 second long regions from ROIs inferred from {\color{red} ElToro}
  }
  \label{fig:mean_vs_var}
 \end{figure}
