@@ -28,3 +28,5 @@ build
 /docs/diff.out
 /docs/diff.pdf
 /docs/diff.tex
+/app/dope.py
+/app/nope.py
