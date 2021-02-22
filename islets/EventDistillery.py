@@ -95,6 +95,15 @@ def distill_events(
     return pd.concat(DF_filt)
 
 
+def draw_spike(row, ax):
+    ax.fill(
+        row.t0 + row.halfwidth * np.array([0, 0, 1, 1, 0]),
+        row.its + np.array([0, 1, 1, 0, 0]) * .8 - .5,
+        color=row.color,
+        zorder=-1,
+        linewidth=0,
+    )
+
 def distill_events_per_roi(roiEvents,
                            regions,
                            plot=False,
@@ -128,14 +137,6 @@ def distill_events_per_roi(roiEvents,
     if plot:
         fig, axs = plt.subplots(3, 1, figsize=figsize, sharex=True, sharey=True)
         from matplotlib.ticker import MultipleLocator
-        def draw_spike(row, ax):
-            ax.fill(
-                row.t0 + row.halfwidth * np.array([0, 0, 1, 1, 0]),
-                row.its + np.array([0, 1, 1, 0, 0]) * .8 - .5,
-                color=row.color,
-                zorder=-1
-                # linewidth=.7,
-            )
         for ix, row in roiEvents.iterrows():
             draw_spike(row, axs[1])
     colorDict = {}
