@@ -12,7 +12,8 @@ def get_means_and_variances(regions, ts, Nt = 100):
                                        dilate=True,
                                        write=False,
                                        normalize=False,
-                                       npass=0
+                                       npass=0,
+                                       Npoints=np.inf,
                                       )
     dn = int(np.ceil(regions.Freq*ts))
     m,v = np.zeros((s.shape[0],Nt)),np.zeros((s.shape[0],Nt))
@@ -90,8 +91,8 @@ r.plotEdges(r.df.query("Nsatur>1").index, lw=.8, color="r",ax=ax, image=False, s
 
 axs[-1,-1].get_shared_x_axes().join(*axs[:,1:].flat)
 axs[-1,-1].get_shared_y_axes().join(*axs[:,1:].flat)
-axs[-1,-1].set_ylim(6,3e6)
-axs[-1,-1].set_xlim(6,3e6)
+axs[-1,-1].set_ylim(6,3e5)
+axs[-1,-1].set_xlim(6,3e5)
 for ik,k in enumerate(regions):
     r = regions[k]
     for ts,ax in zip([1,10],axs[ik,1:3]):
@@ -108,16 +109,16 @@ for ik,k in enumerate(regions):
             m,v = m[ff], v[ff]
             ax.plot(mrest.flat,vrest.flat,".", color="red", ms=1,zorder=3)
         pc = ax.hexbin(m,v,xscale="log", yscale="log", mincnt=1, cmap=hexbincmap, vmax=hexvmax,zorder=4)
-        filtPars = r.prep_filtering(ts,write=False)
-        if filtPars["Nrebin"]>1:
-            txt = r"$N_{\rm rebin} = %i$"%filtPars["Nrebin"]
-            ax.text(.95,.03, txt, ha="right", transform=ax.transAxes,zorder=4,bbox=bbox)
+        # filtPars = r.prep_filtering(ts,write=False)
+        # if filtPars["Nrebin"]>1:
+        #     txt = r"$N_{\rm rebin} = %i$"%filtPars["Nrebin"]
+        #     ax.text(.95,.03, txt, ha="right", transform=ax.transAxes,zorder=4,bbox=bbox)
         
 axs[0,2].set_xticklabels([])
 axs[0,2].set_yticklabels([])
 axs[1,2].set_yticklabels([])
 axs[0,1].set_xticklabels([])
-fig.set_facecolor("y")
+# fig.set_facecolor("y")
 axs[0,1].set_ylabel(r"variance $\sigma^2$")
 axs[1,1].set_ylabel(r"variance $\sigma^2$")
 axs[1,1].set_xlabel(r"mean @ 1s")
