@@ -154,35 +154,72 @@ The same reasoning holds for rebinning a single trace, where the resulting trace
 
 \subsubsection{Realistic detectors}
 All{\color{red}?} the experiments discussed in this manuscript were recorded on a Leica setup with Hybrid detector in photon counting mode.
-In this case, we see no significant departure from our assumption of Poisson distribution at short timescales (fig.~\ref{fig:mean_vs_var}).
+In this case, we see no significant departure from our assumption of Poisson distribution.
+Even with non-unit gain, the linear dependence between variance and mean remains, though the slope is different from $1$ (fig.~\ref{fig:mean_vs_var}).
+
+Other types of detectors introduce additional sources of noise other than Poisson (e.g. thermal), but, mostly it is still dominated by Poisson in our experience, at least as long as the values between neighboring pixels and frames are independent.
 
 
 \begin{figure}[t]
  \centering
- \includegraphics[trim=25mm 0 20mm 10mm, clip]{figures/mean_vs_var.pdf}
+ \includegraphics[trim=25mm 0 20mm 10mm, clip,scale=0.9]{figures/mean_vs_var.pdf}
  \caption{
- {\it Left}: Regions of interest for the two experiments recorded using the raw photon-counting mode ({\it top}, used for {\color{red} Fig.1} in the main text), and the standard mode with large gain ({\it bottom}). Pixels which had at least 10 saturated values are shown in green. In thick red contours we emphasize ROIs with at least 30 green pixels.
+ {\it Left}: Regions of interest for the two experiments recorded using the raw photon-counting mode ({\it top}, used for {\color{red} Fig.1} in the main text), and the standard mode with large gain ({\it bottom}). Pixels which had at least 10 saturated values are shown in green. In thick red contours we emphasize ROIs with at least 30 green pixels used to emphasize the influence of saturation (see below).
  \\
- For each recording, we filter the ROI traces at $1$s ({\it middle}) and $10$s ({\it right}) to separate the trace into slow and fast component. For each ROI we then randomly choose $100$ values of the slow component together with the variance of the fast component from a window around the same timepoint, where the window size same as the timescale.
- timepoints, and collect the 
- In {\it middle} and {\it right} panels we show varience
- Variance vs value of the slow component of 1000 second long regions from ROIs inferred from {\color{red} ElToro}
+ For each recording, we filter the ROI traces at $1$s ({\it middle}) and $10$s ({\it right}) to separate the trace into slow and fast component. For each ROI we then randomly choose $100$ values of the slow component together with the variance of the fast component from a window around the same timepoint, with window size the same as the timescale.
+ \\
+ In agreement with our assumptions, the variances and the means are linearly dependent, and in the case of raw photon counts, the dependence is exactly 1 (solid diagonal line $\sigma^2=\mu$). In the standard mode, the dependence is still linear, yet with a slope larger than one (dashed orange line). Points above the bulk in this view are due to windows with larger variance, and presumably connected with activity (at the appropriate timescale). Points below the bulk are due to undervariate windows. They are concentrated at high values and are due to saturated pixels. In the lower right plot we emphasize this fact by showing the points from saturated ROIs in red.
  }
  \label{fig:mean_vs_var}
 \end{figure}
 
 
+\begin{figure}[t]
+
+ \centering
+%  \newgeometry{textwidth=20cm}
+ \includegraphics[trim=12mm 0 0mm 0mm, scale=0.9]{figures/evdist.pdf}
+ \caption{(A) Example of a track (black) and slow components in sequential filtering (shades of gray). Square indicates the regions shown in B and C. 
+ (B) Close-up view of a small region (top) and a representation of all candidate events in that region detected through sequential filtering.
+ Height corresponds to the timescale at which the event was detected.
+ Many events are obviously redundant. 
+ (C) Distillation greatly removes redundancies and false positive candidates. Only robust events are selected for further analysis (see text for details). 
+ In the top part we represent the distilled events at single height, with color indicating their halfwidth.
+ We choose a non-linear color code (mapping to a hill curve) yet nearly linear between $1$ and $\sim 5$ seconds, to emphasize the regions most interesting for our analysis.
+ }
+ \label{fig:evdist_demo}
+\end{figure}
 
 
 \subsection{Identification of Events}
 
-\newpage
+We devised an algorithm to detect events at timescales spanning multiple orders of magnitude.
+In the first step, we perform a sequential filtering of the traces at timescales starting from $0.5$s, and increasing by a factor of $\sqrt[4]{2}$,  $\tau = \{2^{-1}, 2^{-3/4}, 2^{-1/2}, 2^{-1/4},\dots\}$, until the timescale of the longest event we are interested (and in any case it makes no sense to filter at timescale comparable to the length of the experiment itself).
+At each timescale, we transform the trace to $z$-score, and identify regions where $z>3$ as {\it candidate events}. 
+
+An event is characterized by the start time ($t_0$), it's maximal height, and the width at the half of the height ({\it halfwidth}, $\delta t$), which is our measurement of it's duration.
+For simplicity, we define end time as $t_{\rm end} = t_0+\delta t$, although events arguably last much longer after the intensity drops at half of the peak.
+
+If an event is real, it will be detected at multiple timescales, and will start around the same time and will have approximately same halfwidth.
+We specify a tolerance of 20\% of the halfwidth as to whether two candidate events should be considered equal; if their start and end times are within 20\% of the halfwidth, they are considered cognates, having arisen due to the same real event. 
+For a set of cognates, we estimate the start and end time of the real underlying event as a median over the set.
+If the resulting estimate for the halfwidth is larger than 2s, we require that a set consists of at least 4 candidate events (corresponding to event being detectable when filtered at timescales that differ at least two-fold).
+For shorter events, we require only that an event is not unique to a single timescale.
+
+We also neglect events that last less than $3$ time frames, as well as those too close to the begging or end of the recording (within $\delta t/2$), which we ascribe to artefacts from zero-padding for the filtering. 
+We term this procedure event {\it distilling} (see fig.~\ref{fig:evdist_demo}).
+
+
+
+
 
 \section{Analyses}
 \subsection{El Toro}
 \subsection{Isradipine}
 \subsection{Low Ca}
 \subsection{etc}
+
+\newpage
 
 \bibliographystyle{plain}% E-Life prefers apa
 \bibliography{matmet}
