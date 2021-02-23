@@ -350,8 +350,9 @@ class Recording:
                     mode="ram"
             if mode=="memmap":
                 if not hasattr(self, "tempdir"):
-                    import tempfile
-                    tempdir = tempfile.gettempdir()
+                    # import tempfile
+                    # tempdir = tempfile.gettempdir()
+                    tempdir = "/data/.tmp"
                     self.tempdir = os.path.join(tempdir,f"{np.random.randint(int(1e10))}")
                     os.makedirs(self.tempdir)
                 filename = os.path.join(self.tempdir, f"{Series}.memmap")
