@@ -95,14 +95,23 @@ def distill_events(
     return pd.concat(DF_filt)
 
 
-def draw_spike(row, ax):
-    ax.fill(
-        row.t0 + row.halfwidth * np.array([0, 0, 1, 1, 0]),
-        row.its + np.array([0, 1, 1, 0, 0]) * .8 - .5,
-        color=row.color,
-        zorder=-1,
-        linewidth=0,
-    )
+def draw_spike(row, ax, edge=False,zorder=3, height=.8):
+    if edge:
+        ax.plot(
+            row.t0 + row.halfwidth * np.array([0, 0, 1, 1, 0]),
+            row.its + np.array([0, 1, 1, 0, 0]) * height - .5,
+            color=row.color,
+            zorder=zorder,
+            linewidth=.5,
+        )
+    else:
+        ax.fill(
+            row.t0 + row.halfwidth * np.array([0, 0, 1, 1, 0]),
+            row.its + np.array([0, 1, 1, 0, 0]) * height - .5,
+            color=row.color,
+            zorder=zorder,
+            linewidth=0,
+        )
 
 def distill_events_per_roi(roiEvents,
                            regions,
@@ -177,15 +186,6 @@ def distill_events_per_roi(roiEvents,
         conflicts = conflicts.query(f"tend>{spike.tend - toll}")
         conflicts = conflicts.query(f"tend<{spike.tend + toll}")
         # conflicts = conflicts.query(f"index!={spike.name}")
-        if len(conflicts.index)==1 and not take_best:
-            status = "unique"
-            roiEvents.loc[isp, "status"] = status
-            if plot:
-                if status not in colorDict:
-                    colorDict[status] = axs[0].plot([], label=status)[0].get_color()
-                row = pd.Series(spike)
-                row.color = colorDict[status]
-                draw_spike(row, axs[0])
         for other in list(conflicts.index):
             g.add_edge(isp, other)
     if plot:
@@ -207,7 +207,17 @@ def distill_events_per_roi(roiEvents,
     ######################################################
     df_filt = []
     for ixs in nx.connected_components(g.to_undirected()):
-        if len(ixs)==1 and not take_best: continue
+        if len(ixs)==1 and not take_best: 
+            status = "unique"
+            isp = list(ixs)[0]
+            roiEvents.loc[isp, "status"] = status
+            if plot:
+                if status not in colorDict:
+                    colorDict[status] = axs[0].plot([], label=status)[0].get_color()
+                row = pd.Series(spike)
+                row.color = colorDict[status]
+                draw_spike(row, axs[0])
+            continue
         row = pd.Series(roiEvents.loc[list(ixs)].sort_values("height").iloc[-1])
         if not take_best:
             for col in ["t0","tend","height","color","coltrans"]:
