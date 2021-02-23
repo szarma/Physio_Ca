@@ -40,18 +40,19 @@
 \section{General pipeline}
 
 A typical experiment involving imaging of pancreatic slices in our lab concerns a single field of view
-showing 10s--100s of cells, in a recording of at least several, often dozens, of gigabytes.
+showing 10s--100s of cells, in a recording of at least several, often dozens, gigabytes.
 Current tools (ImageJ, \dots) rely on loading the recording, or its part, into memory, for viewing, analysis, and processing.
 It also requires laborious and long human engagement.
-We have developed a set of interdependent tools to automatize as much as possible the pipeline. 
+We have developed a set of interdependent tools to automatize as much as possible the analysis pipeline (see fig.~\ref{fig:pipeline}). 
 The crucial elements of our pipeline are the following:
 \begin{itemize}
 \item (Semi-)automatic detection of regions of interest (ROIs);
-\item Transformation of ROI time traces into standard score ("z-score");
+\item Transformation of ROI time traces into standard score ("z-score") and correction for filtering distortion;
 \item Quantification of the phenotype for each ROI in terms of the distribution of events of different durations.
 \end{itemize}
 
 Our toolset is inspired and relies on CaImAn \cite{giovannucci2019caiman}, a similar package developed for the purposes in neuroscience research.
+
 
 \begin{figure}[h]
 \centering
@@ -62,7 +63,7 @@ An illustration of our processing and analysis pipeline:
 ({\it i})  From a full movie, we calculate the mean (or other statistic) across all frames.
 ({\it ii}) We pass the mean image through a band-pass filter and define ROIs by detecting local peaks.
 ({\it iii}) We save ROIs with all the important information (time traces, ROI coordinates, movie statistics, recording frequency, pixel size, etc.).
-({\it iv}) Traces contain features at very different time scales---with different timescales presumably important for different cell types. We collect them into separable events for analysis.
+({\it iv}) Traces contain features at very different timescales---with different timescales presumably important for different cell types. We collect them into separable events for analysis.
 }
 \end{figure}
 
@@ -74,11 +75,13 @@ In case there is horizontal movement, it can be corrected for by aligning the fr
 For this we use the functionality present in CaImAn \cite{giovannucci2019caiman}, except that high frequency recordings need to be rebinned to some moderate frequency (a few Hz), before correcting, in order to reduce the noise level. 
 Once the translation offsets are obtained, we use them to correct the recording in original frequency.
 
-To define regions of interest, we blur the representative image by a kernel of the size we expect cells to be, 
-and at the scale double of that.
+To define regions of interest, we blur the representative image by a kernel of the size we expect cells to be, and at the scale double of that.
 The difference between these two images represents a band-pass filter of the original, where the local intensity variation are emphasized (fig.\ref{fig:regions}).
 We then pass through all pixels where the value of the filtered image is positive (or larger than a small positive threshold), and for each pixel we search for a local peak in its vicinity. 
 All the pixels that lead to the same local peak are then grouped into a single ROI.
+
+As we are mainly interested in islet cells, we choose the kernel size to approximately correspond to $10\mu$m, the characteristic length scale of the islets cells.
+If the pixel size is unknown, the choice of kernel is up to the person running the scripts.
 
 
 \begin{figure}[t]
@@ -94,7 +97,9 @@ All the pixels that lead to the same local peak are then grouped into a single R
 \end{minipage}
 \caption{
 (A) Computationally created template $64{\times}64$ image with uniform spherical cells, and with Poisson noise added.
-(B) Band-pass filtering of the "realistic" image from A, with different kernel sizes. The size of the kernel determines the approximate size of the ROIs obtained.
+(B) Band-pass filtering of the "realistic" image from A, with different kernel sizes, for denoising  ({\it left}), and  for approximating background  ({\it middle}).
+The difference is the filtered image, used to construct ROIs ({\it right}).
+The size of the kernel determines the approximate size of the ROIs obtained.
 In thick red contours we emphasize misidentified ROIs; the dots indicate the real locations of the cells.
 (C) Each ROI is constructed by explicitly searching for a closest peak in intensity. A pixel can only be part of a single ROI.
 \label{fig:regions}}
@@ -179,9 +184,9 @@ Other types of detectors introduce additional sources of noise other than Poisso
  \centering
 %  \newgeometry{textwidth=20cm}
  \includegraphics[trim=12mm 0 0mm 0mm, scale=0.9]{figures/evdist.pdf}
- \caption{(A) Example of a track (black) and slow components in sequential filtering (shades of gray). Square indicates the regions shown in B and C. 
- (B) Close-up view of a small region (top) and a representation of all candidate events in that region detected through sequential filtering.
- Height corresponds to the timescale at which the event was detected.
+ \caption{(A) Example of a trace (black) and slow components in sequential filtering (shades of gray). % Square indicates the regions shown in B and C. 
+ (B) Close-up view of the indicated small region from (A) and a representation of all candidate events in that region detected through sequential filtering.
+ Each black bar represents an event. Vertical position corresponds to the timescale at which the event was detected, the horizontal boundaries correspond to beginning and end time.
  Many events are obviously redundant. 
  (C) Distillation greatly removes redundancies and false positive candidates. Only robust events are selected for further analysis (see text for details). 
  In the top part we represent the distilled events at single height, with color indicating their halfwidth.
@@ -193,7 +198,9 @@ Other types of detectors introduce additional sources of noise other than Poisso
 
 \subsection{Identification of Events}
 
-We devised an algorithm to detect events at timescales spanning multiple orders of magnitude.
+Traces contain features spanning orders of magnitude in time: from tens of miliseconds, to tens of minutes. 
+We aim to investigate how do events at these different timescales interact and a connection between them and the islets' environment.
+For this, we devised an algorithm based on sequential filtering, followed by .
 In the first step, we perform a sequential filtering of the traces at timescales starting from $0.5$s, and increasing by a factor of $\sqrt[4]{2}$,  $\tau = \{2^{-1}, 2^{-3/4}, 2^{-1/2}, 2^{-1/4},\dots\}$, until the timescale of the longest event we are interested (and in any case it makes no sense to filter at timescale comparable to the length of the experiment itself).
 At each timescale, we transform the trace to $z$-score, and identify regions where $z>3$ as {\it candidate events}. 
 
@@ -206,7 +213,7 @@ For a set of cognates, we estimate the start and end time of the real underlying
 If the resulting estimate for the halfwidth is larger than 2s, we require that a set consists of at least 4 candidate events (corresponding to event being detectable when filtered at timescales that differ at least two-fold).
 For shorter events, we require only that an event is not unique to a single timescale.
 
-We also neglect events that last less than $3$ time frames, as well as those too close to the begging or end of the recording (within $\delta t/2$), which we ascribe to artefacts from zero-padding for the filtering. 
+We also neglect events that last less than $3$ time frames, as well as those too close to the beginning or end of the recording (within $\delta t/2$), which we ascribe to artefacts from zero-padding for the filtering. 
 We term this procedure event {\it distilling} (see fig.~\ref{fig:evdist_demo}).
 
 
