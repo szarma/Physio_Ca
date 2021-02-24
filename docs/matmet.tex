@@ -157,14 +157,6 @@ Therefore, when calculating $z$ score for a ROI trace, we always consider the su
 The same reasoning holds for rebinning a single trace, where the resulting trace, rebinned by a factor of $n$,  has a standard deviation $\sqrt{n}$ times smaller than the original.
 
 
-\subsubsection{Realistic detectors}
-All{\color{red}?} the experiments discussed in this manuscript were recorded on a Leica setup with Hybrid detector in photon counting mode.
-In this case, we see no significant departure from our assumption of Poisson distribution.
-Even with non-unit gain, the linear dependence between variance and mean remains, though the slope is different from $1$ (fig.~\ref{fig:mean_vs_var}).
-
-Other types of detectors introduce additional sources of noise other than Poisson (e.g. thermal), but, mostly it is still dominated by Poisson in our experience, at least as long as the values between neighboring pixels and frames are independent.
-
-
 \begin{figure}[t]
  \centering
  \includegraphics[trim=25mm 0 20mm 10mm, clip,scale=0.9]{figures/mean_vs_var.pdf}
@@ -179,21 +171,13 @@ Other types of detectors introduce additional sources of noise other than Poisso
 \end{figure}
 
 
-\begin{figure}[t]
 
- \centering
-%  \newgeometry{textwidth=20cm}
- \includegraphics[trim=12mm 0 0mm 0mm, scale=0.9]{figures/evdist.pdf}
- \caption{(A) Example of a trace (black) and slow components in sequential filtering (shades of gray). % Square indicates the regions shown in B and C. 
- (B) Close-up view of the indicated small region from (A) and a representation of all candidate events in that region detected through sequential filtering.
- Each black bar represents an event. Vertical position corresponds to the timescale at which the event was detected, the horizontal boundaries correspond to beginning and end time.
- Many events are obviously redundant. 
- (C) Distillation greatly removes redundancies and false positive candidates. Only robust events are selected for further analysis (see text for details). 
- In the top part we represent the distilled events at single height, with color indicating their halfwidth.
- We choose a non-linear color code (mapping to a hill curve) yet nearly linear between $1$ and $\sim 5$ seconds, to emphasize the regions most interesting for our analysis.
- }
- \label{fig:evdist_demo}
-\end{figure}
+\subsubsection{Realistic detectors}
+All{\color{red}?} the experiments discussed in this manuscript were recorded on a Leica setup with Hybrid detector in photon counting mode.
+In this case, we see no significant departure from our assumption of Poisson distribution.
+Even with non-unit gain, the linear dependence between variance and mean remains, though the slope is different from $1$ (fig.~\ref{fig:mean_vs_var}).
+
+Other types of detectors introduce additional sources of noise other than Poisson (e.g. thermal), but, mostly it is still dominated by Poisson in our experience, at least as long as the values between neighboring pixels and frames are independent.
 
 
 \subsection{Identification of Events}
@@ -206,6 +190,27 @@ At each timescale, we transform the trace to $z$-score, and identify regions whe
 
 An event is characterized by the start time ($t_0$), it's maximal height, and the width at the half of the height ({\it halfwidth}, $\delta t$), which is our measurement of it's duration.
 For simplicity, we define end time as $t_{\rm end} = t_0+\delta t$, although events arguably last much longer after the intensity drops at half of the peak.
+
+\begin{figure}[t]
+
+ \centering
+%  \newgeometry{textwidth=20cm}
+ \includegraphics[trim=12mm 0 0mm 0mm, scale=0.9]{figures/evdist.pdf}
+ \caption{(A) Example of a trace (black) and slow components in sequential filtering (shades of gray). % Square indicates the regions shown in B and C. 
+ (B) Close-up view of the indicated small region from (A) and a representation of all candidate events in that region detected through sequential filtering.
+ Each bar represents an event. Vertical position corresponds to the timescale at which the event was detected, the horizontal boundaries correspond to beginning and end time.
+ Many events are obviously redundant.
+ In red we show events that are deemed false positives, because they are detected at too few filtering timescales.
+ Others events belong to groups of similar events which are then considered real; in black we show the event closest to the one finally distilled. 
+ It's time boundaries are set to median of the whole group.
+ (C) Distillation greatly removes redundancies and false positive candidates. Only robust events are selected for further analysis (see text for details). 
+ In the top part we represent the distilled events at single height, with color indicating their halfwidth.
+ We choose a non-linear color code (mapping to a hill curve) yet nearly linear between $1$ and $\sim 5$ seconds, to emphasize the color difference at the timescales most interesting for our analysis.
+ }
+ \label{fig:evdist_demo}
+\end{figure}
+
+
 
 If an event is real, it will be detected at multiple timescales, and will start around the same time and will have approximately same halfwidth.
 We specify a tolerance of 20\% of the halfwidth as to whether two candidate events should be considered equal; if their start and end times are within 20\% of the halfwidth, they are considered cognates, having arisen due to the same real event. 
