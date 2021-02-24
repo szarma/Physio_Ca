@@ -40,7 +40,7 @@
 \section{General pipeline}
 
 A typical experiment involving imaging of pancreatic slices in our lab concerns a single field of view
-showing 10s--100s of cells, in a recording of at least several, often dozens, gigabytes.
+showing up to hundreds of cells, in a recording of at least several, often dozens, gigabytes.
 Current tools (ImageJ, \dots) rely on loading the recording, or its part, into memory, for viewing, analysis, and processing.
 It also requires laborious and long human engagement.
 We have developed a set of interdependent tools to automatize as much as possible the analysis pipeline (see fig.~\ref{fig:pipeline}). 
@@ -57,8 +57,8 @@ Our toolset is inspired and relies on CaImAn \cite{giovannucci2019caiman}, a sim
 \begin{figure}[h]
 \centering
 \includegraphics[width=\textwidth,trim=1.5cm 1.5cm 15mm 15mm,clip]{figures/pipeline.pdf}
-\label{fig:pipeline}
 \caption{
+\label{fig:pipeline}
 An illustration of our processing and analysis pipeline:
 ({\it i})  From a full movie, we calculate the mean (or other statistic) across all frames.
 ({\it ii}) We pass the mean image through a band-pass filter and define ROIs by detecting local peaks.
@@ -199,13 +199,12 @@ For simplicity, we define end time as $t_{\rm end} = t_0+\delta t$, although eve
  \caption{(A) Example of a trace (black) and slow components in sequential filtering (shades of gray). % Square indicates the regions shown in B and C. 
  (B) Close-up view of the indicated small region from (A) and a representation of all candidate events in that region detected through sequential filtering.
  Each bar represents an event. Vertical position corresponds to the timescale at which the event was detected, the horizontal boundaries correspond to beginning and end time.
- Many events are obviously redundant.
- In red we show events that are deemed false positives, because they are detected at too few filtering timescales.
- Others events belong to groups of similar events which are then considered real; in black we show the event closest to the one finally distilled. 
- It's time boundaries are set to median of the whole group.
+ In grey we show events that are deemed false positives, because they are detected at too few filtering timescales.
+ Others events belong to groups of similar events which are then considered real; we show a boundary around the bar of the event closest to the one finally distilled. 
+ It's time boundaries are set to median of the whole group, and the color indicates its halfwidth.
  (C) Distillation greatly removes redundancies and false positive candidates. Only robust events are selected for further analysis (see text for details). 
- In the top part we represent the distilled events at single height, with color indicating their halfwidth.
- We choose a non-linear color code (mapping to a hill curve) yet nearly linear between $1$ and $\sim 5$ seconds, to emphasize the color difference at the timescales most interesting for our analysis.
+ In the top part we represent the distilled events at single height, in a more compact view.
+ We choose a color code (mapping to a hill curve) which is nearly linear up to a few seconds, to emphasize the color difference at the timescales most interesting for our analysis.
  }
  \label{fig:evdist_demo}
 \end{figure}
