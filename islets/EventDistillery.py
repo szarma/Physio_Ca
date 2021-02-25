@@ -95,20 +95,20 @@ def distill_events(
     return pd.concat(DF_filt)
 
 
-def draw_spike(row, ax, edge=False,zorder=3, height=.8):
+def draw_event(row, ax, edge=False,zorder=3, height=.8):
     if edge:
         ax.plot(
-            row.t0 + row.halfwidth * np.array([0, 0, 1, 1, 0]),
-            row.its + np.array([0, 1, 1, 0, 0]) * height - .5,
-            color=row.color,
+            row['t0'] + row["halfwidth"] * np.array([0, 0, 1, 1, 0]),
+            row["its"] + (np.array([0, 1, 1, 0, 0]) - .5) * height,
+            color=row['color'],
             zorder=zorder,
             linewidth=.5,
         )
     else:
         ax.fill(
-            row.t0 + row.halfwidth * np.array([0, 0, 1, 1, 0]),
-            row.its + np.array([0, 1, 1, 0, 0]) * height - .5,
-            color=row.color,
+            row['t0'] + row["halfwidth"] * np.array([0, 0, 1, 1, 0]),
+            row["its"] + (np.array([0, 1, 1, 0, 0]) - .5) * height,
+            color=row['color'],
             zorder=zorder,
             linewidth=0,
         )
@@ -147,14 +147,14 @@ def distill_events_per_roi(roiEvents,
         fig, axs = plt.subplots(3, 1, figsize=figsize, sharex=True, sharey=True)
         from matplotlib.ticker import MultipleLocator
         for ix, row in roiEvents.iterrows():
-            draw_spike(row, axs[1])
+            draw_event(row, axs[1])
     colorDict = {}
     for ix, row in roiEvents.iterrows():
         t = regions.showTime.get("%g" % row.ts, regions.time)
         it0 = np.searchsorted(t, row.t0) - 1
         ite = np.searchsorted(t, row.t0 + row.halfwidth) + 1
-        spikeLength = ite - it0
-        if spikeLength < 3 and not take_best:
+        eventLength = ite - it0
+        if eventLength < 3 and not take_best:
             status = "too short"
             roiEvents.loc[ix, "status"] = status
             if plot:
@@ -162,7 +162,7 @@ def distill_events_per_roi(roiEvents,
                     colorDict[status] = axs[0].plot([], label=status)[0].get_color()
                 row = pd.Series(row)
                 row.color = colorDict[status]
-                draw_spike(row, axs[0])
+                draw_event(row, axs[0])
                 continue
         if (row.t0-row.halfwidth/2 < regions.time[0]) or (row.tend+row.halfwidth/2 > regions.time[-1]):
             status = "too close to begging/end"
@@ -172,20 +172,20 @@ def distill_events_per_roi(roiEvents,
                     colorDict[status] = axs[0].plot([], label=status)[0].get_color()
                 row = pd.Series(row)
                 row.color = colorDict[status]
-                draw_spike(row, axs[0])
+                draw_event(row, axs[0])
                 continue
     g = nx.DiGraph()
-    for isp, spike in roiEvents.query("status=='ok'").sort_values("halfwidth").iterrows():
-        toll = spike.halfwidth * halfwidth_toll
-        conflicts = roiEvents.query(f"t0>{spike.t0 - toll}")
-        conflicts = conflicts.query(f"t0<{spike.t0 + toll}")
+    for isp, event in roiEvents.query("status=='ok'").sort_values("halfwidth").iterrows():
+        toll = event.halfwidth * halfwidth_toll
+        conflicts = roiEvents.query(f"t0>{event.t0 - toll}")
+        conflicts = conflicts.query(f"t0<{event.t0 + toll}")
         if require_contingency and row.halfwidth>small_halfwidth:
-            conflicts = conflicts.query(f"its>={spike.its-1}")
-            conflicts = conflicts.query(f"its<={spike.its+1}")
+            conflicts = conflicts.query(f"its>={event.its-1}")
+            conflicts = conflicts.query(f"its<={event.its+1}")
 
-        conflicts = conflicts.query(f"tend>{spike.tend - toll}")
-        conflicts = conflicts.query(f"tend<{spike.tend + toll}")
-        # conflicts = conflicts.query(f"index!={spike.name}")
+        conflicts = conflicts.query(f"tend>{event.tend - toll}")
+        conflicts = conflicts.query(f"tend<{event.tend + toll}")
+        # conflicts = conflicts.query(f"index!={event.name}")
         for other in list(conflicts.index):
             g.add_edge(isp, other)
     if plot:
@@ -211,12 +211,13 @@ def distill_events_per_roi(roiEvents,
             status = "unique"
             isp = list(ixs)[0]
             roiEvents.loc[isp, "status"] = status
+            roiEvents.loc[isp, "attractor"] = isp
             if plot:
                 if status not in colorDict:
                     colorDict[status] = axs[0].plot([], label=status)[0].get_color()
-                row = pd.Series(spike)
+                row = pd.Series(roiEvents.loc[isp])
                 row.color = colorDict[status]
-                draw_spike(row, axs[0])
+                draw_event(row, axs[0])
             continue
         row = pd.Series(roiEvents.loc[list(ixs)].sort_values("height").iloc[-1])
         if not take_best:
@@ -230,7 +231,7 @@ def distill_events_per_roi(roiEvents,
         for ix in ixs:
             if ix != row.name:
                 roiEvents.loc[ix,"status"]="merged"
-                roiEvents.loc[ix,"attractor"]=row.name
+            roiEvents.loc[ix,"attractor"]=row.name
         # TODO: movement detection
         # dt = roiEvents.loc[ixs].sort_values("ts")[["t0","tend"]].diff(axis=0).dropna().values.flatten()
         # if row.halfwidth>small_halfwidth and p:
@@ -243,7 +244,7 @@ def distill_events_per_roi(roiEvents,
         #                 colorDict[status] = axs[0].plot([], label=status)[0].get_color()
         #             row = pd.Series(row)
         #             row.color = colorDict[status]
-        #             draw_spike(row, axs[0])
+        #             draw_event(row, axs[0])
         #         continue
 
         if len(ixs)<minconfidence and row.halfwidth>small_halfwidth:
@@ -254,7 +255,7 @@ def distill_events_per_roi(roiEvents,
                     colorDict[status] = axs[0].plot([], label=status)[0].get_color()
                 row = pd.Series(row)
                 row.color = colorDict[status]
-                draw_spike(row, axs[0])
+                draw_event(row, axs[0])
             continue
         df_filt += [row]
     df_filt = pd.DataFrame(df_filt).sort_index()
@@ -263,7 +264,7 @@ def distill_events_per_roi(roiEvents,
             del df_filt[col]
     if plot:
         for ix, row in df_filt.iterrows():
-            draw_spike(row, axs[2])
+            draw_event(row, axs[2])
         nr = np.round(regions.Freq / freqShow)
         if nr > 1:
             nr = int(nr)
