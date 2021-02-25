@@ -87,8 +87,8 @@ from islets.Regions import Regions, getStatImages
 
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category= FutureWarning,)
-    from caiman import movie as cmovie
-    from caiman import load as cload
+    from islets import cmovie
+    from islets import cload
 
 
 pathToTif = args.use_tif

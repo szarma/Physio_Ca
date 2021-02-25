@@ -430,7 +430,7 @@ def getEvents(tfMatrix_,DistMatrix_=None, offset=(0,0,0)):
     return events
 
 def blurInTime(original_, k, s=-1):
-    from caiman import movie
+    from islets import cmovie
     from cv2 import GaussianBlur
     out = original_.copy()
     out = GaussianBlur(
@@ -438,7 +438,7 @@ def blurInTime(original_, k, s=-1):
 #         ksize=(k,1),sigmaX=s, sigmaY=0
         ksize=(1,k),sigmaX=0, sigmaY=s
     ).reshape(out.shape)
-    out = movie(out)
+    out = cmovie(out)
     return out
 
 from scipy.cluster.hierarchy import linkage, dendrogram, fcluster

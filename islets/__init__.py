@@ -1,9 +1,12 @@
 import pkg_resources
 import warnings
 
+# noinspection PyUnresolvedReferences
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=FutureWarning, )
-    from .movies import movie as cmovie
+    from caiman import load as cload
+    from caiman import movie as cmovie
+    # from .movies import movie as cmovie
     # from .movies import load as cload
 from . import EventDistillery
 from .examine import examine

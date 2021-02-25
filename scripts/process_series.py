@@ -113,7 +113,7 @@ if __name__=="__main__":
             class_path=bfJARS,
             max_heap_size="20G"
         )
-        from caiman import movie as cmovie
+        from islets import cmovie
     rec = Recording(args.recording)
     rec.calc_gaps()
     restrict=(0,-2)

@@ -42,11 +42,11 @@ syspath.append(os.path.expanduser("~/srdjan_functs/"))
 
 from islets.Recording import Recording, saveMovie, autocorr2d
 from islets.utils import saveRois, get_filterSizes
-from islets.Regions1 import Regions, getStatImages
+from islets.Regions import Regions, getStatImages
 
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category= FutureWarning,)
-    from caiman import load as cload
+    from islets import cload
 
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects

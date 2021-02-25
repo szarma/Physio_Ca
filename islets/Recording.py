@@ -74,7 +74,7 @@ def saveMovie(movie, filename, maxFreq=2, frameRate=60, dpi=100,figScale=1):
         nrebin = int(np.ceil((movie.fr/maxFreq)))
         if nrebin>1:
             showMovie = rebin(movie, nrebin)
-            from caiman import movie as cmovie
+            from . import cmovie
             showMovie = cmovie(showMovie, fr=movie.fr/nrebin)
         else:
             showMovie = movie+1
