@@ -679,7 +679,7 @@ class Regions:
         self.df["interest"] = interesting
         
     def change_frequency(self, fr=2):
-        from caiman import movie as cmovie
+        from .movies import movie as cmovie
         traces = np.vstack(self.df.trace)
         fr0 = self.Freq
         trmov = cmovie(traces.T.reshape((-1,len(self.df),1)), fr=fr0)

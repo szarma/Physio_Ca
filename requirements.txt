@@ -15,6 +15,6 @@ jupyter-plotly-dash
 python-bioformats
 plotly-express
 islets
-caiman
+bidict
 mgzip
 orjson
