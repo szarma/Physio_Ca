@@ -330,7 +330,7 @@ def distill_events_per_roi(roiEvents,
         axs = None
     if "attractor" in roiEvents.columns:
         roiEvents['attractor']= roiEvents['attractor'].astype(pd.Int64Dtype())
-    return df_filt, None, roiEvents
+    return df_filt, axs, roiEvents
 
 
 def plot_events(events,
