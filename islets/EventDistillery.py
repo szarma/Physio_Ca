@@ -80,38 +80,56 @@ def sequential_filtering(
     if verbose: print ("#"*30+"\n"+"#"*10+"   DONE   "+"#"*10+"\n"+"#"*30)
     return allEvents
 
-
 def distill_events(
         candidateEvents,
         regions,
         **kwargs):
-#     from tqdm.notebook import tqdm
+    global iterf
+    def iterf(roi_dfroi_):
+        return distill_events_per_roi(roi_dfroi_[1], regions, **kwargs)[0]
+
+    from multiprocessing import Pool
     from tqdm import tqdm
-    # tqdm().pandas()
+
+    groupby = candidateEvents.groupby("roi")
+
     DF_filt = []
-    for roi,dfroi in tqdm(candidateEvents.groupby("roi")):
-        df_filt = distill_events_per_roi(dfroi, regions, **kwargs)[0]
-        DF_filt += [df_filt]
-    return pd.concat(DF_filt)
-
-
-def draw_event(row, ax, edge=False,zorder=3, height=.8):
-    if edge:
-        ax.plot(
-            row['t0'] + row["halfwidth"] * np.array([0, 0, 1, 1, 0]),
-            row["its"] + (np.array([0, 1, 1, 0, 0]) - .5) * height,
-            color=row['color'],
-            zorder=zorder,
-            linewidth=.5,
-        )
+    pool = Pool(10)
+    try:
+        with tqdm(total=len(groupby)) as pbar:
+            for res in pool.imap_unordered(iterf, groupby):
+                DF_filt += [res]
+                pbar.update()
+    finally:
+        pool.close()
+        pool.join()
+    if len(DF_filt):
+        DF_filt = pd.concat(DF_filt)
     else:
-        ax.fill(
-            row['t0'] + row["halfwidth"] * np.array([0, 0, 1, 1, 0]),
-            row["its"] + (np.array([0, 1, 1, 0, 0]) - .5) * height,
-            color=row['color'],
-            zorder=zorder,
-            linewidth=0,
-        )
+        DF_filt = pd.DataFrame()
+    return DF_filt
+
+
+def draw_event(row, ax, **kwargs):
+    ax.barh(row.its, row.halfwidth, left=row.t0, align="center", color=row["color"], **kwargs)
+
+# def draw_event(row, ax, edge=False,zorder=3, height=.8):
+    # if edge:
+    #     ax.plot(
+    #         row['t0'] + row["halfwidth"] * np.array([0, 0, 1, 1, 0]),
+    #         row["its"] + (np.array([0, 1, 1, 0, 0]) - .5) * height,
+    #         color=row['color'],
+    #         zorder=zorder,
+    #         linewidth=.5,
+    #     )
+    # else:
+    #     ax.fill(
+    #         row['t0'] + row["halfwidth"] * np.array([0, 0, 1, 1, 0]),
+    #         row["its"] + (np.array([0, 1, 1, 0, 0]) - .5) * height,
+    #         color=row['color'],
+    #         zorder=zorder,
+    #         linewidth=0,
+    #     )
 
 def distill_events_per_roi(roiEvents,
                            regions,
@@ -144,6 +162,7 @@ def distill_events_per_roi(roiEvents,
         require_contingency = False
         small_halfwidth = np.inf
     if plot:
+        if not hasattr(regions, "showTime"): regions.showTime = {}
         fig, axs = plt.subplots(3, 1, figsize=figsize, sharex=True, sharey=True)
         from matplotlib.ticker import MultipleLocator
         for ix, row in roiEvents.iterrows():
