@@ -1,3 +1,5 @@
+% from mmfigs
+% for el in $(grep include ../matmet.tex | awk -F "mmfigs/"  '{print $2}' | awk -F "}"  '{print $1}'); do ln -s ../figures/$el $el; done
 \documentclass[a4paper,11pt,oneside,]{article}
 \usepackage{
   %fancyvrb,
@@ -8,14 +10,15 @@
   graphicx,
   xcolor,
 }
+\usepackage[utf8]{inputenc}
 %\usepackage{palatino}
-\usepackage{fbb}
-% \usepackage{pygments}
-% \usepackage{minted}
+%\usepackage{fbb}
+%\usepackage{pygments}
+%\usepackage{minted}
 \usepackage[a4paper,text={16.5cm,25.2cm},centering]{geometry}
 \usepackage{lipsum}
 \usepackage[labelformat=simple,position=top]{subcaption}
-% \renewcommand\thesubfigure{\alph{subfigure})}
+%\renewcommand\thesubfigure{\alph{subfigure})}
 \hypersetup{
   pdfauthor = {Srdjan Sarikas},
   pdftitle={Intracellular Receptors},
@@ -24,7 +27,7 @@
   citecolor=red,
   urlcolor=green
 }
-% \newcommand{\Regions}{{\texttt{Regions}}}
+%\newcommand{\Regions}{{\texttt{Regions}}}
 
 %\setlength{\parindent}{0pt}
 %\setlength{\parskip}{1.2ex}
@@ -63,12 +66,12 @@ Our toolset is inspired and relies on CaImAn \cite{giovannucci2019caiman}, a sim
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=\textwidth,trim=1.5cm 1.5cm 15mm 15mm,clip]{figures/pipeline.pdf}
+\includegraphics[width=\textwidth,trim=1.5cm 1.5cm 15mm 15mm,clip]{mmfigs/pipeline.pdf}
 \caption{
 \label{fig:pipeline}
 An illustration of our processing and analysis pipeline:
 ({\it i})  From a full movie, we calculate the mean (or other statistic) across all frames.
-({\it ii}) We pass the mean image through a band-pass filter and define ROIs by detecting local peaks.
+({\it ii}) We pass the mean image through a band-pass filter and define ROIs by detecting local peaks of light intensity.
 ({\it iii}) We save ROIs with all the important information (time traces, ROI coordinates, movie statistics, recording frequency, pixel size, etc.).
 ({\it iv}) Traces contain features at very different timescales---with different timescales presumably important for different cell types. We collect them into separable events for analysis.
 }
@@ -95,19 +98,19 @@ If the pixel size is unknown, the choice of kernel is up to the person running t
 \centering
 \begin{minipage}{.25\textwidth}
     \vskip 2mm
-    {\fontfamily{phv}\selectfont A} \includegraphics[scale=.5,align=t,trim=25mm 15mm 130mm 72mm, clip]{figures/regions_ideal_real.pdf}\\
-    {\fontfamily{phv}\selectfont C} \includegraphics[scale=.33,align=t,trim={-5mm -1mm -1mm -10mm}]{figures/regions_stars.pdf}
+    {\fontfamily{phv}\selectfont A} \includegraphics[scale=.5,align=t,trim=25mm 15mm 130mm 72mm, clip]{mmfigs/regions_ideal_real.pdf}\\
+    {\fontfamily{phv}\selectfont C} \includegraphics[scale=.33,align=t,trim={-5mm -1mm -1mm -10mm}]{mmfigs/regions_stars.pdf}
 \end{minipage}
 \begin{minipage}{.6\textwidth}
     \vskip 7mm
-    {\fontfamily{phv}\selectfont B} \includegraphics[scale=.5,align=t,trim=10mm 15mm 20mm 15mm, clip]{figures/regions_kernels.pdf}
+    {\fontfamily{phv}\selectfont B} \includegraphics[scale=.5,align=t,trim=10mm 15mm 20mm 15mm, clip]{mmfigs/regions_kernels.pdf}
 \end{minipage}
 \caption{
 (A) Computationally created template $64{\times}64$ image with uniform spherical cells, and with Poisson noise added.
 (B) Band-pass filtering of the "realistic" image from A, with different kernel sizes, for denoising  ({\it left}), and  for approximating background  ({\it middle}).
 The difference is the filtered image, used to construct ROIs ({\it right}).
 The size of the kernel determines the approximate size of the ROIs obtained.
-In thick red contours we emphasize misidentified ROIs; the dots indicate the real locations of the cells.
+In thick red contours we emphasize misidentified ROIs; the dots indicate the real locations of the cells' centers.
 (C) Each ROI is constructed by explicitly searching for a closest peak in intensity. A pixel can only be part of a single ROI.
 \label{fig:regions}}
 \end{figure}
@@ -136,16 +139,16 @@ In general, the mean slow component needs to be inferred, typically by low-pass 
 \begin{figure}[t]
     \centering
     \begin{minipage}{.49\textwidth}
-        {\fontfamily{phv}\selectfont A} \includegraphics[scale=.5,trim=13mm 0 0 0,clip,align=t]{figures/z_score_1.pdf}
+        {\fontfamily{phv}\selectfont A} \includegraphics[scale=.5,trim=13mm 0 0 0,clip,align=t]{mmfigs/z_score_1.pdf}
     \end{minipage}
     \begin{minipage}{.49\textwidth} 
-        {\fontfamily{phv}\selectfont B} \includegraphics[scale=.5,trim=15mm 30mm 0 0,clip,align=t]{figures/z_score_2.pdf}
-        {\fontfamily{phv}\selectfont C} \includegraphics[scale=.48,trim=5mm 0mm 0 0,clip,align=t]{figures/z_score_3.pdf}
+        {\fontfamily{phv}\selectfont B} \includegraphics[scale=.5,trim=15mm 30mm 0 0,clip,align=t]{mmfigs/z_score_2.pdf}
+        {\fontfamily{phv}\selectfont C} \includegraphics[scale=.48,trim=5mm 0mm 0 0,clip,align=t]{mmfigs/z_score_3.pdf}
     \end{minipage}
     \caption{
     (A) \emph{Left}: Simulated traces with Poisson noise (blue) around different means (grey) with different temporal features. The shaded area represents one standard deviation interval around mean. 
     \emph{Right}: Irrespective of the shape of the mean, z-score transformation behaves exactly as a Gaussian variable with zero mean and unit standard deviation.\\
-    (B) The values of $z$-scores depends on the reference. In subfigure (A), the reference curves are known, but in general they need to be inferred, typically by low-pass filtering. The cut-off frequency $f_{cut}$ of a filter determines the timescale of the events that can be detected in $z$-score. If filtered with too high cut-off (orange), the resulting smooth curve follows too closely the trace and the event is not visible in $z$. With $f_{cut}=1/50$~Hz, the resulting $z$-score has obvious outliers ($z\geq 3$), visible both in trace and in the histogram.\\
+    (B) The values of $z$-scores depend on the reference. In subfigure (A), the reference curves are known, but in general they need to be inferred, typically by low-pass filtering. The cut-off frequency $f_{cut}$ of a filter determines the timescale of the events that can be detected in $z$-score. If filtered with too high cut-off (orange), the resulting smooth curve follows too closely the trace and the event is not visible in $z$. With $f_{cut}=1/50$~Hz, the resulting $z$-score has obvious outliers ($z\geq 3$), visible both in trace and in the histogram.\\
     (C) Zoom to the indicated regions form B. The original (blue) and the filtered trace and $z$-score (red), and the filtered trace and $z$-score corrected for distortion (black).
     \label{fig:z_score}
     }
@@ -166,13 +169,14 @@ The same reasoning holds for rebinning a single trace, where the resulting trace
 
 \begin{figure}[t]
  \centering
- \includegraphics[trim=25mm 0 20mm 10mm, clip,scale=0.9]{figures/mean_vs_var.pdf}
+ \includegraphics[trim=25mm 0 20mm 10mm, clip,scale=0.9]{mmfigs/mean_vs_var.pdf}
  \caption{
- {\it Left}: Regions of interest for the two experiments recorded using the raw photon-counting mode ({\it top}, used for {\color{red} Fig.1} in the main text), and the standard mode with large gain ({\it bottom}). Pixels which had at least 10 saturated values are shown in green. In thick red contours we emphasize ROIs with at least 30 green pixels used to emphasize the influence of saturation (see below).
+ {\it Left}: Regions of interest for the two experiments recorded using the raw photon-counting mode ({\it top}, used for {\bf \color{red} Fig.1} in the main text), and the standard mode with large gain ({\it bottom}). Pixels which had at least 10 saturated values are shown in green. In thick red contours we emphasize ROIs with at least 30 green pixels used to emphasize the influence of saturation (see below).
  \\
- For each recording, we filter the ROI traces at $1$s ({\it middle}) and $10$s ({\it right}) to separate the trace into slow and fast component. For each ROI we then randomly choose $100$ values of the slow component together with the variance of the fast component from a window around the same timepoint, with window size the same as the timescale.
+ For each recording, we filter the ROI traces at $1$s ({\it middle}) and $10$s ({\it right}) to separate the trace into slow and fast component. For each ROI we then randomly choose $100$ values of the slow component together with the variance of the fast component from a window around the same timepoint, with window size the same as the timescale. 
+ (Note the log-log scale of the axes, so that for a dependence of type $y=kx^n$, the apparent offset in the log-log plot is defined by slope of the dependence $k$, and the apparent slope in the plot by the exponent $n$.)
  \\
- In agreement with our assumptions, the variances and the means are linearly dependent, and in the case of raw photon counts, the dependence is exactly 1 (solid diagonal line $\sigma^2=\mu$). In the standard mode, the dependence is still linear, yet with a slope larger than one (dashed orange line). Points above the bulk in this view are due to windows with larger variance, and presumably connected with activity (at the appropriate timescale). Points below the bulk are due to undervariate windows. They are concentrated at high values and are due to saturated pixels. In the lower right plot we emphasize this fact by showing the points from saturated ROIs in red.
+In agreement with our assumptions, the variances and the means are linearly dependent ($n=1$), and in the case of raw photon counts, the dependence is exactly 1 (solid diagonal line $\sigma^2=\mu$). In the standard mode with non-unit gain, the dependence is still linear, yet with a slope larger than one (dashed orange line). Points above the bulk in this view are due to windows with larger variance, and presumably connected with activity (at the appropriate timescale). Points below the bulk are due to undervariate windows. They are concentrated at high values and are due to saturated pixels. In the lower right plot we emphasize this fact by showing the points from saturated ROIs in red.
  }
  \label{fig:mean_vs_var}
 \end{figure}
@@ -180,7 +184,7 @@ The same reasoning holds for rebinning a single trace, where the resulting trace
 
 
 \subsubsection{Realistic detectors}
-All{\color{red}?} the experiments discussed in this manuscript were recorded on a Leica setup with Hybrid detector in photon counting mode.
+All\marginpar{{\color{red}All?}} the experiments discussed in this manuscript were recorded on a Leica setup with Hybrid detector in photon counting mode.
 In this case, we see no significant departure from our assumption of Poisson distribution.
 Even with non-unit gain, the linear dependence between variance and mean remains, though the slope is different from $1$ (fig.~\ref{fig:mean_vs_var}).
 
@@ -189,20 +193,20 @@ Other types of detectors introduce additional sources of noise other than Poisso
 
 \subsection{Identification of Events}
 
-Traces contain features spanning orders of magnitude in time: from tens of miliseconds, to tens of minutes. 
+Traces contain features spanning orders of magnitude in time: from tens of milliseconds, to tens of minutes. 
 We aim to investigate how do events at these different timescales interact and a connection between them and the islets' environment.
-For this, we devised an algorithm based on sequential filtering, followed by .
+For this, we devised a two-step algorithm to identify intrinsic timescale of events and minimize false positives.
 In the first step, we perform a sequential filtering of the traces at timescales starting from $0.5$s, and increasing by a factor of $\sqrt[4]{2}$,  $\tau = \{2^{-1}, 2^{-3/4}, 2^{-1/2}, 2^{-1/4},\dots\}$, until the timescale of the longest event we are interested (and in any case it makes no sense to filter at timescale comparable to the length of the experiment itself).
 At each timescale, we transform the trace to $z$-score, and identify regions where $z>3$ as {\it candidate events}. 
 
-An event is characterized by the start time ($t_0$), it's maximal height, and the width at the half of the height ({\it halfwidth}, $\delta t$), which is our measurement of it's duration.
+An event is characterized by the start time ($t_0$), its maximal height, and the width at the half of the height ({\it halfwidth}, $\delta t$), which is our measurement of it's duration.
 For simplicity, we define end time as $t_{\rm end} = t_0+\delta t$, although events arguably last much longer after the intensity drops at half of the peak.
 
 \begin{figure}[t]
 
  \centering
 %  \newgeometry{textwidth=20cm}
- \includegraphics[trim=12mm 0 0mm 0mm, scale=0.9]{figures/evdist.pdf}
+ \includegraphics[trim=12mm 0 0mm 0mm, scale=0.9]{mmfigs/evdist.pdf}
  \caption{(A) Example of a trace (black) and slow components in sequential filtering (shades of gray). % Square indicates the regions shown in B and C. 
  (B) Close-up view of the indicated small region from (A) and a representation of all candidate events in that region detected through sequential filtering.
  Each bar represents an event. Vertical position corresponds to the timescale at which the event was detected, the horizontal boundaries correspond to beginning and end time.
