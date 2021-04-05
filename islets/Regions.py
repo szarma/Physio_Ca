@@ -1793,14 +1793,14 @@ def edges2nodes(x,start=0,direction=1):
 def getStatImages(movie_, debleach=False, downsampleFreq=2):
     if movie_.fr>downsampleFreq:
         n_rebin = int(np.round(movie_.fr/downsampleFreq))
-        if n_rebin>=2:
-            m_for_image = rebin(movie_,n_rebin, dtype="float16")
+        if n_rebin>1:
+            m_for_image = movie_.resize(1,1, 1/n_rebin)
         else:
             m_for_image = movie_
     else:
         m_for_image = movie_
     statImages = {}
-    m_for_image = m_for_image.astype("float16")
+    # m_for_image = m_for_image.astype("float16")
     if debleach:
         m_for_image.debleach()
 
@@ -1812,5 +1812,5 @@ def getStatImages(movie_, debleach=False, downsampleFreq=2):
     for f in [np.mean,np.std]:
         statImages["diff_"+f.__name__] = f(m_for_image,axis=0)
     statImages["diff_highperc"] = np.percentile(m_for_image,100*(1-10/len(m_for_image)), axis=0)
-    statImages = {k:statImages[k].astype("float32") for k in statImages}
+#     statImages = {k:statImages[k] for k in statImages}
     return statImages
