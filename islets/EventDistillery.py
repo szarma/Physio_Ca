@@ -209,17 +209,16 @@ def distill_events_per_roi(roiEvents,
             g.add_edge(isp, other)
     if plot:
         ax = axs[1]
-        nx.draw_networkx(g,
+        lines = nx.draw_networkx_edges(g,
                          ax=ax,
-                         with_labels=False,
                          pos={node: (
                          roiEvents.loc[node, "t0"] + .5 * roiEvents.loc[node, "halfwidth"], roiEvents.loc[node, "its"])
                               for node in g.nodes},
-                         node_size=0,
                          edge_color="grey",
                          width=.8,
                          arrows=False,
                          )
+        lines.set_zorder(5)
         # ax.set_yticks(np.arange(len(timescales)));
         # ax.set_yticklabels(timescales);
         ax.tick_params(left=True, bottom=True, labelleft=True, labelbottom=True)
