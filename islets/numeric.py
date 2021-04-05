@@ -97,10 +97,11 @@ def fast_filter(absdata,
 def robust_max(a,Nlast=10,absolute=True):
     if absolute:
         a = np.abs(a)
+    a = a[np.isfinite(a)]
     if Nlast<2:
-        return np.nanmax(a)
+        return a.max()
     else:
-        return np.nanpercentile(a,100*(1-Nlast/a.size))
+        return np.percentile(a,100*(1-Nlast/a.size))
 
 def rebin(a,n,axis=0, dtype="float32", func=np.mean):
     if type(axis)==int and type(n)==int:
