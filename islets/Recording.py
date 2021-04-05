@@ -1,7 +1,7 @@
 import os
 from sys import exc_info
 from warnings import warn
-
+import errno
 import bioformats as bf
 import numpy as np
 import pandas as pd
@@ -114,6 +114,8 @@ def autocorr2d(sett, dxrange, dyrange):
 
 class Recording:
     def __init__(self, pathToExperiment):
+        if not os.path.isfile(pathToExperiment):
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), pathToExperiment)
         self.folder, self.Experiment = os.path.split(pathToExperiment)
         self.path = pathToExperiment
         self.metafile = os.path.join(self.folder,  f".{self.Experiment}.meta")
