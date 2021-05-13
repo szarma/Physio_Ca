@@ -2,7 +2,8 @@ import os
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-
+import warnings
+import ffmpeg
 
 def coltrans(x, vmin=None, vmax=None, tilt=1, offset=0.1):
     from .numeric import robust_max
@@ -36,6 +37,55 @@ def save_tiff(movie, movieFilename):
             compression="tiff_deflate"
            )
 
+def get_video_dimensions(file):
+    probe = ffmpeg.probe(file)
+    height, width = probe["streams"][0]["height"], probe["streams"][0]["width"]
+    return width, height
+
+def show_frame(file, frame=0, ax=None, show=True):
+    import ffmpeg
+    out, _ = (
+        ffmpeg
+        .input(file)
+        .filter('select', 'eq(n,{})'.format(frame))
+        .output("pipe:", format="rawvideo", pix_fmt="rgb24")
+    #     .output('pipe:', vframes=1, format='image2', vcodec='mjpeg')
+        .run(capture_stdout=True)
+    )
+    w, h = get_video_dimensions(file)
+    values  = np.frombuffer(out,np.uint8).reshape(h, w, 3)
+    if show:
+        setax = ax is None
+        if setax:
+            fig = plt.figure(facecolor="lime")
+            ax = fig.add_axes([.1,.1,.8,.8])
+        ax.imshow(values)
+        if setax:
+            for sp in ax.spines: ax.spines[sp].set_visible(False)
+    return values
+
+def renderLatex(formula, fontsize=12, dpi=200, format='png', file=None):
+    from io import BytesIO
+    """Renders LaTeX formula into image or prints to file.
+    """
+    fig = plt.figure(figsize=(0.01, 0.01))
+    fig.text(0, 0,
+#              s = u'${}$'.format(formula),
+             s = formula,
+             fontsize=fontsize
+            )
+
+    output = BytesIO() if file is None else file
+#     with warnings.catch_warnings():
+#         warnings.filterwarnings('ignore', category=MathTextWarning)
+    fig.savefig(output, dpi=dpi, transparent=True, format=format,
+                bbox_inches='tight', pad_inches=0.05, frameon=False)
+
+    plt.close(fig)
+
+    if file is None:
+        output.seek(0)
+        return output
 
 def hex_to_rgb(value):
     """Return (red, green, blue) for the color given as #rrggbb."""
@@ -209,7 +259,7 @@ def create_preview_image(regions, filepath=None, show=False):
     fig.savefig(filepath,dpi=75)
     if not show:
         plt.close(fig)
-    
+
 def show_movie(m_show,
                figScale = 1,
                out="jshtml",
@@ -225,7 +275,7 @@ def show_movie(m_show,
                offset=(0,0),
               ):
     from .numeric import rebin
-    
+
     from matplotlib import animation
     if tmax is not None:
         pass
@@ -246,7 +296,7 @@ def show_movie(m_show,
     currentBackend = matplotlib.get_backend()
     plt.switch_backend('agg')
     fig = plt.figure(figsize=figsize,dpi=dpi)
-    ax = fig.add_axes([0.01,0.01,.98,.98])
+    ax = fig.add_axes([0.,0.,1,1])
     extent = (offset[0]-.5, offset[0]-.5+m_show.shape[2], offset[1]-.5+m_show.shape[1], offset[1]-.5, )
     if cmapArgs is None:
         im = ax.imshow(m_show[0], cmap="Greys", vmin=m_show.min(), vmax=m_show.max(), extent=extent)
@@ -291,7 +341,7 @@ def show_movie(m_show,
                                    frames=len(m_show),
                                    interval=1000/fps,
                                    blit=True)
-    
+
     plt.switch_backend(currentBackend)
     if out=="html5":
         from IPython.display import HTML
@@ -310,9 +360,9 @@ def show_movie(m_show,
 #                 anim.save(saveName, extra_args=['-vcodec', 'libx264'])
 #         return None
     else:
-        raise ValueError("out can only be one of the following: 'html5, jshtml, save'")    
-        
-        
+        raise ValueError("out can only be one of the following: 'html5, jshtml, save'")
+
+
 def getFigure(w=300,h=300,c="lightgrey"):
     import plotly.graph_objects as go
     fig = go.Figure(layout={
@@ -564,17 +614,18 @@ def saveRois(regions,outDir,filename="",movie=None,col=["trace"],formats=["vienn
                 feedback += [f"ROI info saved in {roifile}."]
 
             elif format=="maribor":
-                
+                warnings.warn(f"you requested to save multiple traces, but maribor format supports only one, so only first ({col[0]}) will be used.")
+                col = col[0]
                 traces = pd.DataFrame(np.vstack(regions.df[col]).T)
                 try:
                     traces["time"] = regions.showTime[col.split("_")[-1]]
                 except:
                     traces["time"] = regions.time
                 traces = traces[["time"]+list(traces.columns[:-1])]
-                tracefile = f"{outDir}/{filename}_trace_for_mb.txt"
+                tracefile = f"{outDir}/{filename}_{col}.txt"
                 np.savetxt(tracefile, traces.values)
                 feedback += [f"Traces saved in {tracefile}."]
-                coordFile = f"{outDir}/{filename}_coords_for_mb.txt"
+                coordFile = f"{outDir}/{filename}_coords.txt"
                 coords = np.array([np.mean(pxs,axis=0) for pxs in regions.df["pixels"]])
                 np.savetxt(coordFile, coords)
                 feedback += [f"Coordinates saved in {coordFile}."]
