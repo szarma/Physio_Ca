@@ -67,7 +67,7 @@ def parse_leica(rec,
         return list(zip(idxs,outSer))
     return outSer
 
-def saveMovie(movie, filename, maxFreq=2, frameRate=60, dpi=100,figScale=1):
+def saveMovie(movie, filename, maxFreq=2, showtime=True, **kwargs):
     from .utils import show_movie
     from .numeric import rebin
     if maxFreq<movie.fr:
@@ -81,25 +81,19 @@ def saveMovie(movie, filename, maxFreq=2, frameRate=60, dpi=100,figScale=1):
     else:
         showMovie = movie+1
     if filename=="embed":
-        return show_movie(showMovie, 
-               fps=frameRate,
-               NTimeFrames=len(showMovie),
-               # out="save",
-               # saveName=filename,
-               tmax=len(showMovie)/showMovie.fr,
-               dpi=dpi,
-               figScale=figScale
-              )
+        return show_movie(showMovie,
+                          NTimeFrames=len(showMovie),
+                          tmax=len(showMovie)/showMovie.fr if showtime else None,
+                          **kwargs
+                          )
     else:
-        show_movie(showMovie, 
-               fps=frameRate,
-               NTimeFrames=len(showMovie),
-               out="save",
-               saveName=filename,
-               tmax=len(showMovie)/showMovie.fr,
-               dpi=dpi,
-               figScale=figScale
-              )
+        show_movie(showMovie,
+                   out="save",
+                   saveName=filename,
+                   NTimeFrames=len(showMovie),
+                   tmax=len(showMovie)/showMovie.fr if showtime else None,
+                   **kwargs
+                   )
         return 0
 
 def autocorr2d(sett, dxrange, dyrange):
