@@ -248,6 +248,8 @@ class Recording:
         self.metadata.to_csv(self.metafile, float_format = "%#.3g")
         
     def import_series(self, Series, onlyMeta=False, isLineScan=False, restrict=None, mode="auto", save=True, pathToTif=None):
+        # print ("+"*20,Series, self.metadata.Name)
+
         if Series=="all":
             SeriesList = self.allSeries
         elif Series in self.metadata.Name.values:
@@ -260,23 +262,31 @@ class Recording:
             else:
                 Series = "Series%03i"%(serrange[0])
         else:
-            serrange = Series.split("Series")[1].split("-")
-            serrange = [int(el) for el in serrange]
-            singleFile = len(serrange)==1
-            if singleFile:
-                SeriesList = [Series]
-            else:
-                serrange = range(serrange[0],serrange[-1]+1)
-                SeriesList = ["Series%03i"%i for i in serrange]
+            try:
+                serrange = Series.split("Series")[1].split("-")
+                serrange = [int(el) for el in serrange]
+                singleFile = len(serrange)==1
+                if singleFile:
+                    SeriesList = [Series]
+                else:
+                    serrange = range(serrange[0],serrange[-1]+1)
+                    SeriesList = ["Series%03i"%i for i in serrange]
+            except:
+                print(f"Cannot import {Series} from {self.path}. Probably a modified name.")
+                SeriesList = []
+                self.Series = {}
+                return None
         try:
             self.Series
         except:
             self.Series = {}
         self.Series[Series] = {}
-        
+
         metadata = self.metadata.copy()
         toDrop = [i for i,r in metadata.iterrows() if r.Name not in SeriesList]
         metadata.drop(index=toDrop, inplace=True)
+        if len(metadata)==0:
+            return None
         if len(metadata)>1:
             assert (np.abs(metadata["Frequency"]/metadata["Frequency"].mean()-1)<1e-1).all()
 
@@ -472,6 +482,7 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
 #                     continue
                 
                 saveDir = os.path.join(analysisFolder, ser)
+                if len(rec.Series)==0: continue
                 for k,v in rec.Series[series]["metadata"].items(): 
                     md[k] = v
                 if "_" in ser:
