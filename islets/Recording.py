@@ -341,8 +341,14 @@ class Recording:
                 mode="auto"
             print("loading")
             # load motion corrected
-            from caiman import load as cload
-            data = cload(pathToTif)
+            if pathToTif.lower().endswith("tif") or pathToTif.lower().endswith("tiff"):
+                from caiman import load as cload
+                data = cload(pathToTif)
+            elif pathToTif.lower().endswith("npy"):
+                from . import cmovie
+                data = cmovie(np.load(pathToTif))
+            else:
+                raise ValueError("Unknown file extension")
             data.fr = None
             FrameRange = metadata2.frame_range
             data = data[FrameRange[0]:FrameRange[1]]
