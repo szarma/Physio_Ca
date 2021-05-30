@@ -5,8 +5,8 @@ import argparse
 parser = argparse.ArgumentParser(description='Correct series for translational motion')
 parser.add_argument('--recording', '-rec', type=str, default="", help='path to the recording')
 parser.add_argument(   '--series', '-ser', type=str, default="", help='name of the series')
-parser.add_argument( '--restrict', type=str, default="", help='restrict analysis to the time interval (in seconds!), e.g. "0-100" will only process first 100 seconds of the movie')
-parser.add_argument('--verbose', const=True, default=False, action="store_const",
+parser.add_argument( '--restrict', type=str, default="", help='restrict analysis to the time interval (in seconds!), e.g. "0_100" will only process first 100 seconds of the movie')
+parser.add_argument(  '--verbose', const=True, default=False, action="store_const",
                     help='toggle verbose output')
 # parser.add_argument('--test', const=True, default=False, action="store_const",
 #                     help='toggle test mode on')
@@ -30,7 +30,6 @@ import warnings
 import os
 import matplotlib.pyplot as plt
 import PIL
-from tempfile import gettempdir
 
 from islets import cmovie
 from islets.numeric import rebin
@@ -71,17 +70,15 @@ if args.verbose:
 
 rec.import_series(serToImport, restrict=restrict, )
 metadata = rec.Series[serToImport]['metadata']
-
-
-metadata   = rec.Series[ser]["metadata"]
+# metadata   = rec.Series[ser]["metadata"]
 freq = metadata.Frequency
 orig_movie = cmovie(rec.Series[ser]["data"][:-1], fr=freq)
 
 if args.debug:
     assert False ########################## debug stop ###########
     
-freqMC = 2
-n_rebin = int(freq/freqMC)
+freqMC = 1
+n_rebin = int(np.round(freq/freqMC))
 if n_rebin<1:
     n_rebin=1
 reb_movie = rebin(orig_movie,n_rebin,dtype='float32')
@@ -89,45 +86,50 @@ reb_movie = cmovie(reb_movie, fr=freq/n_rebin)
 cell_half_width_in_px = int(np.ceil(6/metadata.pxSize))
 max_dev_rig = cell_half_width_in_px//2+1
 
-
-
+figs, axs = plt.subplots(2, 1, figsize=(8, 8), sharex=True, sharey=True)
 shifts = np.zeros((len(reb_movie), 2))
-template = reb_movie[len(reb_movie)//2]
+template = reb_movie[len(reb_movie) // 2]
 while True:
     tmp = reb_movie.motion_correct(
         max_shift_w=max_dev_rig,
         max_shift_h=max_dev_rig,
         template=template
     )
-    dshifts  = np.array(tmp[1])
+    dshifts = np.array(tmp[1])
     template = template
     shifts += dshifts
     maxshift = np.abs(dshifts).max()
-    if maxshift<max_dev_rig:
-        break
 
-        
-plt.plot(np.arange(len(shifts))/reb_movie.fr, shifts[:,0], label="vertical")
-plt.plot(np.arange(len(shifts))/reb_movie.fr, shifts[:,1], label="horizontal")
-plt.legend()
-plt.xlabel("time")
-plt.ylabel("shift in pixels")
+    axs[0].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 0])
+    axs[1].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 1])
+    if maxshift < max_dev_rig:
+        break
+plt.xlabel("time index")
+axs[0].set_title("shifts (in pixels)")
+axs[0].set_ylabel("vertical")
+axs[1].set_ylabel("horizontal")
 plt.savefig(os.path.join(saveDir, "shifts.png"))
 
 if n_rebin>1:
     shifts = cmovie(shifts.reshape((1,)+shifts.shape)).resize(n_rebin,1,1)[0]
 
-m_rshifted = orig_movie[:len(shifts)].apply_shifts(shifts)
+m_rshifted = np.zeros_like(orig_movie[:len(shifts)])
 
+di = len(shifts)//20
 
 mtype = metadata["bit depth"]
 maxv = 2**int(str(mtype).strip("uint"))-1
-m_rshifted[m_rshifted<0] = 0
-if m_rshifted.max()>maxv:
-    print (f"some pixels in the shifted movie are larger than {maxv}, that's strange. I'll put them to the max value.")
-    m_rshifted[m_rshifted>maxv] = maxv
-m_rshifted = np.round(m_rshifted)
-m_rshifted = m_rshifted.astype(mtype)
+
+for i in range(0,len(shifts),di):
+    sl = slice(i,min(len(shifts),i+di))
+    print(sl.start, sl.stop)
+    tmpm = orig_movie[sl].apply_shifts(shifts[sl])
+    tmpm[tmpm<0] = 0
+    tmpm[tmpm>maxv] = maxv
+    tmpm = np.round(tmpm)
+    m_rshifted[sl] = tmpm
+
+del orig_movie, rec
 
 if len(rec.metadata)==1:
     movieFilename = os.path.join(saveDir, ".".join(rec.Experiment.split(".")[:-1]+["mp4"]))
@@ -146,5 +148,4 @@ im.save(movieFilename,
 
 saveMovie(m_rshifted, movieFilename.replace(".tif",".mp4"), )
 bf.javabridge.kill_vm()
-del rec
 quit()
