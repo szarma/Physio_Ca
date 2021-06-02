@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  # config for reverse proxy
+  reverse-proxy:
+    image: traefik:latest
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entryPoints.http.address=:80"
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      # - /etc/certs:/etc/certs
+
+  # config for single user servers
+  jupyter_server:
+    build: 
+      context: ./
+      dockerfile: ./docker/jupyter_server/Dockerfile
+      args: 
+        - SERVER_DOCKER_PATH=${SERVER_DOCKER_PATH}
+    image: jupyterserver_img
+    container_name: jupyterserver_throw-away
+    network_mode: none
+    command: echo
+
+  # config for Hub+Proxy
+  jupyterhub:
+    build: 
+      context: ./
+      dockerfile: ./docker/jupyterhub/Dockerfile
+      args:
+        - HUB_DOCKER_PATH=${HUB_DOCKER_PATH}
+    container_name: jupyterhub_hub
+    volumes:                                                     # Give access to Docker socket.
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:                                                 # Env variables passed to the Hub process.
+      - DOCKER_JUPYTER_CONTAINER=jupyterserver_img
+      - DOCKER_NETWORK_NAME=${COMPOSE_PROJECT_NAME}_default
+      - HUB_IP=localhost
+      - HOST
+    labels:                                                       # Traefik configuration.
+      - "traefik.enable=true"                                     # enable Traefik for this service
+      - "traefik.frontend.rule=Host:${HOST}"                      # apply rule for frontend
+      - "traefik.docker.network=${COMPOSE_PROJECT_NAME}_default"  # use internal docker network
+      - "traefik.http.routers.jupyterhub.rule=Host(`${HOST}`)"    # apply routing through traefik
+  
+# volumes:
+
