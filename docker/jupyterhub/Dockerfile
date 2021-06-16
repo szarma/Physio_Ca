@@ -9,6 +9,7 @@ COPY $HUB_DOCKER_PATH/jupyterhub_config.py .
 # Install dependencies (for culling and spawning)
 RUN pip install \
     dockerspawner \
+    oauthenticator \
     jupyterhub-idle-culler \
     cdsdashboards
 
