@@ -49,5 +49,5 @@ services:
       - "traefik.docker.network=${COMPOSE_PROJECT_NAME}_default"  # use internal docker network
       - "traefik.http.routers.jupyterhub.rule=Host(`${HOST}`)"    # apply routing through traefik
   
-# volumes:
-
+volumes:
+  jupyterhub_data:
