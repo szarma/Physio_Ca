@@ -2,7 +2,16 @@ FROM jupyter/scipy-notebook:latest
 
 # update package manager and create physio environment:
 RUN python3 -m pip install --upgrade pip
-RUN conda create -n Physio -c conda-forge python cython caiman jupyter_contrib_nbextensions dash cdsdashboards-singleuser ffmpeg
+RUN conda create \
+          -n Physio \
+          -c conda-forge \
+          python \
+          cython \
+          caiman \
+          jupyter_contrib_nbextensions \ 
+          dash \
+          cdsdashboards-singleuser \
+          ffmpeg
 
 # copy dash-specific config files:
 RUN rm -rf /home/jovyan/work
@@ -26,8 +35,9 @@ COPY README.md /opt/README.md
 COPY VERSION /opt/VERSION
 
 # install jvm for bioformats and fix permissions:
-RUN apt update
-RUN apt install -y default-jdk
+RUN apt-get update --yes && \
+    apt-get install --yes --no-install-recommends \
+    default-jdk
 RUN ln -s /opt/app/ /home/jovyan/app
 RUN /usr/local/bin/fix-permissions "/opt/"
 

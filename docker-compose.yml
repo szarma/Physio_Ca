@@ -38,6 +38,7 @@ services:
     container_name: jupyterhub_hub
     volumes:                                                     # Give access to Docker socket.
       - /var/run/docker.sock:/var/run/docker.sock
+      - jupyterhub_data:/data:rw
     environment:                                                 # Env variables passed to the Hub process.
       - DOCKER_JUPYTER_CONTAINER=jupyterserver_img
       - DOCKER_NETWORK_NAME=${COMPOSE_PROJECT_NAME}_default

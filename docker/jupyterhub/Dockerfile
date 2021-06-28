@@ -13,4 +13,6 @@ RUN pip install \
     jupyterhub-idle-culler \
     cdsdashboards
 
-RUN useradd --create-home --shell /bin/bash admin --password "$(openssl passwd -1 admin)"
+RUN useradd --create-home \
+            --shell /bin/bash admin \
+            --password "$(openssl passwd -1 admin)"
