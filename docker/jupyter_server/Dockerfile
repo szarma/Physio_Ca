@@ -37,6 +37,7 @@ COPY VERSION /opt/VERSION
 # install jvm for bioformats and fix permissions:
 RUN apt-get update --yes && \
     apt-get install --yes --no-install-recommends \
+    build-essential \
     default-jdk
 RUN ln -s /opt/app/ /home/jovyan/app
 RUN /usr/local/bin/fix-permissions "/opt/"
