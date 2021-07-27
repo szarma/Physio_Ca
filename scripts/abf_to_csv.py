@@ -1,3 +1,5 @@
+#!/opt/tljh/user/envs/physio/bin/python
+
 import argparse
 import logging
 import os
@@ -41,8 +43,7 @@ def df_from_arrays(arrays, columns, index) -> pd.DataFrame:
     return pd.DataFrame(mgr, copy=False)
 
 
-parser = argparse.ArgumentParser(prog='ABF to CSV converter',
-                                 description='Utility to convert files using Axon Bioformat (ABF) to CSV format.')
+parser = argparse.ArgumentParser(description='Utility to convert files using Axon Bioformat (ABF) to CSV format.')
 parser.add_argument('--input-file', '-i',
                     required=True,
                     nargs=1,
