@@ -7,20 +7,28 @@ from sys import stdout
 
 from PIL import Image
 
-parser = argparse.ArgumentParser(prog='correct_tiff',
-                                 description='Utility to swap channels in a TIFF-file')
-parser.add_argument('files',
-                    metavar='N',
-                    help='File(s) to be corrected.',
-                    nargs='+')
-parser.add_argument('--swap-red-green', '-rg',
-                    help='Specifies whether to swap the red and green channel.',
-                    action='store_true',
-                    dest='swap_red_green')
-parser.add_argument('--verbose',
-                    action='store_true',
-                    dest='verbose',
-                    help='Trigger to display more information while executing the script.')
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(prog='correct_tiff',
+                                     description='Utility to swap channels in a TIFF-file')
+    parser.add_argument('files',
+                        metavar='N',
+                        help='File(s) to be corrected.',
+                        nargs='+')
+    parser.add_argument('--swap-red-green', '-rg',
+                        help='Specifies whether to swap the red and green channel.',
+                        action='store_true',
+                        dest='swap_red_green')
+    parser.add_argument('--recursive', '-R',
+                        action='store_true',
+                        dest='is_recursive',
+                        help='Specifies if paths are given from directories and every TIFF per directory shall be '
+                             'considered.')
+    parser.add_argument('--verbose',
+                        action='store_true',
+                        dest='verbose',
+                        help='Trigger to display more information while executing the script.')
+    return parser.parse_args()
 
 
 def prepare_logger(_args: argparse.Namespace) -> logging.Logger:
@@ -36,12 +44,28 @@ def prepare_logger(_args: argparse.Namespace) -> logging.Logger:
 
 
 if __name__ == '__main__':
-    args = parser.parse_args()
+    args = parse_args()
     log = prepare_logger(args)
+    files = args.files
+    if args.is_recursive:
+        files_tmp = []
+        log.debug(f'Searching files in directories:')
+        for entry in files:
+            r_files = []
+            cmd_dir = Path(entry)
+            if cmd_dir.is_dir():
+                log.debug(f'Searching .tif files in "{entry}"')
+                res = cmd_dir.glob('*.tif')
+                for file in res:
+                    if file.is_file():
+                        r_files.append(file)
+                        log.debug(f'Added "{file}" to list.')
+            [files_tmp.append(file) for file in r_files]
+        files = files_tmp
 
     if args.swap_red_green:
         log.info(f'Swapping channels (R <-> G)')
-        for file in args.files:
+        for file in files:
             path = Path(file)
             if path.is_file():
                 image = Image.open(path.as_posix())
