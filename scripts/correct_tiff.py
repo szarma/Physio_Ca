@@ -5,7 +5,9 @@ import logging
 from pathlib import Path
 from sys import stdout
 
-from PIL import Image
+import numpy as np
+from skimage.exposure import rescale_intensity
+from skimage.io import imread, imsave
 
 
 def parse_args() -> argparse.Namespace:
@@ -19,6 +21,11 @@ def parse_args() -> argparse.Namespace:
                         help='Specifies whether to swap the red and green channel.',
                         action='store_true',
                         dest='swap_red_green')
+    parser.add_argument('--lut',
+                        dest='LUT',
+                        nargs=3,
+                        default=None,
+                        help='LUT values for R, G, B channels of the image.')
     parser.add_argument('--recursive', '-R',
                         action='store_true',
                         dest='is_recursive',
@@ -68,11 +75,20 @@ if __name__ == '__main__':
         for file in files:
             path = Path(file)
             if path.is_file():
-                image = Image.open(path.as_posix())
-                r, g, b = image.split()
-                converted_image = Image.merge('RGB', (g, r, b))
+                image: np.ndarray = imread(path.as_posix())
+                r = image[:, :, 0].copy()
+                g = image[:, :, 1].copy()
+                b = image[:, :, 2].copy()
+                if args.LUT is not None:
+                    log.info(f'LUT was set for adjustments.')
+                    log.info(f'R: {args.LUT[0]}, G: {args.LUT[1]}, B: {args.LUT[2]}')
+                    r = rescale_intensity(image[:, :, 0], in_range=(r.min(), int(args.LUT[0])))
+                    g = rescale_intensity(image[:, :, 1], in_range=(g.min(), int(args.LUT[1])))
+                    b = rescale_intensity(image[:, :, 2], in_range=(b.min(), int(args.LUT[2])))
+
+                converted_image = np.dstack((g, r, b))
                 save_path = path.as_posix().replace(path.suffix, '_converted.tif')
-                converted_image.save(save_path)
+                imsave(save_path, converted_image, check_contrast=False)
                 log.info(f'Converted "{path.as_posix()}" and saved it to "{save_path}".')
             else:
                 log.debug(f'"{path.as_posix()}" does not exist or is no file! Skipped.')
