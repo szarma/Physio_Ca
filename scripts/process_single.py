@@ -28,10 +28,26 @@ parser.add_argument('--spatial-filter',"-sp", default=None,
                     sizes based on pxSize in the metadata if there are.''')
 parser.add_argument('--line-scan', default="none", type=str,
                     help='indicate if it is a line scan, and if yes, what kind ("single" or "multi")')
+parser.add_argument('--notify', dest='notify', action='store_true',
+                    help='Triggers notification on slack when the script starts/finishes.')
+parser.add_argument('--notification-user', '-nu', default=None, dest='slack_userlist',
+                    help='List of users to notify with the slack notifications')
 parser.add_argument('--debug', const=True, default=False, action="store_const",
                     help='toggle debug mode')
 
 args = parser.parse_args()
+
+# Token for the bot, which will be used to post in slack for notifications
+SLACK_BOT_TOKEN = 'xoxb-1186403589973-2442412187872-CtxhZTgETZGcfXGQ5uF2Y4kF'
+
+# Member IDs of the users connected to slack
+SLACK_USER_IDS = {
+    'jupyter-johannes': 'U015WBY6A6M',
+    'jupyter-sandra': 'U015MNRBCPM',
+    'jupyter-marjan': 'U015J2J3NG2',
+    'jupyter-nastja': 'U01C6HAJXNZ',
+    'jupyter-srdjan': 'U01545E6T9V'
+}
 
 def process_as_linescans(nameDict=None):
     global data, linescan
@@ -76,6 +92,9 @@ import numpy as np
 np.corrcoef(*np.random.randn(2,3))
 import pickle
 from sys import exc_info, exit
+import getpass
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
 
 from pandas import DataFrame
 
@@ -93,12 +112,29 @@ with warnings.catch_warnings():
     except:
         pass
 
-
 pathToTif = args.use_tif
 if pathToTif is not None:
     args.leave_movie=True
 recFile = args.recording
 ser = args.series
+
+if args.notify:
+    client = WebClient(token=SLACK_BOT_TOKEN)
+    try:
+        user = []
+        if args.slack_userlist is None:
+            user = [getpass.getuser()]
+        else:
+            user = args.slack_userlist if type(args.slack_userlist) == list else [args.slack_userlist]
+        for slack_user in user:
+            if slack_user in SLACK_USER_IDS:
+                client.chat_postMessage(channel=SLACK_USER_IDS[slack_user],
+                                        text=f'Started processing of `{recFile}` (Series: `{ser}`...')
+            else:
+                print(f'User {slack_user} does not exist in slack dictionary. Message will not be sent.')
+    except SlackApiError as e:
+        assert e.response['error']
+        print(f'Error while sending slack notification: {e.response["error"]}')
 
 start_vm = (pathToTif is None) or args.line_scan!="none"
 
@@ -267,4 +303,23 @@ for spFilt in filtSizes:
 
 if 'rec' in globals():
     del rec
+
+if args.notify:
+    client = WebClient(token=SLACK_BOT_TOKEN)
+    try:
+        user = []
+        if args.slack_userlist is None:
+            user = [getpass.getuser()]
+        else:
+            user = args.slack_userlist if type(args.slack_userlist) == list else [args.slack_userlist]
+        for slack_user in user:
+            if slack_user in SLACK_USER_IDS:
+                client.chat_postMessage(channel=SLACK_USER_IDS[slack_user],
+                                        text=f'Finished processing of `{recFile}`.')
+            else:
+                print(f'User {slack_user} does not exist in slack dictionary. Message will not be sent.')
+    except SlackApiError as e:
+        assert e.response['error']
+        print(f'Error while sending slack notification: {e.response["error"]}')
+
 exit()
