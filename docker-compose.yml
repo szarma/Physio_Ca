@@ -20,30 +20,36 @@ services:
   jupyter_server:
     build: 
       context: ./
-      dockerfile: ./docker/jupyter_server/Dockerfile
+      dockerfile: ./${SERVER_DOCKER_PATH}/Dockerfile
       args: 
         - SERVER_DOCKER_PATH=${SERVER_DOCKER_PATH}
-    image: jupyterserver_img
-    container_name: jupyterserver_throw-away
-    network_mode: none
+        - HUB_VERSION=${JUPYTERHUB_VERSION}
+    image: ${SERVER_IMAGE_NAME}
+    networks:
+      - default
     command: echo
 
-  # config for Hub+Proxy
+  # config for Hub
   jupyterhub:
+    depends_on:
+      - "reverse-proxy"
     build: 
       context: ./
-      dockerfile: ./docker/jupyterhub/Dockerfile
+      dockerfile: ./${HUB_DOCKER_PATH}/Dockerfile
       args:
         - HUB_DOCKER_PATH=${HUB_DOCKER_PATH}
-    container_name: jupyterhub_hub
-    volumes:                                                     # Give access to Docker socket.
-      - /var/run/docker.sock:/var/run/docker.sock
-      - jupyterhub_data:/data:rw
+        - HUB_VERSION=${JUPYTERHUB_VERSION}
+    container_name: ${HUB_CONTAINER_NAME}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock                # Give access to Docker socket.
+      - jupyterhub_data:/data/:rw                                # Add a data partition for data storage.
     environment:                                                 # Env variables passed to the Hub process.
-      - DOCKER_JUPYTER_CONTAINER=jupyterserver_img
+      - DOCKER_JUPYTER_CONTAINER=${SERVER_IMAGE_NAME}
       - DOCKER_NETWORK_NAME=${COMPOSE_PROJECT_NAME}_default
-      - HUB_IP=localhost
+      - HUB_IP=${HUB_CONTAINER_NAME}
       - HOST
+    networks:
+      - default
     labels:                                                       # Traefik configuration.
       - "traefik.enable=true"                                     # enable Traefik for this service
       - "traefik.frontend.rule=Host:${HOST}"                      # apply rule for frontend
@@ -52,3 +58,7 @@ services:
   
 volumes:
   jupyterhub_data:
+
+networks:
+  default:
+    name: ${COMPOSE_PROJECT_NAME}_default
