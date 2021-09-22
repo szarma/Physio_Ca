@@ -18,11 +18,15 @@ import pandas as pd
 from scipy.stats import median_abs_deviation
 import plotly.graph_objects as go
 from matplotlib.colors import LogNorm
+from matplotlib.axes import Axes
+from matplotlib.gridspec import GridSpec
 from plotly_express import colors as plc
+from typing import Dict, List, Optional, Tuple
 
 from .general_functions import getCircularKernel
 from .numeric import rebin, bspline
 from .utils import multi_map
+from .EventDistillery import define_legs, plot_events
 
 MYCOLORS = plc.qualitative.Plotly
 # MYCOLORS = ["darkred"]
@@ -1442,6 +1446,196 @@ class Regions:
     def examine_events(self, df, x, y, debug=False, **otherkwargs):
         from .examine_events import examine_events
         return examine_events(self, df, x, y, debug=debug, **otherkwargs)
+
+    def generate_plot(self,
+                      rois: List[int],
+                      events: pd.DataFrame,
+                      legs: Dict[str, Tuple[float, float]],
+                      offset: Optional[float] = None,
+                      halfwidth_scale: Optional[Tuple[float, float]] = None,
+                      show_path: bool = False,
+                      plot_sum: bool = False,
+                      plot_raster: bool = False) -> None:
+        """
+        Generates a plot, which is ready for publication (or should be), automatically.
+
+        :param rois: List of indices of ROIs, which shall be plotted.
+        :param events: Events, which shall be plotted.
+        :param legs: Dictionary containing info about the legs of the experiment.
+        :param offset: Offset between the traces. If None, it will be calculated automatically.
+        :param halfwidth_scale: Sets minimum/maximum of the scale for the halfwidth duration. None: Automatic scale.
+        :param show_path: Trigger to show the path of the pickle, where the data is taken from, in the plot.
+        :param plot_sum: Trigger to plot the sum of all given rois at the bottom.
+        :param plot_raster: Trigger to plot the raster of the given rois at the bottom.
+        :return: None
+        """
+        def determine_offset(n_rebin: int) -> float:
+            new_offset = 0
+            for roi in rois:
+                trace = rebin(self.df.loc[roi, 'detrended'], n_rebin)
+                diff = trace.max() - trace.min()
+                if diff > new_offset:
+                    new_offset = diff
+            return new_offset
+
+        original_font_size = plt.rcParams['font.size']
+        plt.rcParams['font.size'] = 25
+
+        fig: Optional[plt.Figure] = None
+        spec: Optional[GridSpec] = None
+        ax1: Axes
+        ax2: Axes
+        ax3: Axes
+        ax4: Axes
+        ax5: Optional[Axes] = None
+        ax6: Optional[Axes] = None
+
+        if plot_sum and plot_raster:
+            fig = plt.figure(figsize=(32, 28), constrained_layout=True)
+            spec = GridSpec(figure=fig,
+                            ncols=2, nrows=4,
+                            width_ratios=[1, 3],
+                            height_ratios=[1, 0.9, 0.5, 0.8])
+            ax5 = fig.add_subplot(spec[2, 1])
+            ax6 = fig.add_subplot(spec[3, 1])
+        elif plot_sum or plot_raster:
+            fig = plt.figure(figsize=(32, 24), constrained_layout=True)
+            spec = GridSpec(figure=fig,
+                            ncols=2, nrows=3,
+                            width_ratios=[1, 3],
+                            height_ratios=[1, 1, 1])
+            if plot_sum:
+                ax5 = fig.add_subplot(spec[2, 1])
+            elif plot_raster:
+                ax6 = fig.add_subplot(spec[2, 1])
+        else:
+            fig = plt.figure(figsize=(32, 16), constrained_layout=True)
+            GridSpec(figure=fig,
+                     ncols=2, nrows=2,
+                     width_ratios=[1, 3], height_ratios=[1, 1])
+
+        ax1 = fig.add_subplot(spec[0, 0])
+        ax2 = fig.add_subplot(spec[0, 1])
+        ax3 = fig.add_subplot(spec[1, 0])
+        ax4 = fig.add_subplot(spec[1, 1])
+
+        self.plotEdges(ax=ax1, lw=.5)
+        self.plotEdges(ax=ax1, ix=rois, separate=True, fill=True, alpha=.5, image=False)
+        self.plotPeaks(ax=ax1, ix=rois, labels=True)
+        ax1.get_xaxis().set_visible(False)
+        ax1.get_yaxis().set_visible(False)
+
+        num_rebin = 10
+        time = rebin(self.time, num_rebin)
+        ax2.set_xlim(0, time[-1])
+        if offset is None:
+            offset = determine_offset(num_rebin)
+        off = 0
+        for roi in rois:
+            y = rebin(self.df.loc[roi, 'detrended'], num_rebin) + off
+            c = plc.qualitative.Plotly[roi % len(plc.qualitative.Plotly)]
+            ax2.plot(time, y, c=c)
+            ax2.text(x=0, y=y.mean(),
+                     s=str(roi),
+                     c=c,
+                     horizontalalignment='right')
+            off += offset
+
+        ymin, ymax = ax2.get_ylim()
+        new_ymin = ymin - (ymax - ymin) / 18 * self.protocol['compound'].nunique()
+        vl = self.protocol['t_begin'].append(self.protocol['t_end']).unique()
+        ax2.vlines(vl, new_ymin, ymax, color='black', zorder=1000)
+        ax2.hlines(ymin, 0, self.time[-1], color='black', zorder=1000)
+        ax2.set_ylim(new_ymin, ymax)
+
+        off = ymin
+        off_diff = (ymin - new_ymin) / self.protocol['compound'].nunique()
+        for comp, df in self.protocol.groupby('compound'):
+            for ii in df.index:
+                t0, t1 = df.loc[ii].iloc[-2:]
+                conc = df.loc[ii, 'concentration']
+                x, y = [t0, t1, t1, t0, t0], [off - off_diff, off - off_diff, off, off, off - off_diff]
+                ax2.fill(x, y, color='grey', alpha=.3)
+                ax2.text(t0, np.mean(y[:-1]), ' ' + conc, va='center', ha='left')
+                ax2.plot(x, y, color='grey')
+            ax2.text(df['t_begin'].min(), np.mean([off - off_diff, off - off_diff, off, off]), comp + ' ',
+                     va='center', ha='right')
+            off -= off_diff
+        ax2.get_yaxis().set_visible(False)
+        ax2.set_xlabel('time [s]')
+
+        if 'leg' not in events.columns:
+            define_legs(events=events, legs=legs)
+        bins = np.geomspace(.1, 100)
+        binc = (bins[:-1] + bins[1:]) / 2
+        for leg, df in events.dropna().sort_values('t0').groupby('leg'):
+            h = np.histogram(df['halfwidth'], bins)[0]
+            he = h ** .5
+            totime = np.diff(legs[leg])[0] / 60
+            c = ax3.plot(h / totime, binc, label=leg)[0].get_color()
+            ax3.errorbar(h / totime, binc, xerr=(he / totime), c=c, ls='none', marker='.')
+        _, ymax = ax3.get_ylim()
+        if halfwidth_scale is not None:
+            ax3.set_ylim(halfwidth_scale[0], halfwidth_scale[1])
+        else:
+            ax3.set_ylim(.4, ymax)
+        xmin, xmax = ax3.get_xlim()
+        if xmin < 0:
+            xmin = 0
+        ax3.set_xlim(xmax, xmin)
+        ax3.set_yscale('log')
+        ax3.set_xlabel('average # of events / min')
+        ax3.set_ylabel('halfwidth [s]')
+        ax3.set_title(f'Number of ROIs = {self.df.shape[0]}')
+        ax3.legend()
+
+        ax4.hexbin(
+            x=events['t0'],
+            y=events['halfwidth'],
+            gridsize=350,
+            yscale='log',
+            mincnt=1,
+            cmap='hot'
+        )
+        ax4.set_xlim(0, self.time[-1])
+        if halfwidth_scale is not None:
+            ax4.set_ylim(halfwidth_scale[0], halfwidth_scale[1])
+        else:
+            ax4.set_ylim(.4, ymax)
+
+        if plot_sum and (ax5 is not None):
+            sum_trace = np.sum(self.df.loc[rois, 'detrended'].to_numpy(), axis=0)
+            y = rebin(sum_trace, num_rebin)
+            ax5.set_xlim(0, time[-1])
+            ax5.plot(time, y)
+            ymin, ymax = ax5.get_ylim()
+            ax5.vlines(vl, ymin, ymax, color='black')
+            ax5.set_ylim(ymin, ymax)
+            ax5.get_yaxis().set_visible(False)
+            ax5.set_xlabel('time [s]')
+
+        if plot_raster and (ax6 is not None):
+            plot_events(events=events, ax=ax6, transparency=False)
+            ax6.set_facecolor('black')
+            ax6.get_xaxis().set_visible(False)
+            ax6.get_yaxis().set_visible(False)
+
+        if show_path:
+            if hasattr(self, 'pathToRois'):
+                with warnings.catch_warnings():
+                    warnings.simplefilter('ignore')
+                    if plot_raster:
+                        ax6.get_xaxis().set_visible(True)
+                        ax6.set_xticks([], [])
+                        ax6.set_xlabel(self.pathToRois)
+                    else:
+                        ax4.set_xticks([], [])
+                        ax4.set_xlabel(self.pathToRois)
+        else:
+            ax4.get_xaxis().set_visible(False)
+
+        plt.rcParams['font.size'] = original_font_size
+        fig.show()
     
     def plotTraces(regions, indices, axratios = [1,2], figsize=5, freqShow=2, col="detrended",Offset=5,separate=False):
         if col not in regions.df.columns:
