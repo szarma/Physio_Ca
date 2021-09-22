@@ -75,15 +75,45 @@ def crawlDict_restr(image, pixels, diag=False, processes=10, verbose=False):
         B_[(i1,j1)] += [(i0,j0)]
     return B_
 
+def crawl_dict_via_graph(image, validPixelsImage, diag=False, offset=(0,0) ):
+    gph = nx.DiGraph()
+    for start in zip(*np.where(validPixelsImage)):
+        end = climb(start, image, Niter=1, diag=diag)
+        gph.add_edge(start, end)
+    c = dict()
+    for attrs, nodes in zip(nx.algorithms.attracting_components(gph), nx.connected_components(gph.to_undirected())):
+        assert len(attrs)==1
+        peak = attrs.pop()
+        peak = (peak[0]+offset[0], peak[1]+offset[1])
+        c[peak] = [(x+offset[0], y+offset[1]) for x,y in nodes]
+    return c
+  
+def get_crawl_dict(image, pixels, diag=False, offset=(0,0)):
+    # noinspection PyRedeclaration
+    R_ = [climb((i,j), image, diag=diag,) for i,j in pixels]
+    A_ = [ij+r for ij,r in zip(pixels,R_) if r in pixels]
+    A_ = [el for el in A_ if el[-1] is not None]
+    B_ = OrderedDict()
+    for (i0,j0,i1,j1) in A_:
+        i0 += offset[0]
+        j0 += offset[1]
+        i1 += offset[0]
+        j1 += offset[1]
+        if (i1,j1) not in B_:
+            B_[(i1,j1)] = []
+        B_[(i1,j1)] += [(i0,j0)]
+    return B_
+
 def climb(x,blurredWeights,
           diag=True,
-          excludePixels=[]
+          excludePixels=[],
+          Niter=1000
          ):
     dims = blurredWeights.shape
     # x = (60,60)
     x = x+(blurredWeights[x[0],x[1]],)
     xs = [x]
-    for i in range(1000):
+    for i in range(Niter):
         vs = []
         for di,dj in product([-1,0,1],[-1,0,1]):
             if not diag:
@@ -102,6 +132,7 @@ def climb(x,blurredWeights,
             x = x1
             xs += [x]
     return x[:2]
+
 
 def crawlDict(image, crawl_th=0, diag=False, processes=10, excludePixels=None, verbose=False):
     global iterf
@@ -132,19 +163,18 @@ def crawlDict(image, crawl_th=0, diag=False, processes=10, excludePixels=None, v
 
 class Regions:
     def __init__(self, movie_,
-                 diag=True,
+                 diag=False,
                  debleach=False,
                  gSig_filt=None,
                  mode="highperc+mean",
                  full=True,
-                 img_th=0.01,
+                 img_th=None,
                  FrameRange=None,
-                 processes=7,
-                 excludePixels=None,
+                 #processes=7,
+                 #excludePixels=None,
                  verbose=False,
-                 use_restricted=None
+                 #use_restricted=None
                 ):
-#         if isinstance(movie_, Regions):
         if hasattr(movie_, "df") and "pixels" in movie_.df.columns:
             for k in movie_.__dict__.keys():
                 if verbose:
@@ -178,7 +208,8 @@ class Regions:
                     ("peak",  list(movie_.keys())),
                     ("pixels",list(movie_.values()))
                 ]))
-                del self.mode
+                return None
+                
             elif isinstance(akey,str):
                 if verbose:
                     print ("Initiating from a dictionary assumed to be a dictionary of image stats.")
@@ -188,8 +219,18 @@ class Regions:
         else:
             raise ValueError("Regions can initialize either from a movie, or an image, or a dictionary. You supplied %s"%str(type(movie_)))
         self.mode = mode
+        if gSig_filt is not None:
+            if type(gSig_filt) == int:
+                gSig_filt = [gSig_filt]
+        self.filterSize = gSig_filt
+        self.image = self.defineImage(mode=mode, gSig_filt=self.filterSize)
+
         if full and not hasattr(self,"df"):
-            self.constructRois(mode=mode, img_th=img_th, diag=diag, gSig_filt=gSig_filt, processes=processes, excludePixels=excludePixels, verbose=verbose, use_restricted=use_restricted)
+            self.constructRois(image=self.image, img_th=img_th, diag=diag, verbose=verbose,
+                               #processes=processes,
+                               #excludePixels=excludePixels, 
+                               #use_restricted=use_restricted
+                              )
 
     def to_json(self,
                 output_dir: Union[str, Path],
@@ -356,10 +397,11 @@ class Regions:
 
         return regions
 
-    def constructRois(self, mode, img_th=0, diag=True, gSig_filt=None, processes=5,excludePixels=None, verbose=False,use_restricted=True):
+
+    def defineImage(self, mode, gSig_filt=None, ):
         from .numeric import robust_max
-        if mode=="custom":
-            image0=self.statImages[mode]
+        if mode == "custom":
+            image0 = self.statImages[mode]
         else:
             k0 = next(iter(self.statImages))
             tmp = np.zeros_like(self.statImages[k0])
@@ -367,84 +409,128 @@ class Regions:
             for submode in mode.split("+"):
                 im = self.statImages[submode].copy()
                 norm += [robust_max(im)]
-                im = im/norm[-1]
+                im = im / norm[-1]
                 tmp += im
-            image0 = tmp/len(norm)*np.mean(norm)
-            self.statImages[mode] = image0
-            
-        from cv2 import GaussianBlur,dilate
+            image0 = tmp / len(norm) * np.mean(norm)
+            if mode not in self.statImages:
+                self.statImages[mode] = image0
+
+        from cv2 import GaussianBlur
         if gSig_filt is None:
             image = image0
-#             excludePixels = None
-            dks = 3
-        else:
-            if type(gSig_filt)==int:
-                gSig_filt = [gSig_filt]
-            dks = max(3,(max(gSig_filt))//2*2+1)
+        else: # gSig_filt is a list of integers
             image = []
             for gSf in gSig_filt:
-#                 tmp = high_pass_filter_space(image0,(gSf,)*2)
-                tmp  = GaussianBlur(image0,(gSf//2*2+1,)*2,-1)
-                tmp -= GaussianBlur(image0,(gSf*2+1,)*2,-1)
+                tmp = GaussianBlur(image0, (gSf // 2 * 2 + 1,) * 2, -1)
+                tmp -= GaussianBlur(image0, (gSf * 2 + 1,) * 2, -1)
                 tmp *= gSf
-                image += [tmp/robust_max(tmp)]
-            image = np.mean(image,axis=0)
-        if not use_restricted:
-            if excludePixels is None:
-                excludePixels = []
-        
+                image += [tmp / robust_max(tmp)]
+            image = np.mean(image, axis=0)
+        return image
+
+
+    def constructRois(self, image, img_th=None, dks=3, verbose=False, diag=False):
+        from cv2 import dilate,erode
+        try:
+            dks = max(3, (max(self.filterSize)) // 4 * 2 + 1)
+        except:
+            pass
+        dilation_kernel = getCircularKernel(dks)
+        eks = max(3,dks-2)
+        erosion_kernel  = getCircularKernel(eks)
+        if verbose:
+            print ("eroding valid pixels by", eks)
+        if img_th is None:
+            img_th = median_abs_deviation(image.flat)
+        ok = erode((image>img_th).astype(np.uint8), erosion_kernel)
         if verbose:
             print ("dilating valid pixels by", dks)
-        kernel = getCircularKernel(dks)
-        ok = dilate((image>img_th).astype(np.uint8), kernel)
-        # ok = ok*(self.statImages[self.mode]>0).astype(np.uint8)
+        ok = dilate(ok, dilation_kernel)
         ok = ok.astype(bool)
-        self.filterSize = gSig_filt
-        self.image = image
-        if use_restricted:
-            includePixels = list(map(tuple, np.array(np.where(ok)).T))
-            if verbose:
-                print(f"initiating the cralwing dict on {len(includePixels)} (%.1f%%) pixels only."%(100*len(includePixels)/ok.size))
-            B_ = crawlDict_restr(image,
-                           includePixels,
-                           diag=diag,
-                           processes=processes,
-                           verbose=verbose
-                          )
-        else:
-            excludePixels += list(map(tuple, np.array(np.where(~ok)).T))
-            if verbose:
-                print(f"initiating the cralwing dict with {len(excludePixels)} pixels excluded.")
-            B_ = crawlDict(image,
-                           crawl_th=-np.inf,
-                           diag=diag,
-                           processes=processes,
-                           excludePixels=excludePixels,
-                           verbose=verbose
-                          )
+        self.validPixels = ok
+        B_ = crawl_dict_via_graph(image, ok, diag=diag)
         if diag:
-#             try:
                 from .utils import split_unconnected_rois
                 B_ = split_unconnected_rois(B_, self.image)
-#             except:
-#                 print ("Cannot initialize with diagonal crawl. Reverting to diag=False")
-#                 diag = False
-#                 B_ = crawlDict(image,image.min(),diag=diag,min_gradient=min_gradient, processes=processes)
-        
         
         self.df = pd.DataFrame(OrderedDict([
             ("peak",  list(B_.keys())),
             ("pixels",list(B_.values()))
         ]))
-#         try:
-#             blurKsize = min(self.filterSize)//2*2+1
-#             blurKsize = max(3,blurKsize)
-#             slightly_blurred_image = GaussianBlur(self.statImages[self.mode],(blurKsize,)*2,-1)
-#             self.reassign_peaks(slightly_blurred_image+self.statImages[self.mode])
-#         except:
         self.df["peakValue"] = [image[p] for p in B_]
-        self.ExcludePixels = excludePixels
         self.update()
+        self.merge_closest(mergeDist=.71, mergeSizeTh=100, verbose=verbose)
+        
+#     def constructRois(self, image, img_th=None, diag=True, dks=3, processes=5, excludePixels=None, verbose=False,use_restricted=True):
+#         from cv2 import dilate,erode
+#         try:
+#             dks = max(3, (max(self.filterSize)) // 4 * 2 + 1)
+#         except:
+#             pass
+#         if not use_restricted:
+#             if excludePixels is None:
+#                 excludePixels = []
+#         dilation_kernel = getCircularKernel(dks)
+#         eks = max(3,dks-2)
+#         erosion_kernel  = getCircularKernel(eks)
+#         if verbose:
+#             print ("eroding valid pixels by", eks)
+#         if img_th is None:
+#           img_th = median_abs_deviation(image.flat)
+#         ok = erode((image>img_th).astype(np.uint8), erosion_kernel)
+#         if verbose:
+#             print ("dilating valid pixels by", dks)
+#         ok = dilate(ok, dilation_kernel)
+#         # ok = ok*(self.statImages[self.mode]>0).astype(np.uint8)
+#         ok = ok.astype(bool)
+#         self.validPixels = ok
+#         if use_restricted=="break":
+#             raise ValueError("Debugging mode")
+
+#         if use_restricted:
+#             includePixels = list(map(tuple, np.array(np.where(ok)).T))
+#             if verbose:
+#                 print(f"initiating the cralwing dict on {len(includePixels)} (%.1f%%) pixels only."%(100*len(includePixels)/ok.size))
+#             B_ = crawlDict_restr(image,
+#                            includePixels,
+#                            diag=diag,
+#                            processes=processes,
+#                            verbose=verbose
+#                           )
+#         else:
+#             excludePixels += list(map(tuple, np.array(np.where(~ok)).T))
+#             if verbose:
+#                 print(f"initiating the cralwing dict with {len(excludePixels)} pixels excluded.")
+#             B_ = crawlDict(image,
+#                            crawl_th=-np.inf,
+#                            diag=diag,
+#                            processes=processes,
+#                            excludePixels=excludePixels,
+#                            verbose=verbose
+#                           )
+#         if diag:
+# #             try:
+#                 from .utils import split_unconnected_rois
+#                 B_ = split_unconnected_rois(B_, self.image)
+# #             except:
+# #                 print ("Cannot initialize with diagonal crawl. Reverting to diag=False")
+# #                 diag = False
+# #                 B_ = crawlDict(image,image.min(),diag=diag,min_gradient=min_gradient, processes=processes)
+        
+        
+#         self.df = pd.DataFrame(OrderedDict([
+#             ("peak",  list(B_.keys())),
+#             ("pixels",list(B_.values()))
+#         ]))
+# #         try:
+# #             blurKsize = min(self.filterSize)//2*2+1
+# #             blurKsize = max(3,blurKsize)
+# #             slightly_blurred_image = GaussianBlur(self.statImages[self.mode],(blurKsize,)*2,-1)
+# #             self.reassign_peaks(slightly_blurred_image+self.statImages[self.mode])
+# #         except:
+#         self.df["peakValue"] = [image[p] for p in B_]
+#         self.ExcludePixels = excludePixels
+#         self.update()
     
     def reassign_peaks(self, image, write=True):
         newPeaks = []
@@ -485,9 +571,10 @@ class Regions:
                 "trend":ydbl
             }
 
-    def merge_closest(self, mergeSizeTh=10, mergeDist=1, plot=False, Niter=20, verbose=False):
+    def merge_closest(self, mergeSizeTh=10, mergeDist=1, plot=False, Niter=20, verbose=False, axs=None):
         if plot:
-            plt.figure(figsize=(7*Niter,6))
+            if axs is None:
+                plt.figure(figsize=(7*Niter,6))
 
         ia = 1
         for ja in range(Niter):
@@ -496,8 +583,11 @@ class Regions:
             df = df.query(f"dist<={mergeDist} and size_from<={size_th}")
             if len(df):
                 if plot:
-                    ax = plt.subplot(1,Niter,ia)
-                    ax.imshow(self.statImages[self.mode], cmap="Greys", norm=LogNorm())
+                    if axs is None:
+                        ax = plt.subplot(1,Niter,ia)
+                        ax.imshow(self.statImages[self.mode], cmap="Greys", norm=LogNorm())
+                    else:
+                        ax = axs[ia%len(axs)]
                     xl = ax.get_xlim()
                     yl = ax.get_ylim()
                 else:
@@ -517,11 +607,11 @@ class Regions:
         
     def update(self, movie_=None):
         self.df["size"] = self.df["pixels"].apply(len)
-        self.df["interest"] = [np.sum([self.image[px[0],px[1]] for px in pxs]) for pxs in self.df["pixels"]]
         self.calcEdgeIds()
         self.calcEdges()
         self.df["boundary"] = [edges2nodes(self.df["edges"][j]) for j in self.df.index]
         self.calcNNmap()
+        self.df["interest"] = [np.sum([self.image[px[0],px[1]] for px in pxs]) for pxs in self.df["pixels"]]
         if movie_ is not None:
             self.calcTraces(movie_)
             self.movie = movie_
@@ -1680,7 +1770,9 @@ def mergeBasedOnGraph(Gph,rreg,verbose=False):
             continue
         attr = C.loc[attr,"peakValue"].sort_values().index[-1]
         other = [j for j in cl if j!=attr]
-        C.loc[[attr],"pixels"] = [sum(C.loc[cl,"pixels"],[])]
+        unionPixels = sum(C.loc[cl,"pixels"],[])
+        unionPixels = list(set(unionPixels))
+        C.loc[[attr],"pixels"] = [unionPixels]
         toDrop += other
     C.drop(index=toDrop,inplace=True)
     if verbose:
