@@ -106,9 +106,11 @@ def get_crawl_dict(image, pixels, diag=False, offset=(0,0)):
 
 def climb(x,blurredWeights,
           diag=True,
-          excludePixels=[],
+          excludePixels=None,
           Niter=1000
          ):
+    if excludePixels is None:
+        excludePixels = []
     dims = blurredWeights.shape
     # x = (60,60)
     x = x+(blurredWeights[x[0],x[1]],)
@@ -607,7 +609,6 @@ class Regions:
         
     def update(self, movie_=None):
         self.df["size"] = self.df["pixels"].apply(len)
-        self.calcEdgeIds()
         self.calcEdges()
         self.df["boundary"] = [edges2nodes(self.df["edges"][j]) for j in self.df.index]
         self.calcNNmap()
@@ -668,7 +669,7 @@ class Regions:
                   ix=None,
                   ax=None,
                   image=True,
-                  imkw_args={},
+                  imkw_args=None,
                   separate=False,
                   color="darkred",
                   lw=None,
@@ -678,6 +679,8 @@ class Regions:
                   norm=LogNorm(vmin=1),
                   spline=True
                   ):
+        if imkw_args is None:
+            imkw_args = {}
         if ix is None:
             ix = self.df.index
         if ax is None:
@@ -692,6 +695,7 @@ class Regions:
         if image:
             im = self.statImages[self.mode]
             ax.imshow(im,norm=norm,**imkw_args)
+        smoothness = min(self.__dict__.get("filterSize",[])+[3] )
         if separate:
             for i in ix:
                 try:
@@ -700,7 +704,7 @@ class Regions:
                     c = MYCOLORS[i%len(MYCOLORS)]
                 points = self.df.loc[i,"boundary"]+self.df.loc[i,"boundary"][:3]
                 if spline:
-                    points = bspline(points)
+                    points = bspline(points, smoothness=smoothness)
                 points = [(p-points.mean(0))*.9+points.mean(0) for p in points]
                 y,x = np.array(points).T
                 ax.plot(x,y,"-",lw=lw,c=c,alpha=alpha)
@@ -710,7 +714,7 @@ class Regions:
             tmp = []
             for el in self.df.loc[ix,"boundary"]:
                 if spline:
-                    el = list(bspline(el))
+                    el = list(bspline(el, smoothness=smoothness))
                 tmp += el
                 tmp += el[:3]
                 tmp += [(np.nan,)*2]
@@ -1777,12 +1781,12 @@ def mergeBasedOnGraph(Gph,rreg,verbose=False):
     C.drop(index=toDrop,inplace=True)
     if verbose:
         print (f"{len(toDrop)} subsumed into existing ROIs.")
-    rreg.update()
-#     rreg.sortFromCenter()
-    try:
-        rreg.calcTraces()
-    except:
-        pass
+    if len(toDrop):
+        rreg.update()
+        try:
+            rreg.calcTraces()
+        except:
+            pass
     return len(toDrop)
 
 def getPeak2BounAndTraceDF(C):
