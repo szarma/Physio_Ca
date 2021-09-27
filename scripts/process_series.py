@@ -17,8 +17,8 @@ import pandas as pd
 from islets.Recording import Recording, saveMovie
 from islets.Regions import Regions
 from islets.numeric import power_spectrum, rebin
-from islets.utils import saveRois
-from islets.Regions import getPeak2BoundaryDF, getGraph_of_ROIs_to_Merge, mergeBasedOnGraph
+from islets.utils import saveRois, getGraph_of_ROIs_to_Merge, getPeak2BoundaryDF
+from islets.Regions import mergeBasedOnGraph
 from matplotlib.colors import LogNorm
 
 def get_filterSizes(px, physSize=None):
