@@ -1904,9 +1904,8 @@ def getStatImages(movie_, debleach=False, downsampleFreq=2):
         statImages[f.__name__] = f(m_for_image,axis=0)
     statImages["highperc"] = np.percentile(m_for_image,100*(1-10/len(m_for_image)), axis=0)
     
-    m_for_image = np.diff(m_for_image,axis=0)
-    for f in [np.mean,np.std]:
-        statImages["diff_"+f.__name__] = f(m_for_image,axis=0)
-    statImages["diff_highperc"] = np.percentile(m_for_image,100*(1-10/len(m_for_image)), axis=0)
-#     statImages = {k:statImages[k] for k in statImages}
+    # m_for_image = np.diff(m_for_image,axis=0)
+    # for f in [np.mean,np.std]:
+    #     statImages["diff_"+f.__name__] = f(m_for_image,axis=0)
+    # statImages["diff_highperc"] = np.percentile(m_for_image,100*(1-10/len(m_for_image)), axis=0)
     return statImages
