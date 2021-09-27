@@ -7,6 +7,7 @@ import sqlite3
 from sys import stdout
 import tqdm
 from typing import List, NamedTuple, Optional
+from DatabaseManager import DatabaseManager
 
 
 def parse_args() -> argparse.Namespace:
@@ -69,14 +70,7 @@ if __name__ == '__main__':
     args = parse_args()
     log = prepare_logger(args.verbose)
     log.info('Establishing connection to SQLite database...')
-    connection = sqlite3.connect('/home/jupyter-johannes/test_db.db')
-    cursor = connection.cursor()
-
-    log.info('Checking if table for experiments exist (create if not existing)...')
-    cursor.execute('''create table if not exists experiments 
-    (date text, experiment text, series text, experiment_directory text not null primary key, frequency real, 
-    protocol text, protocol_path text, pxSize real, SizeX int, SizeY int, SizeZ int, SizeT int, comments text,
-    duration real, pickles text)''')
+    dbm = DatabaseManager(Path('/home/jupyter-johannes/test_db.db'), verbose=True)
 
     file_paths = get_file_paths(Path(args.root_dir), log)
     file_paths = sorted(file_paths)
