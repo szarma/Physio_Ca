@@ -60,20 +60,6 @@ def load_regions(path,
     
     return regions
 
-def crawlDict_restr(image, pixels, diag=False, processes=10, verbose=False):
-    global iterfcd
-    # noinspection PyRedeclaration
-    def iterfcd(ij):
-        return climb((ij[0],ij[1]), image, diag=diag,)
-    R_ = multi_map(iterfcd,pixels, processes=processes)
-    A_ = [ij+r for ij,r in zip(pixels,R_) if r in pixels]
-    A_ = [el for el in A_ if el[-1] is not None]
-    B_ = OrderedDict()
-    for (i0,j0,i1,j1) in A_:
-        if (i1,j1) not in B_:
-            B_[(i1,j1)] = []
-        B_[(i1,j1)] += [(i0,j0)]
-    return B_
 
 def crawl_dict_via_graph(image, validPixelsImage, diag=False, offset=(0,0) ):
     gph = nx.DiGraph()
@@ -87,22 +73,7 @@ def crawl_dict_via_graph(image, validPixelsImage, diag=False, offset=(0,0) ):
         peak = (peak[0]+offset[0], peak[1]+offset[1])
         c[peak] = [(x+offset[0], y+offset[1]) for x,y in nodes]
     return c
-  
-def get_crawl_dict(image, pixels, diag=False, offset=(0,0)):
-    # noinspection PyRedeclaration
-    R_ = [climb((i,j), image, diag=diag,) for i,j in pixels]
-    A_ = [ij+r for ij,r in zip(pixels,R_) if r in pixels]
-    A_ = [el for el in A_ if el[-1] is not None]
-    B_ = OrderedDict()
-    for (i0,j0,i1,j1) in A_:
-        i0 += offset[0]
-        j0 += offset[1]
-        i1 += offset[0]
-        j1 += offset[1]
-        if (i1,j1) not in B_:
-            B_[(i1,j1)] = []
-        B_[(i1,j1)] += [(i0,j0)]
-    return B_
+
 
 def climb(x,blurredWeights,
           diag=True,
@@ -134,33 +105,6 @@ def climb(x,blurredWeights,
             x = x1
             xs += [x]
     return x[:2]
-
-
-def crawlDict(image, crawl_th=0, diag=False, processes=10, excludePixels=None, verbose=False):
-    global iterf
-    if excludePixels is None:
-        excludePixels = []
-    if verbose:
-        print (f"entering crawling dict with {len(excludePixels)} pixels excluded.")
-    if np.isfinite(crawl_th):
-        excludePixels += list(map(tuple,np.array(np.where(image<crawl_th)).T))
-    if verbose:
-        print (f"Crawling the image with {len(excludePixels)} pixels excluded.")
-        
-    ijs_ = [(i,j) for i,j in product(range(image.shape[0]),range(image.shape[1])) if (i,j) not in excludePixels]
-    def iterf(ij):
-        return climb((ij[0],ij[1]), image, diag=diag,
-                     #excludePixels=excludePixels
-                    )
-    R_ = multi_map(iterf,ijs_, processes=processes)
-    A_ = [ij+r for ij,r in zip(ijs_,R_) if r not in excludePixels]
-    A_ = [el for el in A_ if el[-1] is not None]
-    B_ = OrderedDict()
-    for (i0,j0,i1,j1) in A_:
-        if (i1,j1) not in B_:
-            B_[(i1,j1)] = []
-        B_[(i1,j1)] += [(i0,j0)]
-    return B_
 
 
 class Regions:
