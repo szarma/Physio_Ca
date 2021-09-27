@@ -1,12 +1,10 @@
 from collections import OrderedDict
-from itertools import product
-
 import networkx as nx
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
-from islets.Regions import climb
+from islets.numeric import climb
 from islets.utils import multi_map
 
 
@@ -241,28 +239,3 @@ def get_crawl_dict(image, pixels, diag=False, offset=(0,0)):
     return B_
 
 
-def crawlDict(image, crawl_th=0, diag=False, processes=10, excludePixels=None, verbose=False):
-    global iterf
-    if excludePixels is None:
-        excludePixels = []
-    if verbose:
-        print (f"entering crawling dict with {len(excludePixels)} pixels excluded.")
-    if np.isfinite(crawl_th):
-        excludePixels += list(map(tuple,np.array(np.where(image<crawl_th)).T))
-    if verbose:
-        print (f"Crawling the image with {len(excludePixels)} pixels excluded.")
-
-    ijs_ = [(i,j) for i,j in product(range(image.shape[0]),range(image.shape[1])) if (i,j) not in excludePixels]
-    def iterf(ij):
-        return climb((ij[0],ij[1]), image, diag=diag,
-                     #excludePixels=excludePixels
-                    )
-    R_ = multi_map(iterf,ijs_, processes=processes)
-    A_ = [ij+r for ij,r in zip(ijs_,R_) if r not in excludePixels]
-    A_ = [el for el in A_ if el[-1] is not None]
-    B_ = OrderedDict()
-    for (i0,j0,i1,j1) in A_:
-        if (i1,j1) not in B_:
-            B_[(i1,j1)] = []
-        B_[(i1,j1)] += [(i0,j0)]
-    return B_

@@ -1,9 +1,13 @@
 import warnings
-
+from collections import OrderedDict
+from itertools import product
 import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
 from numba import jit, prange
 from scipy.optimize import curve_fit  # ,minimize,basinhopping
+from islets.utils import multi_map
+
 mad2std = 1.4826 # https://en.wikipedia.org/wiki/Median_absolute_deviation#Relation_to_standard_deviation
 
 def hillCurve(x, h=2, xc=4):
@@ -152,7 +156,6 @@ def power_spectrum(x, fr, mean=True):
 
 def get_sep_th(x_,ax=None,plot=False,thMax=None,log=False):
     from scipy.stats import gaussian_kde
-    from .Regions import crawlDict
     if ax is None:
         fig = plt.figure()
         ax = plt.subplot(111)
@@ -615,3 +618,76 @@ def getEvents_(tfMatrix_,DistMatrix_):
                         allGraph[iframe1*nc+jc, nodeID] = 1
                         allGraph[nodeID, iframe1*nc+jc] = 1
     return allGraph
+
+
+def crawlDict(image, crawl_th=0, diag=False, processes=10, excludePixels=None, verbose=False):
+    global iterf
+    if excludePixels is None:
+        excludePixels = []
+    if verbose:
+        print (f"entering crawling dict with {len(excludePixels)} pixels excluded.")
+    if np.isfinite(crawl_th):
+        excludePixels += list(map(tuple,np.array(np.where(image<crawl_th)).T))
+    if verbose:
+        print (f"Crawling the image with {len(excludePixels)} pixels excluded.")
+
+    ijs_ = [(i,j) for i,j in product(range(image.shape[0]),range(image.shape[1])) if (i,j) not in excludePixels]
+    def iterf(ij):
+        return climb((ij[0],ij[1]), image, diag=diag,
+                     #excludePixels=excludePixels
+                    )
+    R_ = multi_map(iterf,ijs_, processes=processes)
+    A_ = [ij+r for ij,r in zip(ijs_,R_) if r not in excludePixels]
+    A_ = [el for el in A_ if el[-1] is not None]
+    B_ = OrderedDict()
+    for (i0,j0,i1,j1) in A_:
+        if (i1,j1) not in B_:
+            B_[(i1,j1)] = []
+        B_[(i1,j1)] += [(i0,j0)]
+    return B_
+
+
+def crawl_dict_via_graph(image, validPixelsImage, diag=False, offset=(0,0) ):
+    gph = nx.DiGraph()
+    for start in zip(*np.where(validPixelsImage)):
+        end = climb(start, image, Niter=1, diag=diag)
+        gph.add_edge(start, end)
+    c = dict()
+    for attrs, nodes in zip(nx.algorithms.attracting_components(gph), nx.connected_components(gph.to_undirected())):
+        assert len(attrs)==1
+        peak = attrs.pop()
+        peak = (peak[0]+offset[0], peak[1]+offset[1])
+        c[peak] = [(x+offset[0], y+offset[1]) for x,y in nodes]
+    return c
+
+
+def climb(x,blurredWeights,
+          diag=True,
+          excludePixels=None,
+          Niter=1000
+         ):
+    if excludePixels is None:
+        excludePixels = []
+    dims = blurredWeights.shape
+    # x = (60,60)
+    x = x+(blurredWeights[x[0],x[1]],)
+    xs = [x]
+    for i in range(Niter):
+        vs = []
+        for di,dj in product([-1,0,1],[-1,0,1]):
+            if not diag:
+                if di*dj!=0: continue
+            i,j = x[0]+di,x[1]+dj
+            if i<0 or i>=dims[0] or j<0 or j>=dims[1]:
+                continue
+            if (i,j) in excludePixels:
+                continue
+            vs += [(i,j,blurredWeights[i,j])]
+        x1 = vs[np.argmax(vs,axis=0)[-1]]
+        dx = x1[-1]-x[-1]
+        if dx<=0:
+            break
+        else:
+            x = x1
+            xs += [x]
+    return x[:2]

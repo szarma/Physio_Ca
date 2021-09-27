@@ -21,7 +21,7 @@ from matplotlib.colors import LogNorm
 from plotly_express import colors as plc
 
 from .general_functions import getCircularKernel
-from .numeric import rebin, bspline
+from .numeric import rebin, bspline, crawl_dict_via_graph
 from .utils import multi_map
 
 MYCOLORS = plc.qualitative.Plotly
@@ -59,52 +59,6 @@ def load_regions(path,
         print ("encountered error:", exc_info())
     
     return regions
-
-
-def crawl_dict_via_graph(image, validPixelsImage, diag=False, offset=(0,0) ):
-    gph = nx.DiGraph()
-    for start in zip(*np.where(validPixelsImage)):
-        end = climb(start, image, Niter=1, diag=diag)
-        gph.add_edge(start, end)
-    c = dict()
-    for attrs, nodes in zip(nx.algorithms.attracting_components(gph), nx.connected_components(gph.to_undirected())):
-        assert len(attrs)==1
-        peak = attrs.pop()
-        peak = (peak[0]+offset[0], peak[1]+offset[1])
-        c[peak] = [(x+offset[0], y+offset[1]) for x,y in nodes]
-    return c
-
-
-def climb(x,blurredWeights,
-          diag=True,
-          excludePixels=None,
-          Niter=1000
-         ):
-    if excludePixels is None:
-        excludePixels = []
-    dims = blurredWeights.shape
-    # x = (60,60)
-    x = x+(blurredWeights[x[0],x[1]],)
-    xs = [x]
-    for i in range(Niter):
-        vs = []
-        for di,dj in product([-1,0,1],[-1,0,1]):
-            if not diag:
-                if di*dj!=0: continue
-            i,j = x[0]+di,x[1]+dj
-            if i<0 or i>=dims[0] or j<0 or j>=dims[1]:
-                continue
-            if (i,j) in excludePixels:
-                continue
-            vs += [(i,j,blurredWeights[i,j])]
-        x1 = vs[np.argmax(vs,axis=0)[-1]]
-        dx = x1[-1]-x[-1]
-        if dx<=0:
-            break
-        else:
-            x = x1
-            xs += [x]
-    return x[:2]
 
 
 class Regions:
