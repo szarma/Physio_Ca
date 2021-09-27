@@ -1812,7 +1812,7 @@ def getPeak2BounAndTraceDF(C):
     except: peak2bnd = pd.DataFrame(peak2bnd, columns=["i","j","size_i","size_j","dist","nclose"])
     return peak2bnd
 
-def getPeak2BoundaryDF(C):
+def getPeak2BoundaryDF(C, verbose=0, distTh=None):
     peak2bnd = []
     for i in C.index:
         pk = C.loc[i,"peak"]
