@@ -53,8 +53,8 @@ from sys import exit
 from pandas import DataFrame
 
 from islets.Recording import saveMovie, autocorr2d
-from islets.utils import saveRois
-from islets.Regions import Regions, getStatImages
+from islets.utils import saveRois, getStatImages
+from islets.Regions import Regions
 
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category= FutureWarning,)

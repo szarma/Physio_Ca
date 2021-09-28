@@ -24,8 +24,8 @@ from plotly_express import colors as plc
 from typing import Dict, List, Optional, Tuple
 
 from .general_functions import getCircularKernel
-from .numeric import rebin, bspline
-from .utils import multi_map
+from .numeric import rebin, bspline, crawl_dict_via_graph
+from .utils import multi_map, getGraph_of_ROIs_to_Merge, getPeak2BoundaryDF, getStatImages
 from .EventDistillery import define_legs, plot_events
 
 MYCOLORS = plc.qualitative.Plotly
@@ -64,91 +64,21 @@ def load_regions(path,
     
     return regions
 
-def crawlDict_restr(image, pixels, diag=False, processes=10, verbose=False):
-    global iterfcd
-    # noinspection PyRedeclaration
-    def iterfcd(ij):
-        return climb((ij[0],ij[1]), image, diag=diag,)
-    R_ = multi_map(iterfcd,pixels, processes=processes)
-    A_ = [ij+r for ij,r in zip(pixels,R_) if r in pixels]
-    A_ = [el for el in A_ if el[-1] is not None]
-    B_ = OrderedDict()
-    for (i0,j0,i1,j1) in A_:
-        if (i1,j1) not in B_:
-            B_[(i1,j1)] = []
-        B_[(i1,j1)] += [(i0,j0)]
-    return B_
-
-def climb(x,blurredWeights,
-          diag=True,
-          excludePixels=[]
-         ):
-    dims = blurredWeights.shape
-    # x = (60,60)
-    x = x+(blurredWeights[x[0],x[1]],)
-    xs = [x]
-    for i in range(1000):
-        vs = []
-        for di,dj in product([-1,0,1],[-1,0,1]):
-            if not diag:
-                if di*dj!=0: continue
-            i,j = x[0]+di,x[1]+dj
-            if i<0 or i>=dims[0] or j<0 or j>=dims[1]:
-                continue
-            if (i,j) in excludePixels:
-                continue
-            vs += [(i,j,blurredWeights[i,j])]
-        x1 = vs[np.argmax(vs,axis=0)[-1]]
-        dx = x1[-1]-x[-1]
-        if dx<=0:
-            break
-        else:
-            x = x1
-            xs += [x]
-    return x[:2]
-
-def crawlDict(image, crawl_th=0, diag=False, processes=10, excludePixels=None, verbose=False):
-    global iterf
-    if excludePixels is None:
-        excludePixels = []
-    if verbose:
-        print (f"entering crawling dict with {len(excludePixels)} pixels excluded.")
-    if np.isfinite(crawl_th):
-        excludePixels += list(map(tuple,np.array(np.where(image<crawl_th)).T))
-    if verbose:
-        print (f"Crawling the image with {len(excludePixels)} pixels excluded.")
-        
-    ijs_ = [(i,j) for i,j in product(range(image.shape[0]),range(image.shape[1])) if (i,j) not in excludePixels]
-    def iterf(ij):
-        return climb((ij[0],ij[1]), image, diag=diag,
-                     #excludePixels=excludePixels
-                    )
-    R_ = multi_map(iterf,ijs_, processes=processes)
-    A_ = [ij+r for ij,r in zip(ijs_,R_) if r not in excludePixels]
-    A_ = [el for el in A_ if el[-1] is not None]
-    B_ = OrderedDict()
-    for (i0,j0,i1,j1) in A_:
-        if (i1,j1) not in B_:
-            B_[(i1,j1)] = []
-        B_[(i1,j1)] += [(i0,j0)]
-    return B_
-
 
 class Regions:
     def __init__(self, movie_,
-                 diag=True,
+                 diag=False,
                  debleach=False,
                  gSig_filt=None,
                  mode="highperc+mean",
                  full=True,
-                 img_th=0.01,
+                 img_th=None,
                  FrameRange=None,
-                 processes=7,
-                 excludePixels=None,
+                 #processes=7,
+                 #excludePixels=None,
                  verbose=False,
-                 use_restricted=None
+                 #use_restricted=None
                 ):
-#         if isinstance(movie_, Regions):
         if hasattr(movie_, "df") and "pixels" in movie_.df.columns:
             for k in movie_.__dict__.keys():
                 if verbose:
@@ -182,7 +112,8 @@ class Regions:
                     ("peak",  list(movie_.keys())),
                     ("pixels",list(movie_.values()))
                 ]))
-                del self.mode
+                return None
+
             elif isinstance(akey,str):
                 if verbose:
                     print ("Initiating from a dictionary assumed to be a dictionary of image stats.")
@@ -192,8 +123,18 @@ class Regions:
         else:
             raise ValueError("Regions can initialize either from a movie, or an image, or a dictionary. You supplied %s"%str(type(movie_)))
         self.mode = mode
+        if gSig_filt is not None:
+            if type(gSig_filt) == int:
+                gSig_filt = [gSig_filt]
+        self.filterSize = gSig_filt
+        self.image = self.defineImage(mode=mode, gSig_filt=self.filterSize)
+
         if full and not hasattr(self,"df"):
-            self.constructRois(mode=mode, img_th=img_th, diag=diag, gSig_filt=gSig_filt, processes=processes, excludePixels=excludePixels, verbose=verbose, use_restricted=use_restricted)
+            self.constructRois(image=self.image, img_th=img_th, diag=diag, verbose=verbose,
+                               #processes=processes,
+                               #excludePixels=excludePixels,
+                               #use_restricted=use_restricted
+                              )
 
     def to_json(self,
                 output_dir: Union[str, Path],
@@ -360,10 +301,11 @@ class Regions:
 
         return regions
 
-    def constructRois(self, mode, img_th=0, diag=True, gSig_filt=None, processes=5,excludePixels=None, verbose=False,use_restricted=True):
+
+    def defineImage(self, mode, gSig_filt=None, ):
         from .numeric import robust_max
-        if mode=="custom":
-            image0=self.statImages[mode]
+        if mode == "custom":
+            image0 = self.statImages[mode]
         else:
             k0 = next(iter(self.statImages))
             tmp = np.zeros_like(self.statImages[k0])
@@ -371,84 +313,123 @@ class Regions:
             for submode in mode.split("+"):
                 im = self.statImages[submode].copy()
                 norm += [robust_max(im)]
-                im = im/norm[-1]
+                im = im / norm[-1]
                 tmp += im
-            image0 = tmp/len(norm)*np.mean(norm)
-            self.statImages[mode] = image0
-            
-        from cv2 import GaussianBlur,dilate
+            image0 = tmp / len(norm) * np.mean(norm)
+            if mode not in self.statImages:
+                self.statImages[mode] = image0
+
+        from cv2 import GaussianBlur
         if gSig_filt is None:
             image = image0
-#             excludePixels = None
-            dks = 3
-        else:
-            if type(gSig_filt)==int:
-                gSig_filt = [gSig_filt]
-            dks = max(3,(max(gSig_filt))//2*2+1)
+        else: # gSig_filt is a list of integers
             image = []
             for gSf in gSig_filt:
-#                 tmp = high_pass_filter_space(image0,(gSf,)*2)
-                tmp  = GaussianBlur(image0,(gSf//2*2+1,)*2,-1)
-                tmp -= GaussianBlur(image0,(gSf*2+1,)*2,-1)
+                tmp = GaussianBlur(image0, (gSf // 2 * 2 + 1,) * 2, -1)
+                tmp -= GaussianBlur(image0, (gSf * 2 + 1,) * 2, -1)
                 tmp *= gSf
-                image += [tmp/robust_max(tmp)]
-            image = np.mean(image,axis=0)
-        if not use_restricted:
-            if excludePixels is None:
-                excludePixels = []
-        
+                image += [tmp / robust_max(tmp)]
+            image = np.mean(image, axis=0)
+        return image
+
+
+    def constructRois(self, image, img_th=None, dks=3, verbose=False, diag=False, merge=True):
+        from cv2 import dilate,erode
+        try:
+            dks = max(3, (max(self.filterSize)) // 4 * 2 + 1)
+        except:
+            pass
+        dilation_kernel = getCircularKernel(dks)
+        eks = max(3,dks-2)
+        erosion_kernel  = getCircularKernel(eks)
+        if verbose:
+            print ("eroding valid pixels by", eks)
+        if img_th is None:
+            img_th = median_abs_deviation(image.flat)
+        ok = erode((image>img_th).astype(np.uint8), erosion_kernel)
         if verbose:
             print ("dilating valid pixels by", dks)
-        kernel = getCircularKernel(dks)
-        ok = dilate((image>img_th).astype(np.uint8), kernel)
-        # ok = ok*(self.statImages[self.mode]>0).astype(np.uint8)
+        ok = dilate(ok, dilation_kernel)
         ok = ok.astype(bool)
-        self.filterSize = gSig_filt
-        self.image = image
-        if use_restricted:
-            includePixels = list(map(tuple, np.array(np.where(ok)).T))
-            if verbose:
-                print(f"initiating the cralwing dict on {len(includePixels)} (%.1f%%) pixels only."%(100*len(includePixels)/ok.size))
-            B_ = crawlDict_restr(image,
-                           includePixels,
-                           diag=diag,
-                           processes=processes,
-                           verbose=verbose
-                          )
-        else:
-            excludePixels += list(map(tuple, np.array(np.where(~ok)).T))
-            if verbose:
-                print(f"initiating the cralwing dict with {len(excludePixels)} pixels excluded.")
-            B_ = crawlDict(image,
-                           crawl_th=-np.inf,
-                           diag=diag,
-                           processes=processes,
-                           excludePixels=excludePixels,
-                           verbose=verbose
-                          )
+        self.validPixels = ok
+        B_ = crawl_dict_via_graph(image, ok, diag=diag)
         if diag:
-#             try:
                 from .utils import split_unconnected_rois
+                # TODO: this needs review
                 B_ = split_unconnected_rois(B_, self.image)
-#             except:
-#                 print ("Cannot initialize with diagonal crawl. Reverting to diag=False")
-#                 diag = False
-#                 B_ = crawlDict(image,image.min(),diag=diag,min_gradient=min_gradient, processes=processes)
-        
         
         self.df = pd.DataFrame(OrderedDict([
             ("peak",  list(B_.keys())),
             ("pixels",list(B_.values()))
         ]))
-#         try:
-#             blurKsize = min(self.filterSize)//2*2+1
-#             blurKsize = max(3,blurKsize)
-#             slightly_blurred_image = GaussianBlur(self.statImages[self.mode],(blurKsize,)*2,-1)
-#             self.reassign_peaks(slightly_blurred_image+self.statImages[self.mode])
-#         except:
         self.df["peakValue"] = [image[p] for p in B_]
-        self.ExcludePixels = excludePixels
         self.update()
+        if merge:
+            self.merge_closest(mergeDist=.71, mergeSizeTh=100, verbose=verbose, )
+
+    def mergeBasedOnGraph(self, Gph, verbose=0):
+        toDrop = []
+        Gph_ = Gph.to_undirected()
+        connected_components = nx.connected_components(Gph_)
+        # if verbose>1:
+        #     print(f"There are {len(connected_components)}.")
+        for cl in connected_components:
+            cl = list(cl)
+            if verbose>1:
+                print("Connected component:\t", cl)
+            gph = Gph.subgraph(nodes=cl)
+            attr = sum(list(map(list,nx.attracting_components(gph))),[])
+            if verbose>1:
+                print("attractor(s):\t\t", attr)
+            # if len(attr)>=2:
+            #     warnings.warn(f"two or more attractors ({attr}), not implemented yet, will skip")
+            #     continue
+            # if len(attr)==2 and len(cl)>2:
+            #     continue
+            attr = self.df.loc[attr,"peakValue"].sort_values().index[-1]
+            if verbose>1:
+                print("the chosen attractor:\t", attr)
+            other = [j for j in cl if j!=attr]
+            if verbose>1:
+                print("other rois:\t\t", other)
+            unionPixels = sum(self.df.loc[cl,"pixels"],[])
+            unionPixels = list(set(unionPixels))
+            self.df.loc[attr, "Nneighbors"] -= len(other)
+            # nns = set([ngh for ngh in self.df.loc[attr,"neighbors"] if ngh not in other])
+            # if verbose>1:
+            #     print("surviving neighbors:\t", nns)
+            for j in other:
+                for k in self.df.loc[j, "neighbors"]:
+                    if k in other: continue
+                    self.df.loc[k, "neighbors"].remove(j)
+                    if verbose>2:
+                        print (f"\tremoving {j} from neighbor set of {k}")
+            survive = []
+            for edge in sum(self.df.loc[cl,"edges"],[]):
+                if sum([edge in self.df.loc[roi,"edges"] for roi in cl])>1:
+                    if edge in self.edgeIDs:
+                        del self.edgeIDs[edge]
+                else:
+                    survive += [edge]
+            self.df.loc[[attr],"edges"] = [survive]
+            # peak2idx
+            self.df.loc[[attr],"boundary"] = [edges2nodes(survive)]
+            self.df.loc[[attr],"pixels"] = [unionPixels]
+            newSize = len(unionPixels)
+            if "trace" in self.df.columns:
+                self.df.loc[[attr],"trace"] = [self.df.loc[j,"trace"]*self.df.loc[j,"size"]/newSize for j in cl]
+            self.df.loc[attr,"size"] = newSize
+            toDrop += other
+        self.df.drop(index=toDrop,inplace=True)
+        if verbose:
+            print (f"{len(toDrop)} subsumed into existing ROIs.")
+        # if len(toDrop):
+        #     rreg.update()
+        #     try:
+        #         rreg.calcTraces()
+        #     except:
+        #         pass
+        return len(toDrop)
     
     def reassign_peaks(self, image, write=True):
         newPeaks = []
@@ -462,7 +443,8 @@ class Regions:
         if write:
             self.df["peak"] = newPeaks
             self.df["peakValue"] = newValues
-            self.update()
+            self.calc_peak2idx()
+            # self.update()
         else:
             return newPeaks, newValues
     
@@ -489,28 +471,32 @@ class Regions:
                 "trend":ydbl
             }
 
-    def merge_closest(self, mergeSizeTh=10, mergeDist=1, plot=False, Niter=20, verbose=False):
+    def merge_closest(self, mergeSizeTh=10, mergeDist=1, plot=False, Niter=20, verbose=0, axs=None):
         if plot:
-            plt.figure(figsize=(7*Niter,6))
+            if axs is None:
+                plt.figure(figsize=(7*Niter,6))
 
         ia = 1
         for ja in range(Niter):
             size_th = np.percentile(self.df["size"].values, mergeSizeTh)
-            df = getPeak2BoundaryDF(self.df)
+            df = getPeak2BoundaryDF(self.df, distTh=mergeDist)
             df = df.query(f"dist<={mergeDist} and size_from<={size_th}")
             if len(df):
                 if plot:
-                    ax = plt.subplot(1,Niter,ia)
-                    ax.imshow(self.statImages[self.mode], cmap="Greys", norm=LogNorm())
+                    if axs is None:
+                        ax = plt.subplot(1,Niter,ia)
+                        ax.imshow(self.statImages[self.mode], cmap="Greys", norm=LogNorm())
+                    else:
+                        ax = axs[ia%len(axs)]
                     xl = ax.get_xlim()
                     yl = ax.get_ylim()
                 else:
                     ax = None
-                suggestGraph = getGraph_of_ROIs_to_Merge(df.iloc[:,:2], self, plot=plot,ax=ax)
+                suggestGraph = getGraph_of_ROIs_to_Merge(df.iloc[:, :2], self, plot=plot, ax=ax)
                 if plot:
                     ax.set_xlim(xl)
                     ax.set_ylim(yl)
-                mergeBasedOnGraph(suggestGraph, self, verbose=verbose)
+                self.mergeBasedOnGraph(suggestGraph, verbose=verbose)
             else:
                 # print ("No more suggestions.")
                 break
@@ -521,11 +507,10 @@ class Regions:
         
     def update(self, movie_=None):
         self.df["size"] = self.df["pixels"].apply(len)
-        self.df["interest"] = [np.sum([self.image[px[0],px[1]] for px in pxs]) for pxs in self.df["pixels"]]
-        self.calcEdgeIds()
         self.calcEdges()
         self.df["boundary"] = [edges2nodes(self.df["edges"][j]) for j in self.df.index]
         self.calcNNmap()
+        self.df["interest"] = [np.sum([self.image[px[0],px[1]] for px in pxs]) for pxs in self.df["pixels"]]
         if movie_ is not None:
             self.calcTraces(movie_)
             self.movie = movie_
@@ -582,7 +567,7 @@ class Regions:
                   ix=None,
                   ax=None,
                   image=True,
-                  imkw_args={},
+                  imkw_args=None,
                   separate=False,
                   color="darkred",
                   lw=None,
@@ -590,8 +575,11 @@ class Regions:
                   fill=False,
                   scaleFontSize=12,
                   norm=LogNorm(vmin=1),
-                  spline=True
+                  spline=True,
+                  **kwargs
                   ):
+        if imkw_args is None:
+            imkw_args = {}
         if ix is None:
             ix = self.df.index
         if ax is None:
@@ -606,6 +594,7 @@ class Regions:
         if image:
             im = self.statImages[self.mode]
             ax.imshow(im,norm=norm,**imkw_args)
+        smoothness = min(list(self.__dict__.get("filterSize",[]))+[3] )
         if separate:
             for i in ix:
                 try:
@@ -614,32 +603,37 @@ class Regions:
                     c = MYCOLORS[i%len(MYCOLORS)]
                 points = self.df.loc[i,"boundary"]+self.df.loc[i,"boundary"][:3]
                 if spline:
-                    points = bspline(points)
-                points = [(p-points.mean(0))*.9+points.mean(0) for p in points]
+                    points = bspline(points, smoothness=smoothness)
+                else:
+                    points = np.array(points)
+                # points = [(p-points.mean(0))*.9+points.mean(0) for p in points]
                 y,x = np.array(points).T
-                ax.plot(x,y,"-",lw=lw,c=c,alpha=alpha)
+                ax.plot(x,y,"-",lw=lw,c=c,alpha=alpha,**kwargs)
                 if fill:
-                    ax.fill(x,y,c=c,alpha=alpha*.8)
+                    ax.fill(x,y,c=c,alpha=alpha*.8,**kwargs)
         else:
             tmp = []
             for el in self.df.loc[ix,"boundary"]:
                 if spline:
-                    el = list(bspline(el))
+                    el = list(bspline(el, smoothness=smoothness))
                 tmp += el
                 tmp += el[:3]
                 tmp += [(np.nan,)*2]
 
             y,x = np.array(tmp).T
-            ax.plot(x,y,color,lw=lw,alpha=alpha)
+            ax.plot(x,y,color,lw=lw,alpha=alpha, **kwargs)
         dim = self.image.shape
         ax.set_xlim(-.5,dim[1]-.5)
         ax.set_ylim(dim[0]-.5, -.5,)
             
         if scaleFontSize<=0: return None
         if hasattr(self, "metadata") and "pxSize" in self.metadata:
-            lengths = [10,20,50]
+            lengths = [10,20,50,100,200,500]
             il = np.searchsorted(lengths,self.metadata.pxSize*self.image.shape[1]/10)
+            if il>=len(lengths):
+                il = len(lengths)-1
             length=lengths[il]
+
             x0,x1,y0,y1 = np.array([0,length,0,length*3/50])/self.metadata.pxSize + self.image.shape[0]*.02
             ax.fill_between([x0,x1],[y1]*2,[y0]*2, color="k")
             txt = "\n"*1+str(length)
@@ -647,7 +641,7 @@ class Regions:
                 txt += self.metadata["pxUnit"]
             ax.text((x0+x1)/2, y1+.3*(y1-y0), txt, va="center", ha="center", size=scaleFontSize)
             
-    def plotPeaks(self, ix=None, ax=None, image=False, ms=3, labels=False,color=None, imkw_args={},absMarker=True, marker="."):
+    def plotPeaks(self, ix=None, ax=None, image=False, ms=3, labels=False,color=None, imkw_args={},absMarker=True, marker=".", **kwargs):
         if ax is None:
             ax = plt.subplot(111)
         if image:
@@ -669,9 +663,9 @@ class Regions:
                     c = MYCOLORS[i%len(MYCOLORS)]
             else:
                 c = color
-            ax.plot(*p[::-1],marker=marker,ms=ms,c=c)
+            ax.plot(*p[::-1],marker=marker,ms=ms,c=c, **kwargs)
             if labels:
-                ax.text(*p[::-1],s=" "+str(i),color=c)
+                ax.text(*p[::-1],s=" "+str(i),color=c, **kwargs)
     
     def calc_interest(self, zth=4, timescales=[3,10,30,100,300]):
         interesting = np.zeros(len(self.df))
@@ -691,11 +685,14 @@ class Regions:
         self.df.trace = list(trmov[:,:,0].T)
         self.Freq = fr
         self.time = np.arange(len(trmov))/fr
-        
-    def calcNNmap(self):
+
+    def calc_peak2idx(self):
         from bidict import bidict
         peak2idx = bidict([(peak,j) for j,peak in zip(self.df.index,self.df.peak)])
         self.peak2idx = peak2idx
+
+    def calcNNmap(self):
+        self.calc_peak2idx()
         neighborsMap = {k:[] for k in self.df["peak"]}
         for edge in self.edgeIDs:
             if len(self.edgeIDs[edge])>1:
@@ -705,7 +702,7 @@ class Regions:
                     if e1==e2: continue
                     if e2 not in neighborsMap[e1]:
                         neighborsMap[e1] += [e2]
-        self.df["neighbors"] = [[peak2idx[pp] for pp in neighborsMap[p]] for p in self.df["peak"]]
+        self.df["neighbors"] = [[self.peak2idx[pp] for pp in neighborsMap[p]] for p in self.df["peak"]]
         self.df["Nneighbors"] = self.df["neighbors"].apply(len)
         
     def purge_lones(self,min_size=4, verbose=False):
@@ -1439,9 +1436,6 @@ class Regions:
         if imagemode is None:
             imagemode = self.mode
         return examine(self, max_rois=max_rois, imagemode=imagemode, debug=debug, startShow=startShow,mode=mode,name=name)
-    
-    def examine3(self, max_rois=10, imagemode=None, debug=False, startShow='',mode="jupyter",name=None,lw=None):
-        return "examine3 is deprecated. Please, use examine."
 
     def examine_events(self, df, x, y, debug=False, **otherkwargs):
         from .examine_events import examine_events
@@ -1636,7 +1630,7 @@ class Regions:
 
         plt.rcParams['font.size'] = original_font_size
         fig.show()
-    
+
     def plotTraces(regions, indices, axratios = [1,2], figsize=5, freqShow=2, col="detrended",Offset=5,separate=False):
         if col not in regions.df.columns:
             if col=="detrended":
@@ -1781,195 +1775,7 @@ class Regions:
                 plt.text(df.t_begin.min(),y[:-1].mean(),comp+" ",va="center", ha="right")
                 offset -= 1.3*dy/20
         return axs if axs[0] is not None else axs[1]
-    
-def getGraph_of_ROIs_to_Merge(df,rreg, plot=False, ax=None,lw=.5,arrow_width=.5):
-    C = rreg.df
-    Gph = nx.DiGraph()
-    ixs = np.unique(df.values.flatten())
-    if plot:
-        if ax is None:
-            plt.figure(figsize=(10,10))
-            ax = plt.subplot(111)
-        rreg.plotEdges(image=False, ix=ixs, ax=ax, color="k")
 
-
-    for _,row in df.iterrows():
-        i,j = row[["i","j"]]
-        l = list(df.query(f"i=={j}")["j"])
-        if i in l:
-            c="darkgoldenrod"
-            iaccept = C.loc[sorted([i,j]),"peakValue"].idxmax()
-            if j!=iaccept:
-                continue
-        else:
-            c="r"
-        Gph.add_edge(i,j)
-        if plot:
-            x0,y0 = C.loc[i,"peak"]
-            x1,y1 = C.loc[j,"peak"]
-            dx = x1-x0
-            dy = y1-y0
-            ax.arrow(y0,x0,dy,dx,width = arrow_width,
-                     linewidth = lw,
-                     color="r",
-                     zorder=10,
-                     length_includes_head=True)
-            
-            #ax.plot(y1,x1,"o",ms=5,mfc="none",mew=.7,c=c)
-            
-    if plot:
-        plt.gca().set_aspect("equal")
-        attractors = np.squeeze([
-            list(map(list,nx.attracting_components(Gph.subgraph(el)))) \
-                for el in nx.connected_components(Gph.to_undirected())
-        ]).flatten()
-        rreg.plotPeaks(ax=ax,ix=attractors,color="c",ms=6)
-    return Gph
-
-def plotRoi_to_be_connected(Gph, rreg, nplot=35):
-    C = rreg.df
-    Gph_ = Gph.to_undirected()
-    dd = list(nx.connected_components(Gph_))
-    dd = sorted(dd,key=len)[::-1][:nplot]
-    nc = 7
-    nr = int(np.ceil(len(dd)/nc))
-
-    fig, axs = plt.subplots(nr,nc,figsize=(2*nc,nr*2))
-    for i,cl in enumerate(dd):
-        try: ax = axs.flat[i]
-        except: break
-        cl = list(cl)
-        gph = Gph.subgraph(nodes=cl)
-        pos = np.array([el[::-1] for el in C.loc[cl,"peak"]])
-        nx.draw_networkx(gph,
-                         ax=ax,
-                         node_size=30,
-                         node_color="w",
-                         pos=dict(zip(cl,pos)),
-                         font_size=6
-                        )
-        rreg.plotEdges(ax=ax,image=False,ix=cl)
-        attr = sum(list(map(list,nx.attracting_components(gph))),[])
-        rreg.plotEdges(ax=ax,image=False,ix=attr,color="red")
-        rreg.plotPeaks(ax=ax,image=False,ix=attr,color="red",ms=1)
-        for sp in ax.spines: ax.spines[sp].set_visible(False)
-        ax.set_aspect("equal")
-
-    for i in range(i+1,axs.size):
-        axs.flat[i].remove()
-    plt.subplots_adjust(wspace=0,hspace=0)
-
-def mergeBasedOnGraph(Gph,rreg,verbose=False):
-    C = rreg.df
-    toDrop = []
-    Gph_ = Gph.to_undirected()
-    for cl in nx.connected_components(Gph_):
-        cl = list(cl)
-        gph = Gph.subgraph(nodes=cl)
-        attr = sum(list(map(list,nx.attracting_components(gph))),[])
-        if len(attr)>2:
-            # print ("more than two attractors, not implemented yet, will skip")
-            continue
-        if len(attr)==2 and len(cl)>2:
-            continue
-        attr = C.loc[attr,"peakValue"].sort_values().index[-1]
-        other = [j for j in cl if j!=attr]
-        C.loc[[attr],"pixels"] = [sum(C.loc[cl,"pixels"],[])]
-        toDrop += other
-    C.drop(index=toDrop,inplace=True)
-    if verbose:
-        print (f"{len(toDrop)} subsumed into existing ROIs.")
-    rreg.update()
-#     rreg.sortFromCenter()
-    try:
-        rreg.calcTraces()
-    except:
-        pass
-    return len(toDrop)
-
-def getPeak2BounAndTraceDF(C):
-    peak2bnd = []
-    for i in C.index:
-        pk = C.loc[i,"peak"]
-        if len(C.loc[i,"neighbors"])==0:
-            continue
-        try: tr_i = np.diff(C.loc[i,"trace"])
-        except: pass
-        for j in C.loc[i,"neighbors"]:
-            bd = C.loc[j,"boundary"]
-            x = np.linalg.norm(np.array(bd)-np.repeat([pk],len(bd),axis=0), axis=1)
-            out = ( i, j, C.loc[i,"size"], C.loc[j,"size"], x.min(), sum(x==x.min()))
-            try:
-                tr_j = np.diff(C.loc[j,"trace"])
-                cc = np.corrcoef(tr_i,tr_j)[0,1]
-                out = out + (cc,)
-            except: pass
-            peak2bnd += [ out ]
-            
-    try: peak2bnd = pd.DataFrame(peak2bnd, columns=["i","j","size_i","size_j","dist","nclose","cc"])
-    except: peak2bnd = pd.DataFrame(peak2bnd, columns=["i","j","size_i","size_j","dist","nclose"])
-    return peak2bnd
-
-def getPeak2BoundaryDF(C):
-    peak2bnd = []
-    for i in C.index:
-        pk = C.loc[i,"peak"]
-        if len(C.loc[i,"neighbors"])==0:
-            continue
-        dists = OrderedDict()
-        for j in C.loc[i,"neighbors"]:
-            if j not in C.index: continue
-            bd = C.loc[j,"boundary"]
-            x = np.linalg.norm(np.array(bd)-np.repeat([pk],len(bd),axis=0), axis=1)
-            dists[j] = x.min()
-        if len(dists):
-            jmin = pd.Series(dists).idxmin()
-            peak2bnd += [(i,jmin,dists[jmin],C.loc[i,"size"],C.loc[jmin,"size"])]
-
-    peak2bnd = pd.DataFrame(peak2bnd, columns=["i","j","dist","size_from","size_to"])
-    return peak2bnd
-
-def getPeak2EdgesDF(C, regions):
-    peak2bnd = []
-    for i in C.index:
-        pk = C.loc[i,"peak"]
-        pxi = C.loc[i,"pixels"]
-        if len(C.loc[i,"neighbors"])==0:
-            continue
-        dists = OrderedDict()
-        for j in C.loc[i,"neighbors"]:
-            pxj = C.loc[j,"pixels"]
-            edges = C.loc[j,"edges"]
-            emean = np.array(edges).reshape((len(edges),2,2)).mean(axis=1)
-            xx = np.linalg.norm(emean-np.repeat([pk],len(emean),axis=0), axis=1)
-            barriers = []
-            if xx.min()>=1:
-                continue
-            for k in np.where(xx==xx.min())[0]:
-                emin = edges[k]
-                if emin[0]==emin[2]:
-                    y = int((emin[1]+emin[3])/2)
-                    pxs = (int(emin[0]-.5),y),(int(emin[0]+.5),y)
-                else:
-                    assert emin[1]==emin[3]
-                    x = int((emin[0]+emin[2])/2)
-                    pxs = (x,int(emin[1]-.5)),(x,int(emin[1]+.5))
-                if pxs[0] not in pxi:
-                    pxs = pxs[1],pxs[0]
-                if pxs[1] not in pxj:
-                    print (pxs,i,j)
-                    assert pxs[1] in pxj
-                barriers += [(k,regions.image[pxs[1]]-regions.image[pxs[0]])]
-            barriers = sorted(barriers, key=lambda xi: xi[1])[::-1]
-            imin,barrier = barriers[0]
-            dists[j] = xx[imin],barrier
-        if len(dists)==0:
-            continue
-        df = pd.DataFrame(dists).T
-        jmin = df.sort_values([0,1]).index[0]
-        peak2bnd += [(i,jmin)+tuple(df.loc[jmin])]
-    peak2bnd = pd.DataFrame(peak2bnd, columns=["i","j","dist","barrier"])
-    return peak2bnd
 
 
 def edges2nodes(x,start=0,direction=1):
@@ -1984,27 +1790,3 @@ def edges2nodes(x,start=0,direction=1):
                 nodes += [tuple(cand)]
     return nodes
 
-def getStatImages(movie_, debleach=False, downsampleFreq=2):
-    if movie_.fr>downsampleFreq:
-        n_rebin = int(np.round(movie_.fr/downsampleFreq))
-        if n_rebin>1:
-            m_for_image = movie_.resize(1,1, 1/n_rebin)
-        else:
-            m_for_image = movie_
-    else:
-        m_for_image = movie_
-    statImages = {}
-    # m_for_image = m_for_image.astype("float16")
-    if debleach:
-        m_for_image.debleach()
-
-    for f in [np.mean,np.std]:
-        statImages[f.__name__] = f(m_for_image,axis=0)
-    statImages["highperc"] = np.percentile(m_for_image,100*(1-10/len(m_for_image)), axis=0)
-    
-    m_for_image = np.diff(m_for_image,axis=0)
-    for f in [np.mean,np.std]:
-        statImages["diff_"+f.__name__] = f(m_for_image,axis=0)
-    statImages["diff_highperc"] = np.percentile(m_for_image,100*(1-10/len(m_for_image)), axis=0)
-#     statImages = {k:statImages[k] for k in statImages}
-    return statImages

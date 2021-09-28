@@ -1,9 +1,15 @@
 import os
+from collections import OrderedDict
+
 import matplotlib
 import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
 import warnings
 import ffmpeg
+import pandas as pd
+from matplotlib import pyplot as plt
+
 
 def coltrans(x, vmin=None, vmax=None, tilt=1, offset=0.1):
     from .numeric import robust_max
@@ -635,3 +641,209 @@ def saveRois(regions,outDir,filename="",movie=None,col=["trace"],formats=["vienn
 #         from sys import exc_info
 #         feedback += ["ERROR: "+ exc_info().__repr__()]
         return feedback
+
+
+def getGraph_of_ROIs_to_Merge(df,rreg, plot=False, ax=None,lw=.5,arrow_width=.5):
+    if plot:
+        ixs = np.unique(df.values.flatten())
+        if ax is None:
+            plt.figure(figsize=(10,10))
+            ax = plt.subplot(111)
+        rreg.plotEdges(image=False, ix=ixs, ax=ax, color="k")
+
+    C = rreg.df
+    Gph = nx.DiGraph()
+
+    for _,row in df.iterrows():
+        i,j = row[["i","j"]]
+        # from_,to_ = C.loc[[i,j],"peakValue"].sort_values().index
+        l = list(df.query(f"i=={j}")["j"])
+        c = 'red'
+        if i in l:
+            if C.loc[i,"peakValue"]>C.loc[j,"peakValue"]:
+                c = "darkgoldenrod"
+            else:
+                Gph.add_edge(i, j)
+        else:
+            Gph.add_edge(i, j)
+
+        if plot:
+            x0,y0 = np.mean(C.loc[i,"pixels"],0)
+            x1,y1 = C.loc[j,"peak"]
+            dx = x1-x0
+            dy = y1-y0
+            ax.arrow(y0,x0,dy,dx,width = arrow_width,
+                     linewidth = lw,
+                     color=c,
+                     zorder=10,
+                     length_includes_head=True)
+
+            #ax.plot(y1,x1,"o",ms=5,mfc="none",mew=.7,c=c)
+
+    if plot:
+        plt.gca().set_aspect("equal")
+        attractors = sum([list(attr) for attr in nx.attracting_components(Gph)],[])
+        # print (attractors)
+        rreg.plotPeaks(ax=ax,ix=attractors,color="c",ms=6, zorder=10)
+
+    return Gph
+
+
+def plotRoi_to_be_connected(Gph, rreg, nplot=35):
+    C = rreg.df
+    Gph_ = Gph.to_undirected()
+    dd = list(nx.connected_components(Gph_))
+    dd = sorted(dd,key=len)[::-1][:nplot]
+    nc = 7
+    nr = int(np.ceil(len(dd)/nc))
+
+    fig, axs = plt.subplots(nr,nc,figsize=(2*nc,nr*2))
+    for i,cl in enumerate(dd):
+        try: ax = axs.flat[i]
+        except: break
+        cl = list(cl)
+        gph = Gph.subgraph(nodes=cl)
+        pos = np.array([el[::-1] for el in C.loc[cl,"peak"]])
+        nx.draw_networkx(gph,
+                         ax=ax,
+                         node_size=30,
+                         node_color="w",
+                         pos=dict(zip(cl,pos)),
+                         font_size=6
+                        )
+        rreg.plotEdges(ax=ax,image=False,ix=cl, spline=False)
+        attr = sum(list(map(list,nx.attracting_components(gph))),[])
+        rreg.plotEdges(ax=ax,image=False,ix=attr,color="red",spline=False)
+        rreg.plotPeaks(ax=ax,image=False,ix=attr,color="red",ms=1)
+        for sp in ax.spines: ax.spines[sp].set_visible(False)
+        ax.set_aspect("equal")
+
+    for i in range(i+1,axs.size):
+        axs.flat[i].remove()
+    plt.subplots_adjust(wspace=0,hspace=0)
+
+
+def getPeak2BounAndTraceDF(C):
+    peak2bnd = []
+    for i in C.index:
+        pk = C.loc[i,"peak"]
+        if len(C.loc[i,"neighbors"])==0:
+            continue
+        try: tr_i = np.diff(C.loc[i,"trace"])
+        except: pass
+        for j in C.loc[i,"neighbors"]:
+            bd = C.loc[j,"boundary"]
+            x = np.linalg.norm(np.array(bd)-np.repeat([pk],len(bd),axis=0), axis=1)
+            out = ( i, j, C.loc[i,"size"], C.loc[j,"size"], x.min(), sum(x==x.min()))
+            try:
+                tr_j = np.diff(C.loc[j,"trace"])
+                cc = np.corrcoef(tr_i,tr_j)[0,1]
+                out = out + (cc,)
+            except: pass
+            peak2bnd += [ out ]
+
+    try: peak2bnd = pd.DataFrame(peak2bnd, columns=["i","j","size_i","size_j","dist","nclose","cc"])
+    except: peak2bnd = pd.DataFrame(peak2bnd, columns=["i","j","size_i","size_j","dist","nclose"])
+    return peak2bnd
+
+
+def getPeak2BoundaryDF(C, verbose=0, distTh=None):
+    peak2bnd = []
+    for i in C.index:
+        pk = C.loc[i,"peak"]
+        if len(C.loc[i,"neighbors"])==0:
+            continue
+        if distTh is not None:
+            bd = C.loc[i, "boundary"]
+            x = np.linalg.norm(np.array(bd) - np.repeat([pk], len(bd), axis=0), axis=1)
+            if x.min()>distTh:
+                continue
+        if verbose:
+            print(i,"distances:",)
+        # dists = OrderedDict()
+        for j in C.loc[i,"neighbors"]:
+            if j not in C.index:
+                warnings.warn(f"{j} is listed as a neighbor of {i}, but it does not exist")
+                continue
+            bd = C.loc[j,"boundary"]
+            x = np.linalg.norm(np.array(bd)-np.repeat([pk],len(bd),axis=0), axis=1)
+            d = x.min()
+            if distTh is not None and d<=distTh:
+                peak2bnd += [(i,j,d,C.loc[i,"size"],C.loc[j,"size"])]
+            # dists[j] = x.min()
+            if verbose:
+                print(f"\tto {j}:", d)
+        # if len(dists):
+        #     jmin = pd.Series(dists).idxmin()
+        #     peak2bnd += [(i,jmin,dists[jmin],C.loc[i,"size"],C.loc[jmin,"size"])]
+
+    peak2bnd = pd.DataFrame(peak2bnd, columns=["i","j","dist","size_from","size_to"])
+    return peak2bnd
+
+
+def getPeak2EdgesDF(C, regions):
+    peak2bnd = []
+    for i in C.index:
+        pk = C.loc[i,"peak"]
+        pxi = C.loc[i,"pixels"]
+        if len(C.loc[i,"neighbors"])==0:
+            continue
+        dists = OrderedDict()
+        for j in C.loc[i,"neighbors"]:
+            pxj = C.loc[j,"pixels"]
+            edges = C.loc[j,"edges"]
+            emean = np.array(edges).reshape((len(edges),2,2)).mean(axis=1)
+            xx = np.linalg.norm(emean-np.repeat([pk],len(emean),axis=0), axis=1)
+            barriers = []
+            if xx.min()>=1:
+                continue
+            for k in np.where(xx==xx.min())[0]:
+                emin = edges[k]
+                if emin[0]==emin[2]:
+                    y = int((emin[1]+emin[3])/2)
+                    pxs = (int(emin[0]-.5),y),(int(emin[0]+.5),y)
+                else:
+                    assert emin[1]==emin[3]
+                    x = int((emin[0]+emin[2])/2)
+                    pxs = (x,int(emin[1]-.5)),(x,int(emin[1]+.5))
+                if pxs[0] not in pxi:
+                    pxs = pxs[1],pxs[0]
+                if pxs[1] not in pxj:
+                    print (pxs,i,j)
+                    assert pxs[1] in pxj
+                barriers += [(k,regions.image[pxs[1]]-regions.image[pxs[0]])]
+            barriers = sorted(barriers, key=lambda xi: xi[1])[::-1]
+            imin,barrier = barriers[0]
+            dists[j] = xx[imin],barrier
+        if len(dists)==0:
+            continue
+        df = pd.DataFrame(dists).T
+        jmin = df.sort_values([0,1]).index[0]
+        peak2bnd += [(i,jmin)+tuple(df.loc[jmin])]
+    peak2bnd = pd.DataFrame(peak2bnd, columns=["i","j","dist","barrier"])
+    return peak2bnd
+
+
+def getStatImages(movie_, debleach=False, downsampleFreq=2):
+    if movie_.fr>downsampleFreq:
+        n_rebin = int(np.round(movie_.fr/downsampleFreq))
+        if n_rebin>1:
+            m_for_image = movie_.resize(1,1, 1/n_rebin)
+        else:
+            m_for_image = movie_
+    else:
+        m_for_image = movie_
+    statImages = {}
+    # m_for_image = m_for_image.astype("float16")
+    if debleach:
+        m_for_image.debleach()
+
+    for f in [np.mean,np.std]:
+        statImages[f.__name__] = f(m_for_image,axis=0)
+    statImages["highperc"] = np.percentile(m_for_image,100*(1-10/len(m_for_image)), axis=0)
+
+    # m_for_image = np.diff(m_for_image,axis=0)
+    # for f in [np.mean,np.std]:
+    #     statImages["diff_"+f.__name__] = f(m_for_image,axis=0)
+    # statImages["diff_highperc"] = np.percentile(m_for_image,100*(1-10/len(m_for_image)), axis=0)
+    return statImages

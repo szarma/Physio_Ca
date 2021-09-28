@@ -1,7 +1,11 @@
+from collections import OrderedDict
 import networkx as nx
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
+
+from islets.numeric import climb
+from islets.utils import multi_map
 
 
 def filter_events_per_roi(roiEvents,
@@ -200,3 +204,38 @@ def runningMode(x_, filterSize, boundary="reflective"):
         c,v = np.histogram(x_[i:i+filterSize], nbins)
         out[i] = v[np.argmax(c)]
     return out
+
+
+def crawlDict_restr(image, pixels, diag=False, processes=10, verbose=False):
+    global iterfcd
+    # noinspection PyRedeclaration
+    def iterfcd(ij):
+        return climb((ij[0],ij[1]), image, diag=diag,)
+    R_ = multi_map(iterfcd,pixels, processes=processes)
+    A_ = [ij+r for ij,r in zip(pixels,R_) if r in pixels]
+    A_ = [el for el in A_ if el[-1] is not None]
+    B_ = OrderedDict()
+    for (i0,j0,i1,j1) in A_:
+        if (i1,j1) not in B_:
+            B_[(i1,j1)] = []
+        B_[(i1,j1)] += [(i0,j0)]
+    return B_
+
+
+def get_crawl_dict(image, pixels, diag=False, offset=(0,0)):
+    # noinspection PyRedeclaration
+    R_ = [climb((i,j), image, diag=diag,) for i,j in pixels]
+    A_ = [ij+r for ij,r in zip(pixels,R_) if r in pixels]
+    A_ = [el for el in A_ if el[-1] is not None]
+    B_ = OrderedDict()
+    for (i0,j0,i1,j1) in A_:
+        i0 += offset[0]
+        j0 += offset[1]
+        i1 += offset[0]
+        j1 += offset[1]
+        if (i1,j1) not in B_:
+            B_[(i1,j1)] = []
+        B_[(i1,j1)] += [(i0,j0)]
+    return B_
+
+

@@ -101,8 +101,8 @@ from pandas import DataFrame
 from islets.Recording import Recording, saveMovie
 from islets.LineScan import LineScan
 from islets.numeric import rebin
-from islets.utils import saveRois, get_filterSizes
-from islets.Regions import Regions, getStatImages
+from islets.utils import saveRois, get_filterSizes, getStatImages
+from islets.Regions import Regions
 
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category= FutureWarning,)
@@ -289,7 +289,7 @@ for spFilt in filtSizes:
 
     regions = Regions(statistics,gSig_filt=spFilt)
     if args.verbose:
-        print (f"initiallized with {len(regions.df)} rois.")
+        print (f"initialized with {len(regions.df)} rois.")
     regions.merge_closest(verbose=args.verbose)
     regions.sortInOrder()
     regions.metadata = metadata
