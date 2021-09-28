@@ -10,6 +10,12 @@ import ffmpeg
 import pandas as pd
 from matplotlib import pyplot as plt
 
+def load_tif_seq(file_names, subindices = None):
+    # copied from CaImAn
+    with tifffile.TiffSequence(file_names) as tffl:
+        input_arr = tffl.asarray()
+    return input_arr
+
 def load_tif(file_name, subindices = None):
     # copied from CaImAn
     with tifffile.TiffFile(file_name) as tffl:
@@ -397,7 +403,7 @@ def show_movie(m_show,
         return HTML(anim.to_html5_video())
     elif out=="jshtml":
         from IPython.display import HTML
-        return HTML(anim.to_jshtml())
+        return HTML(anim.to_jshtml(default_mode="reflect"))
     elif out=="save" or saveName is not None:
 #         try:
         anim.save(saveName, extra_args=['-vcodec', 'libx264'])
