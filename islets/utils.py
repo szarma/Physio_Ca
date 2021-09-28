@@ -1,6 +1,6 @@
 import os
 from collections import OrderedDict
-
+import tifffile
 import matplotlib
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -10,6 +10,49 @@ import ffmpeg
 import pandas as pd
 from matplotlib import pyplot as plt
 
+def load_tif(file_name, subindices = None):
+    # copied from CaImAn
+    with tifffile.TiffFile(file_name) as tffl:
+        multi_page = True if tffl.series[0].shape[0] > 1 else False
+        if len(tffl.pages) == 1:
+            warnings.warn('Your tif file is saved a single page' +
+                            'file. Performance will be affected')
+            multi_page = False
+        if subindices is not None:
+            # if isinstance(subindices, (list, tuple)): # is list or tuple:
+            if isinstance(subindices, list):  # is list or tuple:
+                if multi_page:
+                    if len(tffl.series[0].shape) < 4:
+                        input_arr = tffl.asarray(key=subindices[0])[:, subindices[1], subindices[2]]
+                    else:  # 3D
+                        shape = tffl.series[0].shape
+                        ts = np.arange(shape[0])[subindices[0]]
+                        input_arr = tffl.asarray(key=np.ravel(ts[:, None] * shape[1] +
+                                                              np.arange(shape[1]))
+                                                 ).reshape((len(ts),) + shape[1:])[
+                            :, subindices[1], subindices[2], subindices[3]]
+                else:
+                    input_arr = tffl.asarray()[tuple(subindices)]
+
+            else:
+                if multi_page:
+                    if len(tffl.series[0].shape) < 4:
+                        input_arr = tffl.asarray(key=subindices)
+                    else:  # 3D
+                        shape = tffl.series[0].shape
+                        ts = np.arange(shape[0])[subindices]
+                        input_arr = tffl.asarray(key=np.ravel(ts[:, None] * shape[1] +
+                                                              np.arange(shape[1]))
+                                                 ).reshape((len(ts),) + shape[1:])
+                else:
+                    input_arr = tffl.asarray()
+                    input_arr = input_arr[subindices]
+
+        else:
+            input_arr = tffl.asarray()
+
+        input_arr = np.squeeze(input_arr)
+    return input_arr
 
 def coltrans(x, vmin=None, vmax=None, tilt=1, offset=0.1):
     from .numeric import robust_max
