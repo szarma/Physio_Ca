@@ -351,6 +351,7 @@ class Regions:
         B_ = crawl_dict_via_graph(image, ok, diag=diag)
         if diag:
                 from .utils import split_unconnected_rois
+                # TODO: this needs review
                 B_ = split_unconnected_rois(B_, self.image)
         
         self.df = pd.DataFrame(OrderedDict([
@@ -638,7 +639,8 @@ class Regions:
                   fill=False,
                   scaleFontSize=12,
                   norm=LogNorm(vmin=1),
-                  spline=True
+                  spline=True,
+                  **kwargs
                   ):
         if imkw_args is None:
             imkw_args = {}
@@ -656,7 +658,7 @@ class Regions:
         if image:
             im = self.statImages[self.mode]
             ax.imshow(im,norm=norm,**imkw_args)
-        smoothness = min(self.__dict__.get("filterSize",[])+[3] )
+        smoothness = min(list(self.__dict__.get("filterSize",[]))+[3] )
         if separate:
             for i in ix:
                 try:
@@ -666,11 +668,13 @@ class Regions:
                 points = self.df.loc[i,"boundary"]+self.df.loc[i,"boundary"][:3]
                 if spline:
                     points = bspline(points, smoothness=smoothness)
-                points = [(p-points.mean(0))*.9+points.mean(0) for p in points]
+                else:
+                    points = np.array(points)
+                # points = [(p-points.mean(0))*.9+points.mean(0) for p in points]
                 y,x = np.array(points).T
-                ax.plot(x,y,"-",lw=lw,c=c,alpha=alpha)
+                ax.plot(x,y,"-",lw=lw,c=c,alpha=alpha,**kwargs)
                 if fill:
-                    ax.fill(x,y,c=c,alpha=alpha*.8)
+                    ax.fill(x,y,c=c,alpha=alpha*.8,**kwargs)
         else:
             tmp = []
             for el in self.df.loc[ix,"boundary"]:
@@ -681,16 +685,19 @@ class Regions:
                 tmp += [(np.nan,)*2]
 
             y,x = np.array(tmp).T
-            ax.plot(x,y,color,lw=lw,alpha=alpha)
+            ax.plot(x,y,color,lw=lw,alpha=alpha, **kwargs)
         dim = self.image.shape
         ax.set_xlim(-.5,dim[1]-.5)
         ax.set_ylim(dim[0]-.5, -.5,)
             
         if scaleFontSize<=0: return None
         if hasattr(self, "metadata") and "pxSize" in self.metadata:
-            lengths = [10,20,50]
+            lengths = [10,20,50,100,200,500]
             il = np.searchsorted(lengths,self.metadata.pxSize*self.image.shape[1]/10)
+            if il>=len(lengths):
+                il = len(lengths)-1
             length=lengths[il]
+
             x0,x1,y0,y1 = np.array([0,length,0,length*3/50])/self.metadata.pxSize + self.image.shape[0]*.02
             ax.fill_between([x0,x1],[y1]*2,[y0]*2, color="k")
             txt = "\n"*1+str(length)
@@ -698,7 +705,7 @@ class Regions:
                 txt += self.metadata["pxUnit"]
             ax.text((x0+x1)/2, y1+.3*(y1-y0), txt, va="center", ha="center", size=scaleFontSize)
             
-    def plotPeaks(self, ix=None, ax=None, image=False, ms=3, labels=False,color=None, imkw_args={},absMarker=True, marker="."):
+    def plotPeaks(self, ix=None, ax=None, image=False, ms=3, labels=False,color=None, imkw_args={},absMarker=True, marker=".", **kwargs):
         if ax is None:
             ax = plt.subplot(111)
         if image:
@@ -720,9 +727,9 @@ class Regions:
                     c = MYCOLORS[i%len(MYCOLORS)]
             else:
                 c = color
-            ax.plot(*p[::-1],marker=marker,ms=ms,c=c)
+            ax.plot(*p[::-1],marker=marker,ms=ms,c=c, **kwargs)
             if labels:
-                ax.text(*p[::-1],s=" "+str(i),color=c)
+                ax.text(*p[::-1],s=" "+str(i),color=c, **kwargs)
     
     def calc_interest(self, zth=4, timescales=[3,10,30,100,300]):
         interesting = np.zeros(len(self.df))
@@ -1490,9 +1497,6 @@ class Regions:
         if imagemode is None:
             imagemode = self.mode
         return examine(self, max_rois=max_rois, imagemode=imagemode, debug=debug, startShow=startShow,mode=mode,name=name)
-    
-    def examine3(self, max_rois=10, imagemode=None, debug=False, startShow='',mode="jupyter",name=None,lw=None):
-        return "examine3 is deprecated. Please, use examine."
 
     def examine_events(self, df, x, y, debug=False, **otherkwargs):
         from .examine_events import examine_events
