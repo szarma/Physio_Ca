@@ -150,7 +150,7 @@ class Recording:
         
     def parse_metadata(self,verbose=False):
         metadata = pd.DataFrame(columns=[
-            "Name","SizeT","SizeX","SizeY","SizeZ",
+            "Name","SizeT","SizeX","SizeY","SizeZ","Nchannels",
             "pxSize","pxUnit","bit depth", "Frequency",
             "Start time", "End time", "Duration"
         ])
@@ -181,6 +181,7 @@ class Recording:
             metadata.loc[i,"pxSize"] = im.Pixels.get_PhysicalSizeX()
             metadata.loc[i,"pxUnit"] = im.Pixels.get_PhysicalSizeXUnit()
             metadata.loc[i,"bit depth"] = im.Pixels.get_PixelType()
+            metadata.loc[i,"Nchannels"] = im.Pixels.get_channel_count()
             if self.is_nd2:
                 try:
                     with ND2Reader(self.path) as nd2data:
@@ -200,7 +201,7 @@ class Recording:
                         print (im.Name, metadata.loc[i,"SizeT"], type(metadata.loc[i,"SizeT"]), lastT)
                     metadata.loc[i,"Frequency"] = (metadata.loc[i,"SizeT"])/lastT
                         
-        for c,t in list(zip(metadata.columns,["str"]+["int"]*4+["float","str","str","float"])):
+        for c,t in list(zip(metadata.columns,["str"]+["int"]*5+["float","str","str","float"])):
             metadata[c] = metadata[c].astype(t)
         metadata["Start time"] = pd.to_datetime(metadata["Start time"])
         metadata["Duration"] = pd.to_timedelta(metadata["SizeT"]/metadata["Frequency"], unit="s")
