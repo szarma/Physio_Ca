@@ -22,7 +22,7 @@ from plotly_express import colors as plc
 
 from .general_functions import getCircularKernel
 from .numeric import rebin, bspline, crawl_dict_via_graph
-from .utils import multi_map
+from .utils import multi_map, getGraph_of_ROIs_to_Merge, getPeak2BoundaryDF, getStatImages
 
 MYCOLORS = plc.qualitative.Plotly
 # MYCOLORS = ["darkred"]
@@ -431,6 +431,69 @@ class Regions:
 #         self.df["peakValue"] = [image[p] for p in B_]
 #         self.ExcludePixels = excludePixels
 #         self.update()
+    def mergeBasedOnGraph(self, Gph, verbose=0):
+        toDrop = []
+        Gph_ = Gph.to_undirected()
+        connected_components = nx.connected_components(Gph_)
+        # if verbose>1:
+        #     print(f"There are {len(connected_components)}.")
+        for cl in connected_components:
+            cl = list(cl)
+            if verbose>1:
+                print("Connected component:\t", cl)
+            gph = Gph.subgraph(nodes=cl)
+            attr = sum(list(map(list,nx.attracting_components(gph))),[])
+            if verbose>1:
+                print("attractor(s):\t\t", attr)
+            # if len(attr)>=2:
+            #     warnings.warn(f"two or more attractors ({attr}), not implemented yet, will skip")
+            #     continue
+            # if len(attr)==2 and len(cl)>2:
+            #     continue
+            attr = self.df.loc[attr,"peakValue"].sort_values().index[-1]
+            if verbose>1:
+                print("the chosen attractor:\t", attr)
+            other = [j for j in cl if j!=attr]
+            if verbose>1:
+                print("other rois:\t\t", other)
+            unionPixels = sum(self.df.loc[cl,"pixels"],[])
+            unionPixels = list(set(unionPixels))
+            self.df.loc[attr, "Nneighbors"] -= len(other)
+            # nns = set([ngh for ngh in self.df.loc[attr,"neighbors"] if ngh not in other])
+            # if verbose>1:
+            #     print("surviving neighbors:\t", nns)
+            for j in other:
+                for k in self.df.loc[j, "neighbors"]:
+                    if k in other: continue
+                    self.df.loc[k, "neighbors"].remove(j)
+                    if verbose>2:
+                        print (f"\tremoving {j} from neighbor set of {k}")
+            survive = []
+            for edge in sum(self.df.loc[cl,"edges"],[]):
+                if sum([edge in self.df.loc[roi,"edges"] for roi in cl])>1:
+                    if edge in self.edgeIDs:
+                        del self.edgeIDs[edge]
+                else:
+                    survive += [edge]
+            self.df.loc[[attr],"edges"] = [survive]
+            # peak2idx
+            self.df.loc[[attr],"boundary"] = [edges2nodes(survive)]
+            self.df.loc[[attr],"pixels"] = [unionPixels]
+            newSize = len(unionPixels)
+            if "trace" in self.df.columns:
+                self.df.loc[[attr],"trace"] = [self.df.loc[j,"trace"]*self.df.loc[j,"size"]/newSize for j in cl]
+            self.df.loc[attr,"size"] = newSize
+            toDrop += other
+        self.df.drop(index=toDrop,inplace=True)
+        if verbose:
+            print (f"{len(toDrop)} subsumed into existing ROIs.")
+        # if len(toDrop):
+        #     rreg.update()
+        #     try:
+        #         rreg.calcTraces()
+        #     except:
+        #         pass
+        return len(toDrop)
     
     def reassign_peaks(self, image, write=True):
         newPeaks = []
@@ -492,11 +555,11 @@ class Regions:
                     yl = ax.get_ylim()
                 else:
                     ax = None
-                suggestGraph = getGraph_of_ROIs_to_Merge(df.iloc[:,:2], self, plot=plot,ax=ax)
+                suggestGraph = getGraph_of_ROIs_to_Merge(df.iloc[:, :2], self, plot=plot, ax=ax)
                 if plot:
                     ax.set_xlim(xl)
                     ax.set_ylim(yl)
-                mergeBasedOnGraph(suggestGraph, self, verbose=verbose)
+                self.mergeBasedOnGraph(suggestGraph, verbose=verbose)
             else:
                 # print ("No more suggestions.")
                 break
@@ -1594,26 +1657,3 @@ def edges2nodes(x,start=0,direction=1):
                 nodes += [tuple(cand)]
     return nodes
 
-def getStatImages(movie_, debleach=False, downsampleFreq=2):
-    if movie_.fr>downsampleFreq:
-        n_rebin = int(np.round(movie_.fr/downsampleFreq))
-        if n_rebin>1:
-            m_for_image = movie_.resize(1,1, 1/n_rebin)
-        else:
-            m_for_image = movie_
-    else:
-        m_for_image = movie_
-    statImages = {}
-    # m_for_image = m_for_image.astype("float16")
-    if debleach:
-        m_for_image.debleach()
-
-    for f in [np.mean,np.std]:
-        statImages[f.__name__] = f(m_for_image,axis=0)
-    statImages["highperc"] = np.percentile(m_for_image,100*(1-10/len(m_for_image)), axis=0)
-    
-    # m_for_image = np.diff(m_for_image,axis=0)
-    # for f in [np.mean,np.std]:
-    #     statImages["diff_"+f.__name__] = f(m_for_image,axis=0)
-    # statImages["diff_highperc"] = np.percentile(m_for_image,100*(1-10/len(m_for_image)), axis=0)
-    return statImages

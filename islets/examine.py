@@ -43,11 +43,12 @@ def examine(self,
     import plotly.graph_objects as go
     from dash import no_update
     from networkx import adjacency_matrix
-    from importlib import import_module
-    module = import_module(self.__module__)
-    getPeak2BoundaryDF = getattr(module, "getPeak2BoundaryDF")
-    getGraph_of_ROIs_to_Merge = getattr(module, "getGraph_of_ROIs_to_Merge")
-    mergeBasedOnGraph = getattr(module, "mergeBasedOnGraph")
+    # from importlib import import_module
+    # module = import_module(self.__module__)
+    from .utils import getPeak2BoundaryDF, getGraph_of_ROIs_to_Merge
+    # getPeak2BoundaryDF = getattr(module, "getPeak2BoundaryDF")
+    # getGraph_of_ROIs_to_Merge = getattr(module, "getGraph_of_ROIs_to_Merge")
+    # mergeBasedOnGraph = getattr(module, "mergeBasedOnGraph")
     
     roisImage = getFigure()#showRoisOnly(self,indices=self.df.index, im=self.statImages[imagemode], lw=lw)
     roisImage.update_layout({"dragmode":'lasso'},)
@@ -384,7 +385,7 @@ def examine(self,
                     )
             ##########
             if mode=="merge":
-                dn = mergeBasedOnGraph(self.mergeGraph, self)
+                dn = self.mergeBasedOnGraph(self.mergeGraph)
                 del self.mergeGraph
                 out += [ html.Br(), f"{dn} rois merged into existing roi(s)"]
                 fig = showRoisOnly(self, indices=self.df.index, im=self.statImages[imagemode], showall=True, lw=lw)
