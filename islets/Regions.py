@@ -329,7 +329,7 @@ class Regions:
         return image
 
 
-    def constructRois(self, image, img_th=None, dks=3, verbose=False, diag=False):
+    def constructRois(self, image, img_th=None, dks=3, verbose=False, diag=False, merge=True):
         from cv2 import dilate,erode
         try:
             dks = max(3, (max(self.filterSize)) // 4 * 2 + 1)
@@ -360,7 +360,8 @@ class Regions:
         ]))
         self.df["peakValue"] = [image[p] for p in B_]
         self.update()
-        self.merge_closest(mergeDist=.71, mergeSizeTh=100, verbose=verbose)
+        if merge:
+            self.merge_closest(mergeDist=.71, mergeSizeTh=100, verbose=verbose, )
         
 #     def constructRois(self, image, img_th=None, diag=True, dks=3, processes=5, excludePixels=None, verbose=False,use_restricted=True):
 #         from cv2 import dilate,erode
@@ -508,7 +509,8 @@ class Regions:
         if write:
             self.df["peak"] = newPeaks
             self.df["peakValue"] = newValues
-            self.update()
+            self.calc_peak2idx()
+            # self.update()
         else:
             return newPeaks, newValues
     
@@ -535,7 +537,7 @@ class Regions:
                 "trend":ydbl
             }
 
-    def merge_closest(self, mergeSizeTh=10, mergeDist=1, plot=False, Niter=20, verbose=False, axs=None):
+    def merge_closest(self, mergeSizeTh=10, mergeDist=1, plot=False, Niter=20, verbose=0, axs=None):
         if plot:
             if axs is None:
                 plt.figure(figsize=(7*Niter,6))
@@ -543,7 +545,7 @@ class Regions:
         ia = 1
         for ja in range(Niter):
             size_th = np.percentile(self.df["size"].values, mergeSizeTh)
-            df = getPeak2BoundaryDF(self.df)
+            df = getPeak2BoundaryDF(self.df, distTh=mergeDist)
             df = df.query(f"dist<={mergeDist} and size_from<={size_th}")
             if len(df):
                 if plot:
@@ -749,11 +751,14 @@ class Regions:
         self.df.trace = list(trmov[:,:,0].T)
         self.Freq = fr
         self.time = np.arange(len(trmov))/fr
-        
-    def calcNNmap(self):
+
+    def calc_peak2idx(self):
         from bidict import bidict
         peak2idx = bidict([(peak,j) for j,peak in zip(self.df.index,self.df.peak)])
         self.peak2idx = peak2idx
+
+    def calcNNmap(self):
+        self.calc_peak2idx()
         neighborsMap = {k:[] for k in self.df["peak"]}
         for edge in self.edgeIDs:
             if len(self.edgeIDs[edge])>1:
@@ -763,7 +768,7 @@ class Regions:
                     if e1==e2: continue
                     if e2 not in neighborsMap[e1]:
                         neighborsMap[e1] += [e2]
-        self.df["neighbors"] = [[peak2idx[pp] for pp in neighborsMap[p]] for p in self.df["peak"]]
+        self.df["neighbors"] = [[self.peak2idx[pp] for pp in neighborsMap[p]] for p in self.df["peak"]]
         self.df["Nneighbors"] = self.df["neighbors"].apply(len)
         
     def purge_lones(self,min_size=4, verbose=False):
