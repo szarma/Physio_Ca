@@ -1,5 +1,6 @@
 import os
 from sys import exc_info
+from typing import Any, Union
 from warnings import warn
 import errno
 import bioformats as bf
@@ -247,31 +248,32 @@ class Recording:
         from os import umask
         umask(0o002)
         self.metadata.to_csv(self.metafile, float_format = "%#.3g")
-        
-    def import_series(self, Series, onlyMeta=False, isLineScan=False, restrict=None, mode="auto", save=True, pathToTif=None):
+
+    def import_series(self, Series, onlyMeta=False, isLineScan=False, restrict=None, mode="auto", save=True,
+                      pathToTif=None, channel=0):
         # print ("+"*20,Series, self.metadata.Name)
 
-        if Series=="all":
+        if Series == "all":
             SeriesList = self.allSeries
         elif Series in self.metadata.Name.values:
             SeriesList = [Series]
         elif "Series" in Series[0]:
             SeriesList = list(Series)
-            serrange = [int(el.replace("Series","")) for el in SeriesList]
-            if len(serrange)>1:
-                Series = "Series%03i-%i"%(serrange[0],serrange[-1])
+            serrange = [int(el.replace("Series", "")) for el in SeriesList]
+            if len(serrange) > 1:
+                Series = "Series%03i-%i" % (serrange[0], serrange[-1])
             else:
-                Series = "Series%03i"%(serrange[0])
+                Series = "Series%03i" % (serrange[0])
         else:
             try:
                 serrange = Series.split("Series")[1].split("-")
                 serrange = [int(el) for el in serrange]
-                singleFile = len(serrange)==1
+                singleFile = len(serrange) == 1
                 if singleFile:
                     SeriesList = [Series]
                 else:
-                    serrange = range(serrange[0],serrange[-1]+1)
-                    SeriesList = ["Series%03i"%i for i in serrange]
+                    serrange = range(serrange[0], serrange[-1] + 1)
+                    SeriesList = ["Series%03i" % i for i in serrange]
             except:
                 print(f"Cannot import {Series} from {self.path}. Probably a modified name.")
                 SeriesList = []
@@ -284,62 +286,62 @@ class Recording:
         self.Series[Series] = {}
 
         metadata = self.metadata.copy()
-        toDrop = [i for i,r in metadata.iterrows() if r.Name not in SeriesList]
+        toDrop = [i for i, r in metadata.iterrows() if r.Name not in SeriesList]
         metadata.drop(index=toDrop, inplace=True)
-        if len(metadata)==0:
+        if len(metadata) == 0:
             return None
-        if len(metadata)>1:
-            assert (np.abs(metadata["Frequency"]/metadata["Frequency"].mean()-1)<1e-1).all()
+        if len(metadata) > 1:
+            assert (np.abs(metadata["Frequency"] / metadata["Frequency"].mean() - 1) < 1e-1).all()
 
-        for c in ["SizeX","SizeY","pxSize","pxUnit","bit depth"]:
-            assert all([x==metadata[c].iloc[0] for x in metadata[c]])
-        
-        tsum = metadata[["Name","SizeT","Start time","Duration","End time"]].copy()
+        for c in ["SizeX", "SizeY", "pxSize", "pxUnit", "bit depth"]:
+            assert all([x == metadata[c].iloc[0] for x in metadata[c]])
+
+        tsum = metadata[["Name", "SizeT", "Start time", "Duration", "End time"]].copy()
         metadata1 = metadata.iloc[0].copy()
         metadata1['SizeT'] = tsum["SizeT"].sum()
         if restrict is not None:
             t_begin, t_end = restrict
             metadata1["time_range"] = restrict
-            time = np.arange(metadata1['SizeT'])/metadata1["Frequency"]
-            if t_end<0:
-                t_end = time.max()+t_end
-            if t_end<t_begin:
+            time = np.arange(metadata1['SizeT']) / metadata1["Frequency"]
+            if t_end < 0:
+                t_end = time.max() + t_end
+            if t_end < t_begin:
                 t_end = time.max()
-            
-            frame_begin = np.where(time>=t_begin)[0][0]
-            frame_end   = np.where(time<=t_end)[0][-1]
+
+            frame_begin = np.where(time >= t_begin)[0][0]
+            frame_end = np.where(time <= t_end)[0][-1]
             metadata1["frame_range"] = frame_begin, frame_end
-            metadata1['SizeT'] = frame_end-frame_begin
+            metadata1['SizeT'] = frame_end - frame_begin
         else:
             frame_begin, frame_end = 0, metadata1['SizeT']
             metadata1["frame_range"] = frame_begin, frame_end
         metadata1["individual Series"] = tsum
         metadata1["Name"] = Series
-        
+
         if isLineScan:
             from copy import deepcopy
             metadata2 = deepcopy(metadata1)
-            metadata2["Frequency"] = metadata2["Frequency"]*metadata2["SizeY"]
-            metadata2["SizeT"] = metadata2["SizeT"]*metadata2["SizeY"]
+            metadata2["Frequency"] = metadata2["Frequency"] * metadata2["SizeY"]
+            metadata2["SizeT"] = metadata2["SizeT"] * metadata2["SizeY"]
             metadata2["SizeY"] = 1
             self.Series[Series]["metadata"] = metadata2
         else:
             metadata2 = metadata1
-            
+
         if save:
             self.Series[Series]["metadata"] = metadata2
-            
+
         if onlyMeta:
             if save:
                 return None
             else:
                 return metadata2
         ###################### if not onlyMeta ##################
-        
+
         if pathToTif is not None:
-            if mode!="auto":
+            if mode != "auto":
                 warn("If you supply a tiff file, the mode will be ignored.")
-                mode="auto"
+                mode = "auto"
             print("loading")
             # load motion corrected
             if pathToTif.lower().endswith("tif") or pathToTif.lower().endswith("tiff"):
@@ -354,57 +356,58 @@ class Recording:
             FrameRange = metadata2.frame_range
             data = data[FrameRange[0]:FrameRange[1]]
         else:
-            if mode=="auto":
-                Nbytes = np.zeros(1,dtype=metadata1["bit depth"]).nbytes
+            if mode == "auto":
+                Nbytes = np.zeros(1, dtype=metadata1["bit depth"]).nbytes
                 Nbytes = Nbytes * metadata1.SizeT * metadata1.SizeY * metadata1.SizeX
-                if Nbytes>1e9:
-                    mode="memmap"
+                if Nbytes > 1e9:
+                    mode = "memmap"
                 else:
-                    mode="ram"
-            if mode=="memmap":
+                    mode = "ram"
+            if mode == "memmap":
                 if not hasattr(self, "tempdir"):
                     # import tempfile
                     # tempdir = tempfile.gettempdir()
                     tempdir = "/data/.tmp"
-                    self.tempdir = os.path.join(tempdir,f"{np.random.randint(int(1e10))}")
+                    self.tempdir = os.path.join(tempdir, f"{np.random.randint(int(1e10))}")
                     os.makedirs(self.tempdir)
-                filename = os.path.join(self.tempdir, f"{Series}_d1_{metadata1.SizeX}_d2_{metadata1.SizeY}_d3_{metadata1.SizeZ}_order_C_frames_{metadata1.SizeT}_.mmap")
-                data =np.memmap(filename,
-                                dtype="float32",#metadata1["bit depth"],
-                                mode="w+",
-                                shape=(metadata1.SizeT, metadata1.SizeY, metadata1.SizeX)
-                                )
-            elif mode=="ram":
+                filename = os.path.join(self.tempdir,
+                                        f"{Series}_d1_{metadata1.SizeX}_d2_{metadata1.SizeY}_d3_{metadata1.SizeZ}_order_C_frames_{metadata1.SizeT}_.mmap")
+                data = np.memmap(filename,
+                                 dtype="float32",  # metadata1["bit depth"],
+                                 mode="w+",
+                                 shape=(metadata1.SizeT, metadata1.SizeY, metadata1.SizeX)
+                                 )
+            elif mode == "ram":
                 data = np.zeros(
                     shape=(metadata1.SizeT, metadata1.SizeY, metadata1.SizeX),
                     dtype=metadata1["bit depth"],
                 )
             else:
                 raise ValueError("mode can only take the following values: 'ram', 'memmap', and 'auto'.")
-        
+
             try:
                 self.rdr
             except:
                 self.rdr = bf.ImageReader(self.path, perform_init=True)
 
-            assert metadata.SizeT.iloc[0]>frame_begin
+            assert metadata.SizeT.iloc[0] > frame_begin
 
             for i in metadata.index:
-    #             firstFrame = self.rdr.read(series=i, rescale=False, t=0)
-    #             if len(firstFrame.shape)==3:
-                if metadata.index[0]==i:
+                #             firstFrame = self.rdr.read(series=i, rescale=False, t=0)
+                #             if len(firstFrame.shape)==3:
+                if metadata.index[0] == i:
                     dt = frame_begin
                 else:
                     dt = 0
 
-                offset = metadata.loc[:i-1,"SizeT"].sum()-frame_begin
-                for t in range(dt,metadata.loc[i,"SizeT"]):
-                    if t+offset>=len(data):break
-                    data[t+offset] = self.rdr.read(series=i, rescale=False, t=t, c=0)
+                offset = metadata.loc[:i - 1, "SizeT"].sum() - frame_begin
+                for t in range(dt, metadata.loc[i, "SizeT"]):
+                    if t + offset >= len(data): break
+                    data[t + offset] = self.rdr.read(series=i, rescale=False, t=t, c=channel)
 
             if isLineScan:
-                data = data.reshape((np.prod(data.shape[:2]),1,data.shape[-1]))
-        
+                data = data.reshape((np.prod(data.shape[:2]), 1, data.shape[-1]))
+
         if save:
             self.Series[Series]["data"] = data
         else:
