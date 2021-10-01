@@ -8,7 +8,8 @@ parser.add_argument('--recording', '-rec', type=str,
 parser.add_argument('--series', '-ser', type=str,
                     help='name of the series', default="")
 parser.add_argument('--restrict', type=str, default="",
-                    help='restrict analysis to the time interval (in seconds!), e.g. "0-100" will only process first 100 seconds of the movie')
+                    help='restrict analysis to the time interval (in seconds!), e.g. "0-100" will only process first '
+                         '100 seconds of the movie')
 parser.add_argument('--use-tif', type=str, default=None, 
                     help='path to a tif file to use instad of the original, useful when passing motion-corrected movie')
 parser.add_argument('--leave-movie', const=True, default=False,action="store_const",
@@ -28,6 +29,8 @@ parser.add_argument('--spatial-filter',"-sp", default=None,
                     sizes based on pxSize in the metadata if there are.''')
 parser.add_argument('--line-scan', default="none", type=str,
                     help='indicate if it is a line scan, and if yes, what kind ("single" or "multi")')
+parser.add_argument('--channel', default=0, type=int,
+                    help='specify a channel (for multi-channel recording). Default is 0')
 parser.add_argument('--notify', dest='notify', action='store_true',
                     help='Triggers notification on slack when the script starts/finishes.')
 parser.add_argument('--notification-user', '-nu', default=None, dest='slack_userlist',
@@ -65,8 +68,8 @@ def process_as_linescans(nameDict=None):
     serNames = rec.metadata.loc[indices,"Name"]
     for ix, name in zip(indices,serNames):
         lsname = "%s: %s"%(rec.Experiment[:-4], name.replace("/","_"))
-        rec.import_series(name, isLineScan=(args.line_scan=="single") )
-        data = rec.Series[name]["data"].astype("float32")
+        rec.import_series(name, isLineScan=(args.line_scan=="single"), channel=args.channel)
+        data = rec.Series[name]["data"]#.astype("float32")
         if args.line_scan=="multi":
             data = data.sum(1)
         else:
@@ -90,8 +93,7 @@ import os
 import warnings
 import numpy as np
 np.corrcoef(*np.random.randn(2,3))
-import pickle
-from sys import exc_info, exit
+from sys import exit
 import getpass
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
@@ -100,7 +102,6 @@ from pandas import DataFrame
 
 from islets.Recording import Recording, saveMovie
 from islets.LineScan import LineScan
-from islets.numeric import rebin
 from islets.utils import saveRois, get_filterSizes, getStatImages
 from islets.Regions import Regions
 
