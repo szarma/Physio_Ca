@@ -373,8 +373,8 @@ class Recording:
                 filename = os.path.join(self.tempdir,
                                         f"{Series}_d1_{metadata1.SizeX}_d2_{metadata1.SizeY}_d3_{metadata1.SizeZ}_order_C_frames_{metadata1.SizeT}_.mmap")
                 data = np.memmap(filename,
-                                 dtype="float32",  # metadata1["bit depth"],
-                                 mode="w+",
+                                 dtype = metadata1["bit depth"],
+                                 mode ="w+",
                                  shape=(metadata1.SizeT, metadata1.SizeY, metadata1.SizeX)
                                  )
             elif mode == "ram":
