@@ -410,6 +410,78 @@ class Recording:
         else:
             return metadata2, data
 
+    def raw_import(self, ser, mode="auto", save=True):
+        try:
+            self.Series
+        except:
+            self.Series = {}
+        self.Series[ser] = {}
+        if isinstance(ser,str):
+            j = self.metadata.index[self.metadata.Name==ser].iloc[0]
+        else:
+            j = ser
+        metadata1 = self.metadata.loc[j]
+        if "Nchannels" not in metadata1.index:
+            metadata1.Nchannels = 1
+
+        if mode=="auto":
+            Nbytes = np.zeros(1,dtype=metadata1["bit depth"]).nbytes
+            Nbytes = Nbytes * metadata1.SizeT * metadata1.SizeY * metadata1.SizeX * metadata1.SizeZ * metadata1.Nchannels
+            if Nbytes>1e9:
+                mode="memmap"
+            else:
+                mode="ram"
+        shape = (metadata1.SizeX, metadata1.SizeY)
+        if metadata1.SizeZ > 1:
+            shape = (metadata1.SizeZ, ) + shape
+        if metadata1.SizeT > 1:
+            shape = (metadata1.SizeT, ) + shape
+        if metadata1.Nchannels > 1:
+            shape = shape + (metadata1.Nchannels,)
+
+        if mode=="memmap":
+            if not hasattr(self, "tempdir"):
+                # import tempfile
+                # tempdir = tempfile.gettempdir()
+                tempdir = "/data/.tmp"
+                self.tempdir = os.path.join(tempdir,f"{np.random.randint(int(1e10))}")
+                os.makedirs(self.tempdir)
+            filename = os.path.join(self.tempdir, f"{ser}.mmap")
+
+            data =np.memmap(filename,
+                            dtype=metadata1["bit depth"],
+                            mode="w+",
+                            shape=shape
+                            )
+        elif mode=="ram":
+            data = np.zeros(
+                shape=shape,
+                dtype=metadata1["bit depth"],
+            )
+        else:
+            raise ValueError("mode can only take the following values: 'ram', 'memmap', and 'auto'.")
+
+        try:
+            self.rdr
+        except:
+            self.rdr = bf.ImageReader(self.path, perform_init=True)
+
+        from itertools import product
+        for c, t, z in product(range(metadata1.Nchannels), range(metadata1.SizeT), range(metadata1.SizeZ)):
+            slicer = slice(None), slice(None)
+            if metadata1.SizeZ > 1:
+                slicer = (z, ) + slicer
+            if metadata1.SizeT > 1:
+                slicer = (t, ) + slicer
+            if metadata1.Nchannels > 1:
+                slicer = slicer + (c,)
+            data[slicer] = self.rdr.read(series=j, rescale=False, t=t, c=c,z=z)
+
+        if save:
+            self.Series[ser]["data"] = data
+        else:
+            return data
+
 def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
     from .general_functions import td2str
     from tqdm import tqdm
