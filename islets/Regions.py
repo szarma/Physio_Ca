@@ -401,9 +401,9 @@ class Regions:
             for j in other:
                 for k in self.df.loc[j, "neighbors"]:
                     if k in other: continue
-                    self.df.loc[k, "neighbors"].remove(j)
                     if verbose>2:
                         print (f"\tremoving {j} from neighbor set of {k}")
+                    self.df.loc[k, "neighbors"].remove(j)
             survive = []
             for edge in sum(self.df.loc[cl,"edges"],[]):
                 if sum([edge in self.df.loc[roi,"edges"] for roi in cl])>1:
@@ -417,7 +417,13 @@ class Regions:
             self.df.loc[[attr],"pixels"] = [unionPixels]
             newSize = len(unionPixels)
             if "trace" in self.df.columns:
-                self.df.loc[[attr],"trace"] = [self.df.loc[j,"trace"]*self.df.loc[j,"size"]/newSize for j in cl]
+                newtrace = np.sum([self.df.loc[j,"trace"]*self.df.loc[j,"size"] for j in cl],axis=0)/newSize
+                # newtrace = pd.Series([newtrace],index=[attr])
+                # print (newtrace[:10])
+                # if not np.isfinite(newtrace).all():
+                #     print (attr, other, cl,"!"*10)
+                #     return None
+                self.df.loc[[attr],"trace"] = pd.Series([newtrace],index=[attr])
             self.df.loc[attr,"size"] = newSize
             toDrop += other
         self.df.drop(index=toDrop,inplace=True)
