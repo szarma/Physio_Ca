@@ -16,6 +16,11 @@ def load_tif_seq(file_names, subindices = None):
         input_arr = tffl.asarray()
     return input_arr
 
+def memmap_tif(file_name, subindices = None):
+    out = tifffile.memmap(file_name)[subindices]
+    return out
+
+
 def load_tif(file_name, subindices = None):
     # copied from CaImAn
     with tifffile.TiffFile(file_name) as tffl:
