@@ -1541,7 +1541,7 @@ class Regions:
 
         num_rebin = 10
         time = rebin(self.time, num_rebin)
-        ax2.set_xlim(0, time[-1])
+        ax2.set_xlim(time[0], time[-1])
         if offset is None:
             offset = determine_offset(num_rebin)
         off = 0
@@ -1611,7 +1611,7 @@ class Regions:
             mincnt=1,
             cmap='hot'
         )
-        ax4.set_xlim(0, self.time[-1])
+        ax4.set_xlim(time[0], time[-1])
         if halfwidth_scale is not None:
             ax4.set_ylim(halfwidth_scale[0], halfwidth_scale[1])
         else:
@@ -1620,7 +1620,7 @@ class Regions:
         if plot_sum and (ax5 is not None):
             sum_trace = np.sum(self.df.loc[rois, 'detrended'].to_numpy(), axis=0)
             y = rebin(sum_trace, num_rebin)
-            ax5.set_xlim(0, time[-1])
+            ax5.set_xlim(time[0], time[-1])
             ax5.plot(time, y)
             ymin, ymax = ax5.get_ylim()
             ax5.vlines(vl, ymin, ymax, color='black')
@@ -1633,6 +1633,7 @@ class Regions:
             ax6.set_facecolor('black')
             ax6.get_xaxis().set_visible(False)
             ax6.get_yaxis().set_visible(False)
+            ax6.set_xlim(time[0], time[-1])
 
         if show_path:
             if hasattr(self, 'pathToRois'):
