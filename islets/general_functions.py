@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+import numpy as np
 
 @contextmanager
 def suppress_stdout():
@@ -91,6 +92,22 @@ def td_nanfloor(x, dt=1):
 #             ret[k] = corrcoef(sett[:len(sett)-i],sett[i:])[0,1]
 #     return ret
 
+def add_protocol(ax, protocol, color="grey"):
+    yl = ax.get_ylim()
+    dy = yl[1]-yl[0]
+    offset = yl[0]/2 - dy/20
+    for comp, df in protocol.groupby("compound"):
+        for ii in df.index:
+            t0,t1 = df.loc[ii].iloc[-2:]
+            conc = df.loc[ii,"concentration"]
+            x,y = [t0,t1,t1,t0,t0],[-1,-1,-2,-2,-1]
+            y = np.array(y)
+            y = y*dy/20 + offset
+            ax.fill(x,y,color=color,alpha =.3)
+            ax.text(t0,y[:-1].mean(), " "+conc,va="center", ha="left")
+            ax.plot(x,y,color=color,)
+        ax.text(df.t_begin.min(),y[:-1].mean(),comp+" ",va="center", ha="right")
+        offset -= 1.3*dy/20
 
 def moving_average(a, n=3) :
     from numpy import cumsum

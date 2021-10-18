@@ -230,7 +230,7 @@ def closeup_movie(regions, indices, movie=None, labels=False):
     ie += 10
     je += 10
     def addplot(ax_):
-        regions.plotEdges(ax=ax_, ix=indices, separate=True, image=False, scaleFontSize=0)
+        regions.plotEdges(ax=ax_, ix=indices, separate=True, image=False, scaleFontSize=0, bound=False)
         regions.plotPeaks(ax=ax_, ix=indices, labels=labels)
     m = movie[:,i0:ie,j0:je]
     a = show_movie(m, additionalPlot = addplot, offset = (j0,i0), figScale=3, autoadjust=False)

@@ -36,8 +36,8 @@ def examine_events(self, spikeDF, x, y,
     if mode=="jupyter-dash":
         from jupyter_dash import JupyterDash as Dash
     from dash.dependencies import Input, Output, State
-    import dash_core_components as dcc
-    import dash_html_components as html
+    from dash import dcc
+    from dash import html
     import plotly.graph_objects as go
     from dash import no_update
     

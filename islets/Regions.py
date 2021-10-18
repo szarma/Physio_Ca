@@ -582,6 +582,7 @@ class Regions:
                   scaleFontSize=12,
                   norm=LogNorm(vmin=1),
                   spline=True,
+                  bound=True,
                   **kwargs
                   ):
         if imkw_args is None:
@@ -600,7 +601,10 @@ class Regions:
         if image:
             im = self.statImages[self.mode]
             ax.imshow(im,norm=norm,**imkw_args)
-        smoothness = min(list(self.__dict__.get("filterSize",[]))+[3] )
+        fs = self.__dict__.get("filterSize", [])
+        if fs is None:
+            fs = []
+        smoothness = min(list(fs)+[3] )
         if separate:
             for i in ix:
                 try:
@@ -628,9 +632,11 @@ class Regions:
 
             y,x = np.array(tmp).T
             ax.plot(x,y,color,lw=lw,alpha=alpha, **kwargs)
-        dim = self.image.shape
-        ax.set_xlim(-.5,dim[1]-.5)
-        ax.set_ylim(dim[0]-.5, -.5,)
+
+        if bound:
+            dim = self.image.shape
+            ax.set_xlim(-.5,dim[1]-.5)
+            ax.set_ylim(dim[0]-.5, -.5,)
             
         if scaleFontSize<=0: return None
         if hasattr(self, "metadata") and "pxSize" in self.metadata:
@@ -1298,6 +1304,7 @@ class Regions:
                     print ("filtering...")
                 self.fast_filter_traces(ts,Npoints=Npoints)
             zScores = np.vstack(self.df["zScore_%g"%ts])
+            allFast = np.vstack(self.df["faster_%g"%ts])
         if t is None:
             try:
                 t = self.showTime["%g"%ts]
@@ -1311,10 +1318,11 @@ class Regions:
             if verbose:
                 print ("smoothing with kernel", smooth)
             zScores = runningAverage(zScores.T,smooth).T
+            allFast = runningAverage(allFast.T,smooth).T
         if debug:
             self.df["zScore_%g"%ts] = list(zScores)
         events = []
-        for i,z in zip(self.df.index,zScores):
+        for i,z,f in zip(self.df.index,zScores,allFast):
             pp = find_peaks(z,
                             width=(ts/dt*min_rel_hw,ts/dt),
                             height=z_th
@@ -1323,7 +1331,13 @@ class Regions:
             w = w*dt
             x0 = x0*dt + t[0]
             xe = xe*dt + t[0]
-            df = pd.DataFrame({"height":z[pp[0]],"halfwidth":w, "t0":x0, "peakpoint":pp[0]*dt+t[0]})
+            df = pd.DataFrame({
+                "z_max": z[pp[0]],
+                "halfwidth": w,
+                "t0": x0,
+                "peakpoint": pp[0]*dt+t[0],
+                "height": f[pp[0]],
+            })
             df["roi"] = i
             events += [df]
         events = pd.concat(events,ignore_index=True)
@@ -1703,7 +1717,7 @@ class Regions:
             plt.text(df.t_begin.min(),y[:-1].mean(),comp+" ",va="center", ha="right")
             offset -= 1.3*dy/20
             
-    def plot_trace(regions, indices, axratios = [1,2.5], figsize=5, freqShow=2, cols=["trace"], Offset=10, separate=False):
+    def plot_trace(regions, indices, axratios = [1,2.5], figsize=5, freqShow=2, cols=["trace"], Offset=10, separate=False,showProtocol=True, spacing=.1):
         for col in cols:
             if col not in regions.df.columns:
                 raise ValueError(f"{col} not found in the dataframe.")
@@ -1713,7 +1727,7 @@ class Regions:
                 colors = regions.df.loc[indices, "color"]
             else:
                 colors = [MYCOLORS[ix % len(MYCOLORS)] for ix in indices]
-            xratios = np.array([.1, axratios[0], .1, axratios[1], .1])
+            xratios = np.array([ spacing, axratios[0], spacing, axratios[1], spacing])
             yratios = xratios[:3]
             xr = xratios / sum(xratios)
             yr = yratios / sum(yratios)
@@ -1734,10 +1748,11 @@ class Regions:
             fig, ax = plt.subplots(1,1,figsize=(3*figsize,figsize))
             axs = [None, ax]
         for ic,col in enumerate(cols):
-            xs = np.vstack(regions.df.loc[indices,col])
-            # if "trace" in col:
-            #     t = regions.time
-            # else:
+            if len(indices):
+                xs = np.vstack(regions.df.loc[indices,col])
+            else:
+                tlength = regions.df[col].iloc[0].shape[0]
+                xs = np.zeros(shape=(1,tlength))
             t = regions.time
             if hasattr(regions, "showTime"):
                 for k in regions.showTime:
@@ -1750,6 +1765,7 @@ class Regions:
                 t = rebin(t, nr)
                 xs = rebin(xs,nr,1)
             offset = 0
+            c="w"
             for x,ix,c in zip(xs, indices, colors):
                 if c is None:
                     axs[1].plot(t,x+offset,lw=1.2 if "slow" in col else .7, color="C%i"%ic, label=col)
@@ -1764,7 +1780,7 @@ class Regions:
             axs[1].set_yticks([])
             for sp in ["left","right","top"]:
                 axs[1].spines[sp].set_visible(False)
-        if hasattr(regions,"protocol"):
+        if hasattr(regions,"protocol") and showProtocol:
             yl = axs[1].get_ylim()
             dy = yl[1]-yl[0]
             offset = yl[0]/2 - dy/20

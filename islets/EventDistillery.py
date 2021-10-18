@@ -76,8 +76,12 @@ def sequential_filtering(
         for ttmp in allEvents:
             spikeDF.index += len(ttmp.index)
         allEvents += [spikeDF]
-    allEvents = pd.concat(allEvents)
-    if verbose: print ("#"*30+"\n"+"#"*10+"   DONE   "+"#"*10+"\n"+"#"*30)
+    if len(allEvents):
+        allEvents = pd.concat(allEvents)
+    else:
+        allEvents = pd.DataFrame()
+    if verbose:
+        print ("#"*30+"\n"+"#"*10+"   DONE   "+"#"*10+"\n"+"#"*30)
     return allEvents
 
 def distill_events(
@@ -143,6 +147,7 @@ def distill_events_per_roi(roiEvents,
                            #movement_pvalue_threshold=.0,
                            require_contingency=False,
                            figsize=(13, 10),
+                           plotTrace=slice(3),
                            ):
     # from scipy.stats import ttest_1samp
     roi = roiEvents["roi"].unique()
@@ -152,6 +157,7 @@ def distill_events_per_roi(roiEvents,
     roi = roi[0]
     if "tend" not in roiEvents.columns:
         roiEvents["tend"] = roiEvents["t0"] + roiEvents["halfwidth"]
+    # hatches = ['//','\\',"++","**"]
     origtrace = regions.df.loc[roi, "trace"]
     tsslows = {float(col.split("_")[1]): regions.df.loc[roi, col] for col in regions.df.columns if "slower" in col}
     roiEvents = pd.DataFrame(roiEvents)
@@ -167,7 +173,12 @@ def distill_events_per_roi(roiEvents,
         from matplotlib.ticker import MultipleLocator
         for ix, row in roiEvents.iterrows():
             draw_event(row, axs[1])
-    colorDict = {}
+    colorDict = {
+        # "too short": plt.cm.Greys(.9),
+        # "too close to beginning/end": plt.cm.Greys(.6),
+        # "too few calls": plt.cm.Greys(.5),
+        # "solitary": plt.cm.Greys(.3),
+    }
     for ix, row in roiEvents.iterrows():
         t = regions.showTime.get("%g" % row.ts, regions.time)
         it0 = np.searchsorted(t, row.t0) - 1
@@ -179,8 +190,11 @@ def distill_events_per_roi(roiEvents,
             if plot:
                 if status not in colorDict:
                     colorDict[status] = axs[0].plot([], label=status)[0].get_color()
+                # else:
+                #     axs[0].plot([], label=status,c=colorDict[status])
                 row = pd.Series(row)
                 row.color = colorDict[status]
+                # print (row.color)
                 draw_event(row, axs[0])
                 continue
         if (row.t0-row.halfwidth/2 < regions.time[0]) or (row.tend+row.halfwidth/2 > regions.time[-1]):
@@ -226,20 +240,23 @@ def distill_events_per_roi(roiEvents,
     df_filt = []
     for ixs in nx.connected_components(g.to_undirected()):
         if len(ixs)==1 and not take_best: 
-            status = "unique"
+            status = "solitary"
             isp = list(ixs)[0]
             roiEvents.loc[isp, "status"] = status
             roiEvents.loc[isp, "attractor"] = isp
             if plot:
                 if status not in colorDict:
                     colorDict[status] = axs[0].plot([], label=status)[0].get_color()
+                # else:
+                #     axs[0].plot([], label=status,c=colorDict[status])
+                #     axs[0].plot([], label=status,c=colorDict[status])
                 row = pd.Series(roiEvents.loc[isp])
                 row.color = colorDict[status]
                 draw_event(row, axs[0])
             continue
-        row = pd.Series(roiEvents.loc[list(ixs)].sort_values("height").iloc[-1])
+        row = pd.Series(roiEvents.loc[list(ixs)].sort_values("z_max").iloc[-1])
         if not take_best:
-            for col in ["t0","tend","height","color","coltrans"]:
+            for col in ["t0","tend","z_max","color","coltrans"]:
                 if col in row.index:
                     row[col] = np.median(np.vstack(roiEvents.loc[list(ixs), col]),axis=0)
                     if len(row[col])==1:
@@ -266,11 +283,13 @@ def distill_events_per_roi(roiEvents,
         #         continue
 
         if len(ixs)<minconfidence and row.halfwidth>small_halfwidth:
-            status = "too few calls at large timescale"
+            status = "too few calls"
             roiEvents.loc[row.name, "status"] = status
             if plot:
                 if status not in colorDict:
                     colorDict[status] = axs[0].plot([], label=status)[0].get_color()
+                # else:
+                #     axs[0].plot([], label=status,c=colorDict[status])
                 row = pd.Series(row)
                 row.color = colorDict[status]
                 draw_event(row, axs[0])
@@ -283,27 +302,11 @@ def distill_events_per_roi(roiEvents,
     if plot:
         for ix, row in df_filt.iterrows():
             draw_event(row, axs[2])
-        nr = np.round(regions.Freq / freqShow)
-        if nr > 1:
-            nr = int(nr)
-            from .numeric import rebin
-            x = rebin(regions.time, nr)
-            y = rebin(origtrace, nr)
-        else:
-            x, y = regions.time, origtrace
-        axxs = [ax.twinx() for ax in axs]
-        axxs[0].get_shared_y_axes().join(*axxs)
-        for axx in axxs:
-            axx.set_ylabel("light intensity")
-            axx.plot(x, y, c="navy", lw=.7)
-            if plotSlows is not None:
-                for ts in plotSlows:
-                    axx.plot(regions.showTime.get("%g" % ts, regions.time), tsslows[ts])
 
         yl = axs[1].get_ylim()[::-1]
         for ax in axs:
             # ax.set_facecolor("k")
-            ax.set_ylabel("filtering timescale [s]")
+            ax.set_ylabel("filtering\ntimescale [s]")
             if hasattr(regions, "timescales"):
                 timescales = regions.timescales
                 # ax.set_yticks(np.arange(len(timescales)))
@@ -322,13 +325,33 @@ def distill_events_per_roi(roiEvents,
             fr.set_facecolor("w")
             fr.set_alpha(.7)
         for ax, txt in zip(axs, ["discarded","all","distilled"]):
-            ax.text(.01,.9,txt, fontsize=14, transform=ax.transAxes, bbox=dict(facecolor="w",alpha=.7,linewidth=0))
+            ax.text(.01,.95,txt, fontsize=12, transform=ax.transAxes, bbox=dict(facecolor="w",alpha=.7,linewidth=0),va="top")
             ax.yaxis.set_minor_locator(MultipleLocator(1))
         plt.subplots_adjust(hspace=0.01)
     else:
         axs = None
     if "attractor" in roiEvents.columns:
         roiEvents['attractor']= roiEvents['attractor'].astype(pd.Int64Dtype())
+
+
+    if plot and plotTrace:
+        nr = np.round(regions.Freq / freqShow)
+        if nr > 1:
+            nr = int(nr)
+            from .numeric import rebin
+            x = rebin(regions.time, nr)
+            y = rebin(origtrace, nr)
+        else:
+            x, y = regions.time, origtrace
+        axxs = [ax.twinx() for ax in axs[plotTrace]]
+        axxs[0].get_shared_y_axes().join(*axxs)
+        for axx in axxs:
+            # axx.set_ylabel("light intensity")
+            axx.plot(x, y, c=plt.cm.Greys(.9), lw=.7, zorder=-1)
+            axx.set_yticks([])
+            if plotSlows is not None:
+                for ts in plotSlows:
+                    axx.plot(regions.showTime.get("%g" % ts, regions.time), tsslows[ts])
     return df_filt, axs, roiEvents
 
 
@@ -336,7 +359,7 @@ def plot_events(events,
                 ax=None,
                 min_height=.3,
                 allrois=None,
-                cmap="turbo",
+                cmap="turbo_r",
                 modify=False,
                 **hillkwargs):
     if not modify:

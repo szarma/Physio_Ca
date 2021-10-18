@@ -11,7 +11,7 @@ from islets.utils import multi_map
 mad2std = 1.4826 # https://en.wikipedia.org/wiki/Median_absolute_deviation#Relation_to_standard_deviation
 
 def hillCurve(x, h=2, xc=4):
-    return (x/xc)**h/(1+(x/xc)**h)
+    return (x/xc)**h/(1+(x/xc)**h)*.94+.03
 
 def bspline(cv, n=100, smoothness=3):
     """ Calculate n samples on a period spline

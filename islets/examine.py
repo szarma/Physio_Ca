@@ -38,8 +38,8 @@ def examine(self,
     if mode=="jupyter-dash":
         from jupyter_dash import JupyterDash as Dash
     from dash.dependencies import Input, Output, State
-    import dash_core_components as dcc
-    import dash_html_components as html
+    from dash import dcc
+    from dash import html
     import plotly.graph_objects as go
     from dash import no_update
     from networkx import adjacency_matrix
@@ -107,7 +107,8 @@ def examine(self,
         html.Div([
            "Choose columns",
             dcc.Dropdown(id="cols-input",
-                value=["detrended" if "detrended" in self.df.columns else "trace"],
+                # value=["detrended" if "detrended" in self.df.columns else "trace"],
+                value=["trace"],
                  options=[{"value":c,"label":c} for c in self.df.columns if \
                           hasattr(self.df[c].iloc[0],"shape") \
                           and len(self.df[c].iloc[0].shape)   \
@@ -153,8 +154,8 @@ def examine(self,
     initNcs = {"discard_unsel":0,"discard_sel":0,"mark":0,"merge":0}
     
     movieCloseup = [
-        html.H3("Movie closeup"),
-        html.Button("create", id="create-closeup", n_clicks=0,),
+        # html.H3("Movie closeup", style={"display":"inline-block"}),
+        html.Button("generate closeup", id="create-closeup", n_clicks=0,title="[!experimental feature!] Works only if the regions have the associated movie."),
         html.Div(id="closeup-output")
                    ]
     
@@ -181,7 +182,9 @@ def examine(self,
             html.Div([
                 dcc.Graph(id="trace-show",figure=getFigure(400,300)),
                 FilterBox,
-                html.Details(title="Movie Closeup",children=movieCloseup, open=debug)
+                # html.Details(title="Movie Closeup",children=movieCloseup, open=debug)
+                html.Br(),
+                html.Div(movieCloseup)
             ],style={"max-width":"550px","max-height":"800px",
 #                      "border":"thin grey solid"
                     })
@@ -227,7 +230,9 @@ def examine(self,
                     output += [f"selected={selected}"]
 #                     output += [str(type(m))]
                     m = closeup_movie(self, indices = selected)
-                    output += [html.Iframe(srcDoc=m._repr_html_(), width = 700, height = 800)]
+                    output += [html.Iframe(srcDoc=m._repr_html_(),
+                                           width = 700, height = 800
+                                           )]
                 else:
                     output += ["Oops, you first need to associate a movie to the regions."]
         except:
