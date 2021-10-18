@@ -14,7 +14,7 @@ c.JupyterHub.allow_named_servers = True
 c.JupyterHub.template_paths = CDS_TEMPLATE_PATHS
 c.JupyterHub.extra_handlers = cds_extra_handlers
 c.CDSDashboardsConfig.builder_class = 'cdsdashboards.builder.dockerbuilder.DockerBuilder'
-c.CDSDashboardsConfig.conda_envs = ['']
+c.CDSDashboardsConfig.conda_envs = ['', 'Physio']
 c.CDSDashboardsConfig.presentation_types = ['plotlydash']
 
 c.Authenticator.admin_users = {'admin'}

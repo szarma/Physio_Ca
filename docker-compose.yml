@@ -24,7 +24,7 @@ services:
       args: 
         - SERVER_DOCKER_PATH=${SERVER_DOCKER_PATH}
         - HUB_VERSION=${JUPYTERHUB_VERSION}
-    image: ${SERVER_IMAGE_NAME}
+    image: ${SERVER_IMAGE_NAME}:latest
     network_mode: none
     #networks:
     #  - default
@@ -40,6 +40,7 @@ services:
       args:
         - HUB_DOCKER_PATH=${HUB_DOCKER_PATH}
         - HUB_VERSION=${JUPYTERHUB_VERSION}
+    image: ${HUB_CONTAINER_NAME}:latest
     container_name: ${HUB_CONTAINER_NAME}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock                # Give access to Docker socket.
