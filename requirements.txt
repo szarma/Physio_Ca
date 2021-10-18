@@ -14,7 +14,6 @@ setuptools
 jupyter-plotly-dash
 python-bioformats
 plotly-express
-islets
 bidict
 mgzip
 orjson

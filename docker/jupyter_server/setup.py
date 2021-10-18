@@ -1,12 +1,12 @@
 from setuptools import setup, find_packages
 
-with open('/opt/requirements.txt') as f:
+with open('requirements.txt') as f:
     requirements = f.read().splitlines()
 
-with open('/opt/README.md') as f:
+with open('README.md') as f:
     long_description = f.read()
 
-with open('/opt/VERSION') as f:
+with open('VERSION') as f:
     version = f.read().strip()
 
 setup(
