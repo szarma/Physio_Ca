@@ -438,6 +438,42 @@ def getFigure(w=300,h=300,c="lightgrey"):
     return fig
 
 
+def boil_down(regions, timescales=None, verbose=False, minNevents = 10, time_ranges=None, skip_sequential_filtering=False):
+    if not skip_sequential_filtering:
+        from .EventDistillery import sequential_filtering
+        if timescales is None:
+            timescales = 2. ** np.arange(-1, 20)
+        timescales = timescales[timescales < regions.time[-1] / 3]
+        timescales = timescales[timescales > 5 / regions.Freq]
+        sequential_filtering(regions, timescales=timescales, verbose=verbose)
+    timescales = regions.timescales
+    if time_ranges is None:
+        time_ranges = {"all": (regions.time[0], regions.time[-1])}
+    output = {}
+    for tr in time_ranges:
+        tbegin, tend = time_ranges[tr]
+        median_ccs = {}
+        for ts in timescales:
+            k = "%g" % ts
+            time = regions.showTime.get(k, regions.time)
+            time_mask = (time>tbegin) & (time<tend)
+            zs = np.vstack(regions.df["zScore_%g" % ts].values)[:,time_mask]
+            meanZ = zs.sum(0)
+            median_ccs[ts] = np.median([np.corrcoef(meanZ, z)[0, 1] for z in zs])
+        t_sync=pd.Series(median_ccs).sort_values().idxmax()
+        median_cc = median_ccs[t_sync]
+        events = regions.events["%g" % t_sync]
+        events["tend"] = events["t0"] + events["halfwidth"]
+        periods = []
+        halfwidths = []
+        for roi, evroi in events.query(f"t0>{tbegin} and tend<{tend}").groupby("roi"):
+            if len(evroi) < minNevents:
+                continue
+            periods += [evroi.t0.sort_values().diff().median()]
+            halfwidths += [evroi.halfwidth.median()]
+        output[tr] = dict(t_sync=t_sync, halfwidth=np.median(halfwidths), period=np.median(periods), cc2sum=median_cc)
+    return pd.DataFrame(output).T
+
 def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None):
     import plotly.graph_objects as go
     from .Regions import MYCOLORS
@@ -449,7 +485,6 @@ def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None):
         colors = regions.df.loc[indices,"color"]
     else:
         colors = [MYCOLORS[i%len(MYCOLORS)] for i in indices]
-    
 #     for i in indices:
 #         try:
 #             cl = regions.df.loc[i, "color"]
