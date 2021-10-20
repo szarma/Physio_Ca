@@ -6,17 +6,23 @@ import importlib
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=FutureWarning, )
     warnings.filterwarnings("ignore", category=RuntimeWarning, )
-    if importlib.util.find_spec("caiman") is not None:
-        from caiman import load as cload
+    # if importlib.util.find_spec("caiman") is not None:
+    try:
         from caiman import movie as cmovie
-    else:
+    except:
+        from .movies import movie as cmovie
+        print("Managed to import cmovie from .movies")
+    try:
+        from caiman import load as cload
+    except:
         try:
-            from .movies import movie as cmovie
-            print("Managed to import cmovie from .movies")
             from .movies import load as cload
             print("Managed to import cload from .load. Perhaps we can depart from full caiman?")
         except:
-            print("But, not all that's necessary. Do not depart from caiman yet.")
+            print("could not import load from anywhere.")
+
+        # except:
+        #     print("But, not all that's necessary. Do not depart from caiman yet.")
     from . import EventDistillery
     from .examine import examine
     from .CrossfilterApp import crossfilterApp
