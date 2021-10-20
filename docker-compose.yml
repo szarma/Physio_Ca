@@ -24,10 +24,10 @@ services:
       args: 
         - SERVER_DOCKER_PATH=${SERVER_DOCKER_PATH}
         - HUB_VERSION=${JUPYTERHUB_VERSION}
-    image: ${SERVER_IMAGE_NAME}:latest
-    network_mode: none
-    #networks:
-    #  - default
+        - ISLETS_VERSION=${ISLETS_VERSION}
+    image: ${SERVER_IMAGE_NAME}:${ISLETS_VERSION}
+    networks:
+      - default
     command: echo
 
   # config for Hub
@@ -40,7 +40,7 @@ services:
       args:
         - HUB_DOCKER_PATH=${HUB_DOCKER_PATH}
         - HUB_VERSION=${JUPYTERHUB_VERSION}
-    image: ${HUB_CONTAINER_NAME}:latest
+    image: ${HUB_CONTAINER_NAME}:${ISLETS_VERSION}
     container_name: ${HUB_CONTAINER_NAME}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock                # Give access to Docker socket.
@@ -50,17 +50,18 @@ services:
       - DOCKER_NETWORK_NAME=${COMPOSE_PROJECT_NAME}_default
       - HUB_IP=${HUB_CONTAINER_NAME}
       - HOST
-#    networks:
-#      - default
+      - ISLETS_VERSION
+    networks:
+      - default
     labels:                                                       # Traefik configuration.
       - "traefik.enable=true"                                     # enable Traefik for this service
       - "traefik.frontend.rule=Host:${HOST}"                      # apply rule for frontend
-      #- "traefik.docker.network=${COMPOSE_PROJECT_NAME}_default"  # use internal docker network
+      - "traefik.docker.network=${COMPOSE_PROJECT_NAME}_default"  # use internal docker network
       - "traefik.http.routers.jupyterhub.rule=Host(`${HOST}`)"    # apply routing through traefik
   
 volumes:
   jupyterhub_data:
 
-#networks:
-#  default:
-#    name: ${COMPOSE_PROJECT_NAME}_default
+networks:
+  default:
+    name: ${COMPOSE_PROJECT_NAME}_default
