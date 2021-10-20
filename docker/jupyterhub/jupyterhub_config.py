@@ -14,7 +14,7 @@ c.JupyterHub.allow_named_servers = True
 c.JupyterHub.template_paths = CDS_TEMPLATE_PATHS
 c.JupyterHub.extra_handlers = cds_extra_handlers
 c.CDSDashboardsConfig.builder_class = 'cdsdashboards.builder.dockerbuilder.DockerBuilder'
-c.CDSDashboardsConfig.conda_envs = ['', 'Physio']
+c.CDSDashboardsConfig.conda_envs = ['']
 c.CDSDashboardsConfig.presentation_types = ['plotlydash']
 
 c.Authenticator.admin_users = {'admin'}
@@ -27,7 +27,7 @@ c.DockerSpawner.notebook_dir = notebook_dir
 c.DockerSpawner.volumes = {'jupyterhub-user-{username}': notebook_dir}
 c.DockerSpawner.name_template = "{prefix}-{username}-{servername}"
 c.DockerSpawner.debug = True
-c.DockerSpawner.image = os.environ['DOCKER_JUPYTER_CONTAINER']
+c.DockerSpawner.image = os.environ['DOCKER_JUPYTER_CONTAINER'] + ':' + os.environ['ISLETS_VERSION']
 c.DockerSpawner.remove = True
 c.DockerSpawner.network_name = os.environ['DOCKER_NETWORK_NAME']
 
