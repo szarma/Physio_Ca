@@ -1,10 +1,7 @@
 # -*- coding: utf-8 -*-
 import dash
-import dash_html_components as html
-import dash_table
+from dash import html, dcc, dash_table
 from dash_table.Format import Format, Scheme#, Sign, Symbol
-import dash_core_components as dcc
-import dash_html_components as html
 from dash.dependencies import Input, Output, State
 import json
 import os
