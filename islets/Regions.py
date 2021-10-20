@@ -342,14 +342,16 @@ class Regions:
         dilation_kernel = getCircularKernel(dks)
         eks = max(3,dks-2)
         erosion_kernel  = getCircularKernel(eks)
-        if verbose:
-            print ("eroding valid pixels by", eks)
         if img_th is None:
             img_th = median_abs_deviation(image.flat)/30
-        ok = erode((image>img_th).astype(np.uint8), erosion_kernel)
+        ok = (image>img_th).astype(np.uint8)
+        if eks<dks:
+            ok = erode(ok, erosion_kernel)
+            if verbose:
+                print ("eroding valid pixels by", eks)
+        ok = dilate(ok, dilation_kernel)
         if verbose:
             print ("dilating valid pixels by", dks)
-        ok = dilate(ok, dilation_kernel)
         ok = ok.astype(bool)
         self.validPixels = ok
         B_ = crawl_dict_via_graph(image, ok, diag=diag)
