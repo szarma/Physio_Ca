@@ -474,6 +474,31 @@ def boil_down(regions, timescales=None, verbose=False, minNevents = 10, time_ran
         output[tr] = dict(t_sync=t_sync, halfwidth=np.median(halfwidths), period=np.median(periods), cc2sum=median_cc)
     return pd.DataFrame(output).T
 
+def get_ccs(regions, timescales=None, verbose=False, time_ranges=None, skip_sequential_filtering=False):
+    if not skip_sequential_filtering:
+        from .EventDistillery import sequential_filtering
+        if timescales is None:
+            timescales = 2. ** np.arange(-1, 20)
+        timescales = timescales[timescales < regions.time[-1] / 10]
+        timescales = timescales[timescales > 5 / regions.Freq]
+        sequential_filtering(regions, timescales=timescales, verbose=verbose)
+    timescales = regions.timescales
+    if time_ranges is None:
+        time_ranges = {"all": (regions.time[0], regions.time[-1])}
+    output = {}
+    for tr in time_ranges:
+        ccs = np.ones((len(timescales), len(regions.df)))
+        tbegin, tend = time_ranges[tr]
+        for it,ts in enumerate(timescales):
+            k = "%g" % ts
+            time = regions.showTime.get(k, regions.time)
+            time_mask = (time>tbegin) & (time<tend)
+            zs = np.vstack(regions.df["zScore_%g" % ts].values)[:,time_mask]
+            meanZ = zs.sum(0)
+            ccs[it] = [np.corrcoef(meanZ, z)[0, 1] for z in zs]
+        output[tr] = ccs
+    return output
+
 def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None):
     import plotly.graph_objects as go
     from .Regions import MYCOLORS
