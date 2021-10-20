@@ -345,7 +345,7 @@ class Regions:
         if verbose:
             print ("eroding valid pixels by", eks)
         if img_th is None:
-            img_th = median_abs_deviation(image.flat)
+            img_th = median_abs_deviation(image.flat)/30
         ok = erode((image>img_th).astype(np.uint8), erosion_kernel)
         if verbose:
             print ("dilating valid pixels by", dks)
@@ -580,27 +580,29 @@ class Regions:
                   alpha=1,
                   fill=False,
                   scaleFontSize=12,
-                  norm=LogNorm(vmin=1),
                   spline=True,
                   bound=True,
                   **kwargs
                   ):
-        if imkw_args is None:
-            imkw_args = {}
         if ix is None:
             ix = self.df.index
         if ax is None:
             ax = plt.subplot(111)
         if lw is None:
             lw=.5
-        if "cmap" not in imkw_args:
-            from copy import copy
-            mycmap = copy(plt.cm.Greys)
-            mycmap.set_bad("lime")
-            imkw_args["cmap"] = mycmap
         if image:
-            im = self.statImages[self.mode]
-            ax.imshow(im,norm=norm,**imkw_args)
+            im = self.statImages[self.mode].copy()
+            im = im**1.5/(1+np.abs(im))
+            # imth = np.percentile(im[im>0],5)
+            # im[im<imth] = imth
+            if imkw_args is None:
+                imkw_args = {}
+                from copy import copy
+                mycmap = copy(plt.cm.Greys)
+                mycmap.set_bad("lime")
+                imkw_args["cmap"] = mycmap
+                # imkw_args["norm"] = LogNorm(vmin=imth)
+            ax.imshow(im,**imkw_args)
         fs = self.__dict__.get("filterSize", [])
         if fs is None:
             fs = []
@@ -1580,7 +1582,7 @@ class Regions:
 
         if 'leg' not in events.columns:
             define_legs(events=events, legs=legs)
-        bins = np.geomspace(.1, 100)
+        bins = np.geomspace(events.halfwidth.min(), events.halfwidth.max())
         binc = (bins[:-1] + bins[1:]) / 2
         for leg, df in events.dropna().sort_values('t0').groupby('leg'):
             h = np.histogram(df['halfwidth'], bins)[0]

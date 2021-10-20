@@ -235,7 +235,7 @@ if len(rec.metadata)==1:
 else:
     movieFilename = os.path.join(saveDir, rec.Experiment+"_"+ser+".mp4")
 
-if metadata.pxSize<.8:
+if metadata.pxSize<.4:
     if args.verbose: print ("Resizing the movie resolution by 2...")
     movie = movie.resize(1/2,1/2,1)
     metadata.pxSize *= 2
@@ -296,7 +296,7 @@ for spFilt in filtSizes:
     regions.metadata = metadata
     regions.calcTraces(movie)
     regions.time += metadata.frame_range[0]/metadata.Frequency
-    regions.infer_gain()
+    regions.infer_TwoParFit()
     regions.calc_interest()
     if not args.debug: 
         saveRois(regions, saveDir, filename= ".".join(map(str,spFilt)), add_date=False, formats=["vienna"])
