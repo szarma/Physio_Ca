@@ -141,6 +141,96 @@ class Regions:
                                #use_restricted=use_restricted
                               )
 
+    def to_hdf5(self,
+                output_dir: Union[str, Path],
+                file_name: str = '',
+                movie = None,
+                col = None,
+                formats: Optional[List] = None,
+                add_date: bool = True) -> None:
+        """
+        Exports the current regions object to HDF5 format.
+
+        :param output_dir: Directory, where the file should be stored to.
+        :param file_name: Name of the file within the output directory.
+        :param movie:
+        :param col: Columns of the dataframe to store except the necessary ones.
+        :param formats: Format to serialize for. Currently only Vienna is supported.
+        :param add_date: Determines whether current date shall be added to the file name.
+        :return: None
+        """
+        if col is None:
+            col = ['trace']
+        if formats is None:
+            formats = ['vienna']
+        if type(output_dir) == str:
+            output_dir = Path(output_dir)
+        if movie is not None:
+            self.update(movie)
+
+        file_name = file_name.replace(' ', '_')
+
+        if add_date:
+            today = date.today()
+            file_name = '_'.join([today.strftime('%Y_%m_%d'), file_name]) if len(file_name) \
+                else today.strftime('%Y_%m_%d')
+        if not output_dir.is_dir():
+            output_dir.mkdir(parents=True)
+
+        for file_format in formats:
+            if file_format == 'vienna':
+                store = pd.HDFStore(output_dir.joinpath(file_name).as_posix())
+                saving = ['statImages', 'mode', 'image', 'filterSize', 'trange', 'FrameRange',
+                          'analysisFolder', 'time', 'Freq', 'metadata']
+
+                copy_movie = hasattr(self, 'movie')
+                tmp_movie = None
+                if copy_movie:
+                    tmp_movie = self.movie
+                    del self.movie
+                regions_to_save = deepcopy(self)
+                all_attributes = list(self.__dict__.keys())
+
+                for k in self.df.columns:
+                    if k not in ['peak', 'pixels', 'peakValue', 'tag', 'interest'] + col:
+                        del regions_to_save.df[k]
+                store['df'] = regions_to_save.df
+
+                for k in all_attributes:
+                    if k not in saving:
+                        del regions_to_save.__dict__[k]
+                save_dict = pd.Series(regions_to_save.__dict__)
+                store['__dict__'] = save_dict
+                store.close()
+
+                if copy_movie:
+                    self.movie = tmp_movie
+                    del tmp_movie
+            elif file_format == 'maribor':
+                raise NotImplementedError
+            else:
+                raise NotImplementedError(f'Output format "{file_format}" is not supported.')
+
+    @staticmethod
+    def from_hdf5(file_path: Union[str, Path]) -> object:
+        """
+        Imports regions from a HDF5 file.
+
+        :param file_path: Path of the file to load.
+        :return: Regions object contained by the file.
+        """
+        if type(file_path) == str:
+            file_path = Path(file_path)
+        if not file_path.is_file():
+            raise FileNotFoundError
+
+        regions = Regions({(0, 0): [0, 0]}, mode='dummy')
+        store = pd.HDFStore(file_path.as_posix())
+        series = store['__dict__']
+        regions.__dict__ = series.to_dict()
+        regions.df = store['df']
+        return regions
+
     def to_json(self,
                 output_dir: Union[str, Path],
                 file_name: str = '',
