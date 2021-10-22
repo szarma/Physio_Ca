@@ -336,11 +336,11 @@ class Regions:
     def constructRois(self, image, img_th=None, dks=3, verbose=False, diag=False, merge=True):
         from cv2 import dilate,erode
         try:
-            dks = max(3, (max(self.filterSize)) // 4 * 2 + 1)
+            dks = max(3, (max(self.filterSize)) // 3 * 2 + 1)
         except:
             pass
         dilation_kernel = getCircularKernel(dks)
-        eks = max(3,dks-2)
+        eks = max(3,dks-4)
         erosion_kernel  = getCircularKernel(eks)
         if img_th is None:
             img_th = median_abs_deviation(image.flat)/30
