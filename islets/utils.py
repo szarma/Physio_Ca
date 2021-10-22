@@ -474,7 +474,10 @@ def boil_down(regions, timescales=None, verbose=False, minNevents = 10, time_ran
         output[tr] = dict(t_sync=t_sync, halfwidth=np.median(halfwidths), period=np.median(periods), cc2sum=median_cc)
     return pd.DataFrame(output).T
 
-def get_ccs(regions, timescales=None, verbose=False, time_ranges=None, skip_sequential_filtering=False):
+def get_ccs(regions, timescales=None, verbose=False, time_ranges=None, skip_sequential_filtering=False, mode="toMean", col="zScore"):
+    validModes = ["toMean", "cross"]
+    if mode not in validModes:
+        raise ValueError("mode can only accept one of the following: "+str(validModes))
     if not skip_sequential_filtering:
         from .EventDistillery import sequential_filtering
         if timescales is None:
@@ -487,15 +490,22 @@ def get_ccs(regions, timescales=None, verbose=False, time_ranges=None, skip_sequ
         time_ranges = {"all": (regions.time[0], regions.time[-1])}
     output = {}
     for tr in time_ranges:
-        ccs = np.ones((len(timescales), len(regions.df)))
+        if mode=="toMean":
+            ccs = np.ones((len(timescales), len(regions.df)))
+        if mode=="cross":
+            ccs = np.ones((len(timescales), len(regions.df), len(regions.df)))
         tbegin, tend = time_ranges[tr]
         for it,ts in enumerate(timescales):
             k = "%g" % ts
             time = regions.showTime.get(k, regions.time)
             time_mask = (time>tbegin) & (time<tend)
-            zs = np.vstack(regions.df["zScore_%g" % ts].values)[:,time_mask]
-            meanZ = zs.sum(0)
-            ccs[it] = [np.corrcoef(meanZ, z)[0, 1] for z in zs]
+            zs = np.vstack(regions.df[col+"_%g" % ts].values)[:,time_mask]
+            if mode=="toMean":
+                meanZ = zs.sum(0)
+                ccs[it] = [np.corrcoef(meanZ, z)[0, 1] for z in zs]
+            if mode=="cross":
+                ccs[it] = np.corrcoef(zs)
+                
         output[tr] = ccs
     return output
 
