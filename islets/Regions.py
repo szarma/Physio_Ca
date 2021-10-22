@@ -1492,6 +1492,7 @@ class Regions:
             for roi in rois:
                 trace = rebin(self.df.loc[roi, 'detrended'], n_rebin)
                 diff = trace.max() - trace.min()
+                diff /= 2
                 if diff > new_offset:
                     new_offset = diff
             return new_offset
@@ -1633,7 +1634,7 @@ class Regions:
             ax5.set_xlabel('time [s]')
 
         if plot_raster and (ax6 is not None):
-            plot_events(events=events, ax=ax6, transparency=False)
+            plot_events(events=events, ax=ax6)
             ax6.set_facecolor('black')
             ax6.get_xaxis().set_visible(False)
             ax6.get_yaxis().set_visible(False)
