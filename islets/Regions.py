@@ -144,8 +144,8 @@ class Regions:
     def to_hdf5(self,
                 output_dir: Union[str, Path],
                 file_name: str = '',
-                movie = None,
-                col = None,
+                movie=None,
+                col: Optional[List[str]] = None,
                 formats: Optional[List] = None,
                 add_date: bool = True) -> None:
         """
@@ -235,8 +235,8 @@ class Regions:
                 output_dir: Union[str, Path],
                 file_name: str = '',
                 movie=None,
-                col: Union[list, None] = None,
-                formats: Union[list, None] = None,
+                col: Optional[list] = None,
+                formats: Optional[List] = None,
                 add_date: bool = True,
                 use_compression: bool = False) -> None:
         """
