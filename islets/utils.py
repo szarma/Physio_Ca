@@ -218,7 +218,7 @@ def split_unconnected_rois(B_, image=None):
 #         B_[nnpeak] += [px]
 #     return B_
 
-def closeup_movie(regions, indices, movie=None, labels=False):
+def closeup_movie(regions, indices, movie=None, labels=False,**kwargs):
     if movie is None:
         movie = regions.movie
 #     from .utils import show_movie
@@ -233,7 +233,7 @@ def closeup_movie(regions, indices, movie=None, labels=False):
         regions.plotEdges(ax=ax_, ix=indices, separate=True, image=False, scaleFontSize=0, bound=False)
         regions.plotPeaks(ax=ax_, ix=indices, labels=labels)
     m = movie[:,i0:ie,j0:je]
-    a = show_movie(m, additionalPlot = addplot, offset = (j0,i0), figScale=3, autoadjust=False)
+    a = show_movie(m, additionalPlot = addplot, offset = (j0,i0), figScale=3, autoadjust=False, **kwargs)
     return a
 
 def mode(l):
@@ -301,12 +301,12 @@ def multi_map(some_function, iterable, processes=1, library="multiprocessing"):
 
 def create_preview_image(regions, filepath=None, show=False):
     from copy import copy
-    cmap = copy(plt.cm.Greys)
-    cmap.set_bad("lime")
+#     cmap = copy(plt.cm.Greys)
+#     cmap.set_bad("lime")
     dims = regions.image.shape
     fig = plt.figure(figsize=(5,5*np.divide(*dims)))
     ax = fig.add_axes([0.01,0.01,.98,.98])
-    regions.plotEdges(imkw_args={"cmap":cmap},color="darkred", ax=ax, separate=False)
+    regions.plotEdges(color="darkred", ax=ax, separate=False)
     text = ax.text(.98,.03,len(regions.df),size=16,transform = ax.transAxes, ha="right",color="goldenrod")
     text.set_bbox(dict(facecolor='black', alpha=0.5))
 #     text.set_path_effects([path_effects.Stroke(linewidth=3, foreground='black'),
