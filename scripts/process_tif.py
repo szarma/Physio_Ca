@@ -58,7 +58,8 @@ from islets.Regions import Regions
 
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category= FutureWarning,)
-    from islets import cload
+    from islets import cmovie
+from islets.utils import load_tif
 
 import matplotlib.pyplot as plt
 from copy import copy
@@ -74,7 +75,7 @@ if not os.path.isfile(tiffile):
 freq = float(args.frequency)
 
 # restrict = tuple([int(t) for t in args.restrict.split("_")]) if len(args.restrict) else None
-movie = cload(tiffile, fr=freq)
+movie = cmovie(load_tif(tiffile), fr=freq)
 
 if args.test:
     movie = movie[:,200:300,200:400]
