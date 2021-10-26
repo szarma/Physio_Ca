@@ -45,7 +45,7 @@ def load_regions(path,
         regions.update()
         regions.pathToRois = path
         pickleDir = os.path.split(path)[0]
-        regions = Regions(regions)
+        #regions = Regions(regions)
         try:
             protocolFile = os.path.join(pickleDir, [f for f in os.listdir(pickleDir) if "protocol" in f][0])
             regions.import_protocol(protocolFile)
@@ -208,7 +208,7 @@ class Regions:
                 for k, v in subregions.__dict__.items():
                     value = v
                     if isinstance(v, (pd.DataFrame, pd.Series)):
-                        value = json.JSONDecoder().decode(v.to_json(double_precision=15))
+                        value = json.JSONDecoder().decode(v.to_json(double_precision=8))
                     if isinstance(v, (np.float64, np.int64)):
                         value = str(v)
                     if isinstance(v, np.ndarray):
@@ -217,12 +217,12 @@ class Regions:
                         for k_, v_ in v.items():
                             if isinstance(v_, np.ndarray):
                                 # v[k_] = json.dumps(v_.tolist())
-                                v[k_] = v_.tolist()
+                                v[k_] = v_.astype("float16").tolist()
                         value = v
 
                     json_dict[k] = value
 
-                json_string = orjson.dumps(json_dict).decode()
+                json_string = orjson.dumps(json_dict,option=orjson.OPT_INDENT_2).decode()
 
                 roi_file = f'{output_dir.as_posix()}/{file_name}_rois.json'
                 if use_compression:
@@ -336,14 +336,14 @@ class Regions:
     def constructRois(self, image, img_th=None, dks=3, verbose=False, diag=False, merge=True):
         from cv2 import dilate,erode
         try:
-            dks = max(3, (max(self.filterSize)) // 3 * 2 + 1)
+            dks = max(3, (max(self.filterSize)) // 2 * 2 + 1)
         except:
             pass
         dilation_kernel = getCircularKernel(dks)
         eks = max(3,dks-4)
         erosion_kernel  = getCircularKernel(eks)
         if img_th is None:
-            img_th = median_abs_deviation(image.flat)/30
+            img_th = 0.02#median_abs_deviation(image.flat)/3
         ok = (image>img_th).astype(np.uint8)
         if eks<dks:
             ok = erode(ok, erosion_kernel)
@@ -770,10 +770,10 @@ class Regions:
             self.df["trend"] = trend
             self.df["detrended"] = [self.df.trace[i] - self.df.trend[i] for i in self.df.index]
         elif method=="fast":
-            self.fast_filter_traces(timescale)
+            self.fast_filter_traces(timescale, Npoints=np.inf)
             self.df["detrended"] = self.df["faster_%g"%timescale]
             self.df["trend"]     = self.df["slower_%g"%timescale]
-            del self.df["faster_%g"%timescale], self.df["slower_%g"%timescale]
+            del self.df["faster_%g"%timescale], self.df["slower_%g"%timescale], self.df["zScore_%g"%timescale]
         elif method=="slow":
             self.slow_filter_traces(timescale)
             self.df["detrended"] = self.df["faster_%g"%timescale]
