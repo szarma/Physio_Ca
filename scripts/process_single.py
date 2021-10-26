@@ -296,8 +296,8 @@ for spFilt in filtSizes:
     regions.metadata = metadata
     regions.calcTraces(movie)
     regions.time += metadata.frame_range[0]/metadata.Frequency
-    regions.infer_TwoParFit()
-    regions.calc_interest()
+    # regions.infer_TwoParFit()
+    # regions.calc_interest()
     if not args.debug: 
         saveRois(regions, saveDir, filename= ".".join(map(str,spFilt)), add_date=False, formats=["vienna"])
 
