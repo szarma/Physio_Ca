@@ -2,12 +2,13 @@ import os
 from collections import OrderedDict
 import tifffile
 import matplotlib
-import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import warnings
 import ffmpeg
 import pandas as pd
+from . import cmovie
+from tqdm import tqdm
 from matplotlib import pyplot as plt
 
 def load_tif_seq(file_names, subindices = None):
@@ -693,6 +694,95 @@ def createStaticImage(im,regions,showall=True,color="grey",separate=True, return
     
     return PilImage.open(bkg_img_file)
 
+
+def gentle_motion_correct(movie, freqMC=1, max_dev=(5,5), plot_name="shifts.png", template=None,pinpoint_template=0):
+    from .numeric import rebin
+    freq = movie.fr
+    n_rebin = int(np.round(freq / freqMC))
+    if n_rebin < 1:
+        n_rebin = 1
+    print (f"The original frequency is {freq}.")
+    if n_rebin>1:
+        print (f"The movie will be rebinned in time by {n_rebin} for shifts extraction.")
+    reb_movie = movie.resize(1,1,1./n_rebin).astype("float32")
+    # reb_movie = rebin(movie, n_rebin, dtype='float32')
+    # reb_movie = cmovie(reb_movie, fr=freq / n_rebin)
+
+    print (f'Extracting shifts started. The output will be saved in {plot_name} file.' )
+    fig, axs = plt.subplots(2, 1, figsize=(8, 8), sharex=True, sharey=True, dpi=150)
+    axs[0].set_title("shifts (in pixels)")
+    axs[0].set_ylabel("vertical")
+    axs[1].set_ylabel("horizontal")
+    axs[1].set_xlabel("time [s]]")
+    shifts = np.zeros((len(reb_movie), 2))
+    max_shift_vert, max_shift_hor = max_dev
+
+    # diffmovie = np.diff(reb_movie[:,::reb_movie.shape[1]//10,::reb_movie.shape[2]//10], axis=0).mean((1,2))
+    if template is None:
+        ichoose = int(pinpoint_template*len(reb_movie))#np.argmin(np.abs(diffmovie))
+        template = reb_movie[ichoose]
+    i_extract = 0
+    while True:
+        dshifts = reb_movie.motion_correct(
+            max_shift_w=max_shift_hor,
+            max_shift_h=max_shift_vert,
+            template=template
+        )[1]
+
+        #template = template
+        shifts += dshifts
+        maxshifts = np.abs(dshifts).max(axis=0)
+        print ("maximal shifts are ", maxshifts)
+        # print ("all dshifts ", dshifts)
+        axs[0].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 0])
+        axs[1].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 1])
+        fig.savefig(plot_name)
+        if (maxshifts[0] < max_dev[0]) and (maxshifts[1] < max_dev[1]):
+            break
+        i_extract += 1
+        # if i_extract==2: break
+    print (f'Extracting shifts finished.' )
+
+    if n_rebin > 1:
+        shifts = cmovie(shifts.reshape((1,) + shifts.shape)).resize(n_rebin, 1, 1)[0]
+    m_rshifted = np.zeros_like(movie[:len(shifts)])
+    di = movie.size//2**16 // 20
+    if di<1: di=1
+    mtype = movie.dtype
+    maxv = 2 ** int(str(mtype).split("int")[-1]) - 1
+
+    print (f'Applying shifts...' )
+    for i in tqdm(range(0, len(shifts), di)):
+        sl = slice(i, min(len(shifts), i + di))
+        tmpm = movie[sl].astype("float32").apply_shifts(shifts[sl])
+        tmpm[tmpm < 0] = 0
+        tmpm[tmpm > maxv] = maxv
+        tmpm = np.round(tmpm)
+        m_rshifted[sl] = tmpm
+    print ("Done.")
+    return m_rshifted
+
+def load_json(path):
+    from json import loads
+    from .Regions import Regions
+    with open( path ) as f:
+        txt = f.read()
+    data = loads(txt)
+    data["df"] = pd.DataFrame(data["df"])
+    data["df"]["trace"] = data["df"]["trace"].apply(np.array)
+    for k in data["statImages"]:
+        data["statImages"][k] = np.array(data["statImages"][k])
+    regions = Regions(dict(zip(data["df"]["peak"].apply(tuple), data["df"]["pixels"])))
+    regions.df.index = [int(i) for i in regions.df.index]
+    regions.df["pixels"] = [[tuple(px) for px in pxs] for pxs in regions.df["pixels"]]
+    for k in list(data.keys()):
+        setattr(regions, k, data[k])
+        del data[k]
+    regions.df["peak"] = regions.df["peak"].apply(tuple)
+    regions.image = np.array(regions.image)
+    regions.time = np.array(regions.time)
+    regions.update()
+    return regions
 
 def saveRois(regions,outDir,filename="",movie=None,col=["trace"],formats=["vienna"],add_date=True):
         feedback = []
