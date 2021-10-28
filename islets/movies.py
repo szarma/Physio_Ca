@@ -385,21 +385,23 @@ class movie(np.ndarray):
                 raise Exception('Unknown motion correction method!')
             avg_corr = np.mean(res)
             sh_y, sh_x = top_left
+            # print("="*10,res.shape,top_left, 2 * ms_h - 1, 2 * ms_w - 1)
+            sh_x_n = -(sh_x - ms_h)
+            sh_y_n = -(sh_y - ms_w)
+            # if max is internal, check for subpixel shift using gaussian
+            # peak registration
+            four_log = 4 * np.log(res[sh_x, sh_y])
+            if 0 < sh_y < 2 * ms_w - 1:
+                logm1 = np.log(res[sh_x, sh_y - 1])
+                logp1 = np.log(res[sh_x, sh_y + 1])
+                dshift = (logm1 - logp1)/(2 * logm1 + 2 * logp1 - four_log)
+                sh_y_n -= dshift
 
-            if (0 < top_left[1] < 2 * ms_h - 1) & (0 < top_left[0] < 2 * ms_w - 1):
-                # if max is internal, check for subpixel shift using gaussian
-                # peak registration
-                log_xm1_y = np.log(res[sh_x - 1, sh_y])
-                log_xp1_y = np.log(res[sh_x + 1, sh_y])
-                log_x_ym1 = np.log(res[sh_x, sh_y - 1])
-                log_x_yp1 = np.log(res[sh_x, sh_y + 1])
-                four_log_xy = 4 * np.log(res[sh_x, sh_y])
-
-                sh_x_n = -(sh_x - ms_h + (log_xm1_y - log_xp1_y)//(2 * log_xm1_y - four_log_xy + 2 * log_xp1_y))
-                sh_y_n = -(sh_y - ms_w + (log_x_ym1 - log_x_yp1)//(2 * log_x_ym1 - four_log_xy + 2 * log_x_yp1))
-            else:
-                sh_x_n = -(sh_x - ms_h)
-                sh_y_n = -(sh_y - ms_w)
+            if 0 < sh_x < 2 * ms_h - 1:
+                logm1 = np.log(res[sh_x-1, sh_y])
+                logp1 = np.log(res[sh_x+1, sh_y])
+                dshift = (logm1 - logp1)/(2 * logm1 + 2 * logp1 - four_log)
+                sh_x_n -= dshift
 
             shifts.append([sh_x_n, sh_y_n])
             xcorrs.append([avg_corr])
