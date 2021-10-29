@@ -90,6 +90,9 @@ def coltrans(x, vmin=None, vmax=None, tilt=1, offset=0.1):
 
 
 def save_tiff(movie, movieFilename):
+    '''This is apparently a horrible way to write a tiff, Use Tifffile instead.
+    Need to remove.'''
+    #TODO: remove
     import PIL
     im = PIL.Image.fromarray(movie[0])
     im.save(movieFilename,
@@ -695,8 +698,9 @@ def createStaticImage(im,regions,showall=True,color="grey",separate=True, return
     return PilImage.open(bkg_img_file)
 
 
-def gentle_motion_correct(movie, freqMC=1, max_dev=(5,5), plot_name="shifts.png", template=None,pinpoint_template=0):
+def gentle_motion_correct(movie, m_rshifted, freqMC=1, max_dev=(5,5), plot_name="shifts.png", template=None,pinpoint_template=0):
     from .numeric import rebin
+    assert movie.shape == m_rshifted.shape
     freq = movie.fr
     n_rebin = int(np.round(freq / freqMC))
     if n_rebin < 1:
@@ -709,11 +713,15 @@ def gentle_motion_correct(movie, freqMC=1, max_dev=(5,5), plot_name="shifts.png"
     # reb_movie = cmovie(reb_movie, fr=freq / n_rebin)
 
     print (f'Extracting shifts started. The output will be saved in {plot_name} file.' )
-    fig, axs = plt.subplots(2, 1, figsize=(8, 8), sharex=True, sharey=True, dpi=150)
-    axs[0].set_title("shifts (in pixels)")
-    axs[0].set_ylabel("vertical")
-    axs[1].set_ylabel("horizontal")
-    axs[1].set_xlabel("time [s]]")
+#     fig, axs = plt.subplots(2, 1, figsize=(8, 8), sharex=True, sharey=True, dpi=150)
+    fig, axs = plt.subplots(1, 1, figsize=(8, 3.5), sharex=True, sharey=True, dpi=150)
+    axs = [axs, axs]
+#     axs[0].set_title("shifts (in pixels)")
+    axs[0].set_title("vertical: sold, horizontal: dashed")
+    axs[0].set_ylabel("shifts (in pixels)")
+#     axs[0].set_ylabel("vertical")
+#     axs[1].set_ylabel("horizontal")
+    axs[1].set_xlabel("time [s]")
     shifts = np.zeros((len(reb_movie), 2))
     max_shift_vert, max_shift_hor = max_dev
 
@@ -723,29 +731,38 @@ def gentle_motion_correct(movie, freqMC=1, max_dev=(5,5), plot_name="shifts.png"
         template = reb_movie[ichoose]
     i_extract = 0
     while True:
-        dshifts = reb_movie.motion_correct(
+        dshifts = reb_movie.extract_shifts(
             max_shift_w=max_shift_hor,
             max_shift_h=max_shift_vert,
             template=template
-        )[1]
-
-        #template = template
+        )[0]
         shifts += dshifts
         maxshifts = np.abs(dshifts).max(axis=0)
         print ("maximal shifts are ", maxshifts)
         # print ("all dshifts ", dshifts)
-        axs[0].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 0])
-        axs[1].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 1])
+        c = axs[0].plot([])[0].get_color()
+        axs[0].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 0], label=i_extract,c=c)
+        axs[1].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 1], "--",c=c)
         fig.savefig(plot_name)
+        i_extract += 1
         if (maxshifts[0] < max_dev[0]) and (maxshifts[1] < max_dev[1]):
             break
-        i_extract += 1
         # if i_extract==2: break
+    if i_extract>1:
+        axs[0].legend()
+    maxyl = np.abs([ax.get_ylim() for ax in axs]).max()
+    for ax in axs:
+        ax.set_ylim(-maxyl, maxyl)
+    fig.savefig(plot_name)
     print (f'Extracting shifts finished.' )
 
     if n_rebin > 1:
         shifts = cmovie(shifts.reshape((1,) + shifts.shape)).resize(n_rebin, 1, 1)[0]
-    m_rshifted = np.zeros_like(movie[:len(shifts)])
+    # pad the remaining frames if exist:
+    npad = len(movie)-len(shifts)
+    if npad>0:
+        shifts = np.vstack([shifts,[shifts[-1]]*npad])
+    # m_rshifted = np.zeros_like(movie)
     di = movie.size//2**16 // 20
     if di<1: di=1
     mtype = movie.dtype
@@ -760,7 +777,7 @@ def gentle_motion_correct(movie, freqMC=1, max_dev=(5,5), plot_name="shifts.png"
         tmpm = np.round(tmpm)
         m_rshifted[sl] = tmpm
     print ("Done.")
-    return m_rshifted
+    # return m_rshifted
 
 def load_json(path):
     from json import loads
