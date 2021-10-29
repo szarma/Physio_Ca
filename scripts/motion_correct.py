@@ -32,7 +32,7 @@ import os
 from islets import cmovie
 from islets.Recording import Recording, saveMovie
 from tifffile import memmap as tifmemmap
-
+from islets.utils import gentle_motion_correct
 import bioformats as bf
 bf.javabridge.start_vm(class_path=bf.JARS, max_heap_size="20G")
 
@@ -109,7 +109,6 @@ if args.correct_phase:
         m_rshifted[:,1::2],
         plot_name=movieFilename.split(".mp4")[0]+"_odd_shifts.png",
         template=odd_template,
-        max_dev_rig,
         max_dev_rig = (max_dev_rig, max_dev_rig)
     )
 else:
