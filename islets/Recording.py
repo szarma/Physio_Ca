@@ -6,6 +6,7 @@ import errno
 import bioformats as bf
 import numpy as np
 import pandas as pd
+from . import cmovie
 from nd2reader import ND2Reader
 
 
@@ -345,10 +346,14 @@ class Recording:
             print("loading")
             # load motion corrected
             if pathToTif.lower().endswith("tif") or pathToTif.lower().endswith("tiff"):
-                from caiman import load as cload
-                data = cload(pathToTif)
+                from tifffile import memmap
+                # from caiman import load as cload
+                try:
+                    data = cmovie(memmap(pathToTif))
+                except:
+                    from .utils import  load_tif
+                    data = cmovie(load_tif(pathToTif))
             elif pathToTif.lower().endswith("npy"):
-                from . import cmovie
                 data = cmovie(np.load(pathToTif))
             else:
                 raise ValueError("Unknown file extension")
