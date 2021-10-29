@@ -519,6 +519,8 @@ def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None):
     if indices is None:
 #         indices = regions.df.sort_values("size",ascending=False).index
         indices = regions.df.index
+    if im is None:
+        im = regions.statImages[regions.mode]
     f = go.Figure()
     if "color" in regions.df.columns:
         colors = regions.df.loc[indices,"color"]
@@ -570,11 +572,8 @@ def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None):
         
     if im!="none":
         # f.add_heatmap(z=im, hoverinfo='skip',showscale=False,colorscale=plxcolors.sequential.Greys)
-        imgpointer = createStaticImage(None,
-                                       regions,
+        imgpointer = createStaticImage(regions,
                                        showall=showall,
-#                                        separate=bool(len(MYCOLORS)-1),
-#                                        origin="lower",
                                        lw=lw
                                       )
 
@@ -658,7 +657,7 @@ def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None):
     
     
 
-def createStaticImage(im,regions,showall=True,color="grey",separate=True, returnPath=False, cmap=None,origin="lower",lw=None):
+def createStaticImage(regions,im=None,showall=True,color="grey",separate=True, returnPath=False, cmap=None,origin="lower",lw=None):
     if im is None:
         im = regions.statImages[regions.mode]
     if lw is None:
@@ -666,10 +665,10 @@ def createStaticImage(im,regions,showall=True,color="grey",separate=True, return
     from PIL import Image as PilImage
     currentBackend = matplotlib.get_backend()
     plt.switch_backend('agg')
-    if cmap is None:
-        from copy import copy
-        cmap = copy(plt.cm.Greys)
-        cmap.set_bad("lime")
+    # if cmap is None:
+        # from copy import copy
+        # cmap = copy(plt.cm.Greys)
+        # cmap.set_bad("lime")
     bkg_img_file = "/tmp/%i.png"%np.random.randint(int(1e10))
     figsize=np.array(im.shape)[::-1]/30
     fig = plt.figure(figsize=figsize)
@@ -679,7 +678,7 @@ def createStaticImage(im,regions,showall=True,color="grey",separate=True, return
         im = np.clip(im, np.percentile(im,1), np.percentile(im,(1-20/im.size)*100))
     except:
         pass
-    ax.imshow(np.log(im+1),cmap=cmap,origin=origin)
+    ax.imshow(np.log(im+1),cmap=plt.cm.Greys, origin=origin)
     for sp in ax.spines: ax.spines[sp].set_visible(False)
     if showall:
         try:
