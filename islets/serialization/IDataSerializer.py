@@ -26,5 +26,5 @@ class IDataSerializer(ABC):
         pass
 
     @abstractmethod
-    def save(self, **kwargs) -> None:
+    def save(self, regions: Regions, **kwargs) -> None:
         pass
