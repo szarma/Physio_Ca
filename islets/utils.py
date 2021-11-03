@@ -11,7 +11,7 @@ import pandas as pd
 from tqdm import tqdm
 from matplotlib import pyplot as plt
 
-def load_tif_seq(file_names, subindices = None):
+def load_tif_seq(file_names):
     # copied from CaImAn
     with tifffile.TiffSequence(file_names) as tffl:
         input_arr = tffl.asarray()
@@ -1015,7 +1015,8 @@ def getPeak2BoundaryDF(C, verbose=0, distTh=None):
         #     peak2bnd += [(i,jmin,dists[jmin],C.loc[i,"size"],C.loc[jmin,"size"])]
 
     peak2bnd = pd.DataFrame(peak2bnd, columns=["i","j","dist","size_from","size_to"])
-    peak2bnd = pd.concat([dfi.sort_values("size_to").iloc[[-1]] for i, dfi in peak2bnd.groupby("i")])
+    if len(peak2bnd):
+        peak2bnd = pd.concat([dfi.sort_values("size_to").iloc[[-1]] for i, dfi in peak2bnd.groupby("i")])
     return peak2bnd
 
 
