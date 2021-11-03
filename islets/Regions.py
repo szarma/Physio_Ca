@@ -32,12 +32,12 @@ MYCOLORS = plc.qualitative.Plotly
 # MYCOLORS = ["darkred"]
 
 def load_regions(path,
-                 mergeDist=1,
+                 baremin=False,
+                 calcInterest=False,
+                 mergeDist=0,
                  mergeSizeTh=10,
                  plot=False,
                  verbose=False,
-                 calcInterest=True,
-                 baremin=False
                 ):
     with open(path,"rb") as f:
         regions = pickle.load(f)
@@ -594,17 +594,19 @@ class Regions:
             lw=.5
         if image:
             im = self.statImages[self.mode].copy()
-            im = im**1.5/(1+np.abs(im))
+            im[~np.isfinite(im)] = im[np.isfinite(im)].min()
+            # im = (1+im)**1.5/(1+np.abs(im))
             # imth = np.percentile(im[im>0],5)
             # im[im<imth] = imth
             if imkw_args is None:
                 imkw_args = {}
                 from copy import copy
                 mycmap = copy(plt.cm.Greys)
-                mycmap.set_bad("lime")
+                # mycmap.set_bad("lime")
                 imkw_args["cmap"] = mycmap
                 # imkw_args["norm"] = LogNorm(vmin=imth)
-            ax.imshow(im,**imkw_args)
+            axim = ax.imshow(im,**imkw_args)
+            # plt.colorbar(axim,ax=ax)
         fs = self.__dict__.get("filterSize", [])
         if fs is None:
             fs = []
