@@ -1008,6 +1008,7 @@ def getPeak2BoundaryDF(C, verbose=0, distTh=None):
         #     peak2bnd += [(i,jmin,dists[jmin],C.loc[i,"size"],C.loc[jmin,"size"])]
 
     peak2bnd = pd.DataFrame(peak2bnd, columns=["i","j","dist","size_from","size_to"])
+    peak2bnd = pd.concat([dfi.sort_values("size_to").iloc[[-1]] for i, dfi in peak2bnd.groupby("i")])
     return peak2bnd
 
 
