@@ -69,7 +69,8 @@ from sys import path as syspath
 syspath.append(os.path.expanduser("~/srdjan_functs/"))
 
 from islets.numeric import rebin
-from islets.Recording import Recording, saveMovie
+from islets.Recording import Recording
+from islets import saveMovie
 
 import javabridge
 from bioformats import JARS as bfJARS

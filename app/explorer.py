@@ -9,8 +9,7 @@ from sys import exc_info
 
 
 from islets.general_functions import td2str
-from islets.Recording import import_data
-
+from islets.utils import import_data
 
 addinfoFeatures = """comments
 sex

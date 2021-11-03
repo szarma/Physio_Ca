@@ -42,7 +42,8 @@ from pandas import DataFrame
 from sys import path as syspath
 syspath.append(os.path.expanduser("~/srdjan_functs/"))
 
-from islets.Recording import Recording, saveMovie, parse_leica
+from islets.Recording import Recording, parse_leica
+from islets import saveMovie
 from islets.LineScan import LineScan
 from islets.numeric import rebin
 from islets.utils import saveRois, get_filterSizes

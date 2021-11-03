@@ -52,13 +52,12 @@ from sys import exit
     
 from pandas import DataFrame
 
-from islets.Recording import saveMovie, autocorr2d
-from islets.utils import saveRois, getStatImages
+from islets.utils import saveRois, getStatImages, autocorr2d
 from islets.Regions import Regions
 
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category= FutureWarning,)
-    from islets import cmovie
+    from islets import cmovie, saveMovie
 from islets.utils import load_tif
 
 import matplotlib.pyplot as plt

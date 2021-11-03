@@ -1,6 +1,5 @@
 import os
 from sys import exc_info
-from typing import Any, Union
 from warnings import warn
 import errno
 import bioformats as bf
@@ -8,6 +7,8 @@ import numpy as np
 import pandas as pd
 from . import cmovie
 from nd2reader import ND2Reader
+
+from .utils import autocorr2d
 
 
 def parse_leica(rec,
@@ -69,44 +70,6 @@ def parse_leica(rec,
         return list(zip(idxs,outSer))
     return outSer
 
-def saveMovie(movie, filename, maxFreq=2, showtime=True, **kwargs):
-    from .utils import show_movie
-    from .numeric import rebin
-    if maxFreq<movie.fr:
-        nrebin = int(np.ceil((movie.fr/maxFreq)))
-        if nrebin>1:
-            showMovie = rebin(movie, nrebin)
-            from . import cmovie
-            showMovie = cmovie(showMovie, fr=movie.fr/nrebin)
-        else:
-            showMovie = movie+1
-    else:
-        showMovie = movie+1
-    if filename=="embed":
-        return show_movie(showMovie,
-                          NTimeFrames=len(showMovie),
-                          tmax=len(showMovie)/showMovie.fr if showtime else None,
-                          **kwargs
-                          )
-    else:
-        show_movie(showMovie,
-                   out="save",
-                   saveName=filename,
-                   NTimeFrames=len(showMovie),
-                   tmax=len(showMovie)/showMovie.fr if showtime else None,
-                   **kwargs
-                   )
-        return 0
-
-def autocorr2d(sett, dxrange, dyrange):
-    from numpy import zeros, corrcoef
-    Nx, Ny = sett.shape
-    ret = zeros((len(dxrange), len(dyrange)))
-    for kx,dx in enumerate(dxrange):
-        for ky,dy in enumerate(dyrange):
-            ret[kx,ky] = corrcoef(sett[  :Nx-dx,   :Ny-dy].flatten(),
-                                  sett[dx:     , dy:     ].flatten())[0,1]
-    return ret
 
 class Recording:
     def __init__(self, pathToExperiment):
@@ -239,7 +202,8 @@ class Recording:
                 data = data[0]
 #                 if verbose: print (data.shape)
                 try:
-                    stat = autocorr2d(data,dxrange=[scale], dyrange=[0])[0,0]/np.abs(autocorr2d(data,dyrange=[scale], dxrange=[0])[0,0])
+                    stat = autocorr2d(data, dxrange=[scale], dyrange=[0])[0, 0] / np.abs(
+                        autocorr2d(data, dyrange=[scale], dxrange=[0])[0, 0])
                     if stat>2:
                         rec.metadata.loc[i,"line scan"]="single"
                 except:
@@ -489,171 +453,4 @@ class Recording:
             self.Series[ser]["data"] = data
         else:
             return data
-
-def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
-    from .general_functions import td2str
-    from tqdm import tqdm
-#     tqdm().pandas()
-    recordings = []
-    for cur,ds,fs in os.walk(mainFolder):
-        #### if you wish to restrict to only certain folders: ####
-        for f in fs:
-            if not (f.endswith(".lif") or f.endswith(".nd2")):
-                continue
-            if any([constr.strip() not in cur+f for constr in constrain.split(",")]):
-                continue
-            path = os.path.join(cur,f)
-            recordings += [path]
-    recordings = sorted(recordings)
-
-    from .utils import get_series_dir, get_filterSizes
-    import numpy as np
-    import pandas as pd
-    
-    status = []
-    ilifs = 0
-    for pathToRecording in tqdm(recordings):
-        if verbose>=1:
-            print ("#"*20, pathToRecording)
-        try:
-            rec = Recording(pathToRecording)
-        except:
-            warn("Could not import %s"%pathToRecording)
-            continue
-        recType = "Nikon" if pathToRecording.endswith(".nd2") else "Leica"
-        if forceMetadataParse:
-            rec.parse_metadata()
-            rec.save_metadata()
-        if recType=="Leica":
-            sers = parse_leica(rec)
-        else:
-            sers = [rec.Experiment.split(".")[0]]
-
-        analysisFolder = os.path.join(rec.folder, rec.Experiment+"_analysis")
-        if not os.path.isdir(analysisFolder):
-            continue
-        existingSeries = []
-        for fs in os.listdir(analysisFolder):
-            if not os.path.isdir(os.path.join(analysisFolder, fs)) : continue
-            if len(os.listdir(os.path.join(analysisFolder, fs)))==0: continue
-            if fs[0]=="." : continue
-            ############
-            fssplit = fs.split('_')
-            if len(fssplit)==1:
-                existingSeries += [fs]
-                continue
-            trange = fssplit[-1].split("-")
-            if len(trange)>1:
-                fs = "_".join(fssplit[:-1])
-            existingSeries += [fs]
-        if verbose>1:
-            print (existingSeries)
-        sers = np.unique(sers+existingSeries)
-        for series in sers:
-            subdirs = get_series_dir(pathToRecording, series)
-            if verbose>=2:
-                print ("series=",series,", with subdirs:", subdirs)
-            for ser in subdirs:
-                if verbose>=2:
-                    print ("ser=",ser)
-                md = pd.Series()
-                md["path to exp"] = pathToRecording
-                md["experiment"] = os.path.split(pathToRecording)[-1]
-                md["series"] = series
-                if recType=="Nikon":
-                    series = "all"
-#                     rec.import_series("all", onlyMeta=True)
-#                 else:
-#                 try:
-                rec.import_series(series, onlyMeta=True)
-#                 except:
-#                     print (f"could not import {series} from {rec.path}", exc_info())
-#                     status += [md]
-#                     continue
-                
-                saveDir = os.path.join(analysisFolder, ser)
-                if len(rec.Series)==0: continue
-                for k,v in rec.Series[series]["metadata"].items(): 
-                    md[k] = v
-                if "_" in ser:
-                    fssplit = ser.split("_")
-                    trange = fssplit[-1].split("-")
-                    if verbose>2:
-                        print(trange)
-                    if len(trange)>=2:
-                        try:
-                            t0,t1 = [float(t.strip("s")) for t in fssplit[-1].split("-", maxsplit=1)]
-                            md["Time Range"] = "%i-%i"%(t0,t1)
-                            md["Duration [s]"] = t1-t0
-                        except:
-                            print ("Oops, having problems parsing ",ser)
-                            continue
-                    else:
-                        md["Time Range"] = "all"
-                        md["Duration [s]"] = md["SizeT"]/md["Frequency"]
-                else:
-                    md["Time Range"] = "all"
-                    md["Duration [s]"] = md["SizeT"]/md["Frequency"]
-                fs = get_filterSizes(md.pxSize)
-                if recType=="Nikon":
-                    movieFilename = os.path.join(saveDir, os.path.splitext(rec.Experiment)[0]+".mp4")
-                else:
-                    movieFilename = os.path.join(saveDir, rec.Experiment+"_"+series+".mp4")
-                md["path to movie"] = movieFilename
-                md["movie done"] = os.path.isfile(movieFilename)
-                if md["movie done"]:
-                    md["movie size [MB]"] = np.round(os.path.getsize(movieFilename)/10**6,1)
-                md["date"] = md["Start time"].date().__str__()
-                for k in ["bit depth", "Start time", "End time","Name","frame_range"]: # , "individual Series"
-                    try:    del md[k]
-                    except: pass
-                times = ["00:00"]+[td2str(el) for el in md["individual Series"]["Duration"].cumsum()]
-                md["Duration"] = times[-1]
-                md["Series Durations"] = " \n".join(["%s [%s-%s]"%(name.lstrip("Series0"), t0, t1) for name, t0, t1 in zip(md["individual Series"]["Name"], times[:-1], times[1:])])
-                del md["individual Series"]
-                pklsDone = {}
-                for fsize in fs:
-                    pickleFile = os.path.join(saveDir, ".".join(map(str,fsize))+"_rois.pkl")
-                    pickleThere = os.path.isfile(pickleFile)
-                    pklsDone[fsize] = pickleThere
-                md["pickles done"] = pklsDone
-                pathToProtocol = movieFilename.replace(".mp4","_protocol.txt")#.replace("_"+md["Time Range"]+"s","")
-                md["path to protocol"] = pathToProtocol
-                md["protocol done"] = False
-                try:
-                    protocol = pd.read_csv(pathToProtocol)
-                    if len(protocol):
-                        md["protocol done"] = True
-                        protocol = " ".join(np.unique([
-                            "%s:%s"%(row["compound"].capitalize() if "glu" in row["compound"].lower() else row["compound"], row["concentration"].replace(" ","")) for _,row in protocol.iterrows()]))
-                        protocol = protocol.replace("Glucose","Glu")
-                        md["protocol"] = protocol
-                except:
-                    pass
-                pathToAddInfo = os.path.split(pathToProtocol)[0]
-                pathToAddInfo = os.path.join(pathToAddInfo, "additional_info.txt")
-                md["path to add_info"] = pathToAddInfo
-                md["add_info done"] = os.path.isfile(pathToAddInfo)
-                if md["add_info done"] and os.path.getsize(pathToAddInfo)>10:
-                    # print (ser, )
-                    try:
-                        addInfo = pd.read_csv(pathToAddInfo, sep=":", header=None, index_col=0).T
-                    except:
-                        md["add_info done"] = False
-                        continue
-                    if len(addInfo)==0:
-                        md["add_info done"] = False
-                        continue
-                    for kk in addInfo.columns:
-                        # print ("%s:%s"%(kk, addInfo[kk].iloc[0]), end=" ")
-                        md[str(kk).strip()] = str(addInfo[kk].iloc[0]).strip()
-                status += [dict(md.items())]
-        
-        ilifs +=1
-    #     if ilifs>3:
-    #         break
-    status = pd.DataFrame(status)
-    if "protocol" not in status.columns:
-        status["protocol"] = [""]*len(status)
-    return status
 

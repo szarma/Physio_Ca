@@ -11,8 +11,7 @@ from sys import exc_info
 from sys import path as syspath
 syspath.append("/home/jupyter-srdjan/srdjan_functs/")
 from general_functions import td2str
-from islets.Recording import import_data
-
+from islets.utils import import_data
 
 addinfoFeatures = """comments
 sex

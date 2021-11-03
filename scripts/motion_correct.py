@@ -29,8 +29,8 @@ np.corrcoef([0,1,2],[0,2,1])
 
 import warnings
 import os
-from islets import cmovie
-from islets.Recording import Recording, saveMovie
+from islets import cmovie, saveMovie
+from islets.Recording import Recording
 from tifffile import memmap as tifmemmap
 from islets.utils import gentle_motion_correct
 import bioformats as bf

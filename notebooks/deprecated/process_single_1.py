@@ -40,7 +40,8 @@ from pandas import DataFrame
 from sys import path as syspath
 syspath.append(os.path.expanduser("~/srdjan_functs/"))
 
-from islets.Recording import Recording, saveMovie
+from islets.Recording import Recording
+from islets import saveMovie
 from islets.numeric import rebin
 from islets.utils import show_movie, saveRois, get_filterSizes
 

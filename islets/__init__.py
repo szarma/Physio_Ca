@@ -31,8 +31,8 @@ with warnings.catch_warnings():
     from .numeric import rebin
     from .PicklePicker import PicklePicker
     from .Regions import Regions, load_regions
-    from .Recording import Recording, saveMovie, parse_leica
-    from .utils import saveRois, get_filterSizes
+    from .Recording import Recording, parse_leica
+    from .utils import saveRois, get_filterSizes, saveMovie
     from .fitting import fit_spikes
 
 __version__ = pkg_resources.get_distribution('islets').version
