@@ -876,6 +876,8 @@ class Regions:
                 fast_vars += [absFast[i,j-di:j+di].var()]
         fast_vars = np.array(fast_vars)
         slow_est = np.array(slow_est)
+        fast_vars = fast_vars[slow_est>0]
+        slow_est = slow_est[slow_est>0]
         binedges = np.geomspace(np.percentile(slow_est,1), np.percentile(slow_est,99))
         d = np.digitize( slow_est, binedges)
         irange = range(len(binedges)+1)
