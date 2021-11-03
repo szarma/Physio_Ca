@@ -102,7 +102,7 @@ conditionalFormats += [
     for col in ["experiment"]
 ]
 
-users = sorted(["srdjan","johannes","sandra","marjan","ariana","nastja","ya-chi","dean","lidija"])
+users = sorted(["srdjan","johannes","sandra","marjan","nastja","ya-chi","dean","lidija","anita"])
 app = dash.Dash(__name__,suppress_callback_exceptions=True)
 
 df = prepareDF(startFolder,constr,0)
