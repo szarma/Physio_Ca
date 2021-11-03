@@ -1,7 +1,7 @@
 #!/opt/tljh/user/envs/physio/bin/python
 
 import argparse
-
+#TODO: add option to motion correct by default
 parser = argparse.ArgumentParser(description='Extract series and process from a recording')
 parser.add_argument('--recording', '-rec', type=str,
                     help='path to the recording')
