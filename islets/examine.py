@@ -52,8 +52,9 @@ def examine(self,
     
     roisImage = getFigure()#showRoisOnly(self,indices=self.df.index, im=self.statImages[imagemode], lw=lw)
     roisImage.update_layout({"dragmode":'lasso'},)
-    if not hasattr(self,"gain"):
-        self.infer_gain()
+    if hasattr(self,"time"):
+        if not hasattr(self,"TwoParreit"):
+            self.infer_TwoParFit()
     SelectedRois = html.Div([
         html.Div([
                "Selected ROIs:",
@@ -136,7 +137,7 @@ def examine(self,
             dcc.Input(id="rebin-input",
                 debounce=True,
                 size=3,
-                value=max(1,int(np.round(self.Freq/2))),
+                value=max(1,int(np.round(self.__dict__.get("Freq",1)/2))),
                 style={"display":"inline-block","margin-right":"20px","margin-left":"3px"}
              ),
            "offset",
@@ -401,190 +402,190 @@ def examine(self,
             
         
         return out, outcurns, fig
-
-    @app.callback(
-        Output("trace-show","figure"),
-        [Input("selected-rois", "value"),
-         Input("selectspec-rois", "value"),
-         Input("cols-input","value"),
-         Input("rebin-input","value"),
-         Input("offset-input","value"),
-         Input("sum-checklist","value")],
-        [State("trace-show","relayoutData")]
-                 )
-    def plot_callback(selected,shownRois,cols,nRebin,offset,checklist,rlod):
-        from sys import exc_info
-        out = ""
-        try:
-            if cols is None or cols==[]:
-                return no_update
-            if selected in ["all",""]:
-                selectedIndices = list(self.df.index)
-            else:
-                selectedIndices = list(eval(selected+","))
-            if shownRois in ["all",""]:
-                shownIndices = list(self.df.index)
-            else:
-                shownIndices = list(eval(shownRois+","))
-            selectedIndices = np.intersect1d(selectedIndices, shownIndices)
-            nRebin=int(nRebin)
-            offset=float(offset)
-            toSum = bool(len(checklist))
-            if not toSum:
-                if "interest" in self.df.columns:
-                    selectedIndices = list(
-                        self.df.loc[selectedIndices].sort_values(
-                        "interest", ascending=False
-                        ).index)[:max_rois]
-                else:
-                    selectedIndices = selectedIndices[:max_rois]
-            from plotly.subplots import make_subplots
-            from .Regions import MYCOLORS
+    if hasattr(self,"time"):
+        @app.callback(
+            Output("trace-show","figure"),
+            [Input("selected-rois", "value"),
+             Input("selectspec-rois", "value"),
+             Input("cols-input","value"),
+             Input("rebin-input","value"),
+             Input("offset-input","value"),
+             Input("sum-checklist","value")],
+            [State("trace-show","relayoutData")]
+                     )
+        def plot_callback(selected,shownRois,cols,nRebin,offset,checklist,rlod):
+            from sys import exc_info
+            out = ""
             try:
-                treatments = self.protocol["compound"].unique()
-            except:
-                treatments = []
-            h,w = 370+20*len(treatments),600
-            margin = dict(zip("tblr",[30,10,20,20]))
-            fg = make_subplots(rows = 2, shared_xaxes=True, row_heights = [1-.05*len(treatments)-.01,.05*len(treatments)],
-                               vertical_spacing=0,
-                               start_cell="bottom-left"
-                              )
-            dt0 = self.time[1]-self.time[0]
-            for col in cols:
-                if toSum:
-                    ys = np.array([np.sum([self.df.loc[ix,col]*self.df.loc[ix,"size"] for ix in \
-                                           selectedIndices],0)/self.df.loc[selectedIndices,"size"].sum()])
-                    ixlbl = ["avg"]
+                if cols is None or cols==[]:
+                    return no_update
+                if selected in ["all",""]:
+                    selectedIndices = list(self.df.index)
                 else:
-                    ys = np.vstack(self.df.loc[selectedIndices,col])
-                    ixlbl = selectedIndices
-                try:    t = self.showTime[col.split("_")[-1]].copy()
-                except: t = self.time.copy()
-#                 t = self.time.copy()
-                dt = t[1]-t[0]
-                nrb = int(nRebin*dt0/dt)
-                if nrb>1:
-                    ys = rebin(ys,nrb,axis=1)
-                    if "zScore" in col:
-                        ys *= nrb**.5
-                    t = rebin(t,nrb)
-                for iy,y,ix in zip(np.arange(len(ys)),ys, ixlbl):
-                    if toSum:
-                        cl="black"
+                    selectedIndices = list(eval(selected+","))
+                if shownRois in ["all",""]:
+                    shownIndices = list(self.df.index)
+                else:
+                    shownIndices = list(eval(shownRois+","))
+                selectedIndices = np.intersect1d(selectedIndices, shownIndices)
+                nRebin=int(nRebin)
+                offset=float(offset)
+                toSum = bool(len(checklist))
+                if not toSum:
+                    if "interest" in self.df.columns:
+                        selectedIndices = list(
+                            self.df.loc[selectedIndices].sort_values(
+                            "interest", ascending=False
+                            ).index)[:max_rois]
                     else:
-                        try:
-                            cl = self.df.loc[ix,"color"]
-                        except:
-                            cl = MYCOLORS[ix%len(MYCOLORS)]
-                    fg.add_trace(go.Scatter(x=t,y=y+iy*offset,line_width=.7,line_color=cl,hovertext=f"{col} [ix={ix}]",hoverinfo="text", ),row=1,col=1)
-            it = 0
-            treatments = [tr for tr in treatments if tr[:3].lower()!="glu"] + [tr for tr in treatments if tr.lower()[:3]=="glu"]
-            for treat in treatments:
-                fg.add_trace(go.Scatter(
-                    x = [self.protocol.t_begin.min()],
-                    y = [0.4+it],
-                    mode="text",
-                    text=[treat[:3]+" "],
-                    textposition="middle left",
-                    showlegend=False,
-                            ),row=2,col=1)
-                for _,row in self.protocol.query(f"compound=='{treat}'").iterrows():
-                    t1,t2 = row.t_begin,row.t_end
+                        selectedIndices = selectedIndices[:max_rois]
+                from plotly.subplots import make_subplots
+                from .Regions import MYCOLORS
+                try:
+                    treatments = self.protocol["compound"].unique()
+                except:
+                    treatments = []
+                h,w = 370+20*len(treatments),600
+                margin = dict(zip("tblr",[30,10,20,20]))
+                fg = make_subplots(rows = 2, shared_xaxes=True, row_heights = [1-.05*len(treatments)-.01,.05*len(treatments)],
+                                   vertical_spacing=0,
+                                   start_cell="bottom-left"
+                                  )
+                dt0 = self.time[1]-self.time[0]
+                for col in cols:
+                    if toSum:
+                        ys = np.array([np.sum([self.df.loc[ix,col]*self.df.loc[ix,"size"] for ix in \
+                                               selectedIndices],0)/self.df.loc[selectedIndices,"size"].sum()])
+                        ixlbl = ["avg"]
+                    else:
+                        ys = np.vstack(self.df.loc[selectedIndices,col])
+                        ixlbl = selectedIndices
+                    try:    t = self.showTime[col.split("_")[-1]].copy()
+                    except: t = self.time.copy()
+    #                 t = self.time.copy()
+                    dt = t[1]-t[0]
+                    nrb = int(nRebin*dt0/dt)
+                    if nrb>1:
+                        ys = rebin(ys,nrb,axis=1)
+                        if "zScore" in col:
+                            ys *= nrb**.5
+                        t = rebin(t,nrb)
+                    for iy,y,ix in zip(np.arange(len(ys)),ys, ixlbl):
+                        if toSum:
+                            cl="black"
+                        else:
+                            try:
+                                cl = self.df.loc[ix,"color"]
+                            except:
+                                cl = MYCOLORS[ix%len(MYCOLORS)]
+                        fg.add_trace(go.Scatter(x=t,y=y+iy*offset,line_width=.7,line_color=cl,hovertext=f"{col} [ix={ix}]",hoverinfo="text", ),row=1,col=1)
+                it = 0
+                treatments = [tr for tr in treatments if tr[:3].lower()!="glu"] + [tr for tr in treatments if tr.lower()[:3]=="glu"]
+                for treat in treatments:
                     fg.add_trace(go.Scatter(
-                        x = [t1,t2,t2,t1,t1],
-                        y = np.array([0,0,1,1,0])*.8+it,
-                        mode="lines",
-                        line_color="grey",
-                        showlegend=False,
-                        fill="toself",
-                        opacity = .4),row=2,col=1)
-                    fg.add_trace(go.Scatter(
-                        x = [t1],
+                        x = [self.protocol.t_begin.min()],
                         y = [0.4+it],
                         mode="text",
-                        text=[" "+row.concentration],
-                        textposition="middle right",
+                        text=[treat[:3]+" "],
+                        textposition="middle left",
                         showlegend=False,
                                 ),row=2,col=1)
-                    fg.update_yaxes({"tickvals":[]},row=2,col=1)
+                    for _,row in self.protocol.query(f"compound=='{treat}'").iterrows():
+                        t1,t2 = row.t_begin,row.t_end
+                        fg.add_trace(go.Scatter(
+                            x = [t1,t2,t2,t1,t1],
+                            y = np.array([0,0,1,1,0])*.8+it,
+                            mode="lines",
+                            line_color="grey",
+                            showlegend=False,
+                            fill="toself",
+                            opacity = .4),row=2,col=1)
+                        fg.add_trace(go.Scatter(
+                            x = [t1],
+                            y = [0.4+it],
+                            mode="text",
+                            text=[" "+row.concentration],
+                            textposition="middle right",
+                            showlegend=False,
+                                    ),row=2,col=1)
+                        fg.update_yaxes({"tickvals":[]},row=2,col=1)
 
-                it += 1
-            fg.update_layout({
-                "height":h+margin["t"]+margin["b"],
-                "margin":margin,
-                "width":w,
-                "xaxis":{"title":"time [s]"},
-                "plot_bgcolor":"white",
-                "showlegend":False
-            })
+                    it += 1
+                fg.update_layout({
+                    "height":h+margin["t"]+margin["b"],
+                    "margin":margin,
+                    "width":w,
+                    "xaxis":{"title":"time [s]"},
+                    "plot_bgcolor":"white",
+                    "showlegend":False
+                })
 
-            fg.update_xaxes(showline=True, linewidth=1, linecolor='black',mirror=True,
-                            ticks="outside", ticklen=2, row=1, col=1,
-                            showgrid=False)
-            fg.update_yaxes(showline=True, linewidth=1, linecolor='black',mirror=True,
-                            ticks="outside", ticklen=2, row=1, col=1,
-                            showgrid=False)
-            try:
-                fg.update_xaxes(range=[rlod["xaxis.range[0]"], rlod["xaxis.range[1]"]])
-                fg.update_yaxes(range=[rlod["yaxis.range[0]"], rlod["yaxis.range[1]"]])
-#                 fg.update_xaxes(range=[rlod["xaxis.range[0]"], rlod["xaxis.range[1]"]], row=1, col=1,)
-#                 fg.update_yaxes(range=[rlod["yaxis.range[0]"], rlod["yaxis.range[1]"]], row=1, col=1,)
+                fg.update_xaxes(showline=True, linewidth=1, linecolor='black',mirror=True,
+                                ticks="outside", ticklen=2, row=1, col=1,
+                                showgrid=False)
+                fg.update_yaxes(showline=True, linewidth=1, linecolor='black',mirror=True,
+                                ticks="outside", ticklen=2, row=1, col=1,
+                                showgrid=False)
+                try:
+                    fg.update_xaxes(range=[rlod["xaxis.range[0]"], rlod["xaxis.range[1]"]])
+                    fg.update_yaxes(range=[rlod["yaxis.range[0]"], rlod["yaxis.range[1]"]])
+    #                 fg.update_xaxes(range=[rlod["xaxis.range[0]"], rlod["xaxis.range[1]"]], row=1, col=1,)
+    #                 fg.update_yaxes(range=[rlod["yaxis.range[0]"], rlod["yaxis.range[1]"]], row=1, col=1,)
+                except:
+                    pass
+
+                return fg
             except:
-                pass
-
-            return fg
-        except:
-            out += str(exc_info()).replace(",","<br>")
-            fg = getFigure(300,300)
-            fg.add_trace(go.Scatter(
-                    x = [0],
-                    y = [0],
-                    mode="text",
-                    text=[out],
-                    textposition="top right",
-                    showlegend=False,))
-            return fg
+                out += str(exc_info()).replace(",","<br>")
+                fg = getFigure(300,300)
+                fg.add_trace(go.Scatter(
+                        x = [0],
+                        y = [0],
+                        mode="text",
+                        text=[out],
+                        textposition="top right",
+                        showlegend=False,))
+                return fg
 
 
-    @app.callback(
-        [Output("filter-feedback", "children"),
-         Output("cols-input", "options")
-        ],
-        [Input("filter-button","n_clicks")],
-        [State("filter-input","value")]
-                 )
-    def filter_callback(n_clicks,filtTs):
-        from sys import exc_info
-        out = ""
-        try:
-            if n_clicks <= 0:
-                return no_update
+        @app.callback(
+            [Output("filter-feedback", "children"),
+             Output("cols-input", "options")
+            ],
+            [Input("filter-button","n_clicks")],
+            [State("filter-input","value")]
+                     )
+        def filter_callback(n_clicks,filtTs):
+            from sys import exc_info
+            out = ""
             try:
-                filtTs = float(filtTs)
+                if n_clicks <= 0:
+                    return no_update
+                try:
+                    filtTs = float(filtTs)
+                except:
+                    out += "Please input timescale in seconds."
+                    return out, no_update
+                k = "faster_%g"%filtTs
+
+                if k not in self.df:
+                    self.fast_filter_traces(filtTs,)
+                    # if filtTs<=10:
+                    #     self.fast_filter_traces(filtTs,Npoints=np.inf,)
+                    # else:
+                    #     self.fast_filter_traces(filtTs,Npoints=np.inf,filt_cutoff=0)
+                    out += f"filtering for features shorter than ~{filtTs}s done."
+                else:
+                    out += f"Traces filtered at {filtTs}s already exist"
+
+                options = [{"value":c,"label":c} for c in self.df.columns if \
+                                  hasattr(self.df[c].iloc[0],"shape") \
+                                  and len(self.df[c].iloc[0].shape)   \
+                                 ]
             except:
-                out += "Please input timescale in seconds."
-                return out, no_update
-            k = "faster_%g"%filtTs
-
-            if k not in self.df:
-                self.fast_filter_traces(filtTs,)
-                # if filtTs<=10:
-                #     self.fast_filter_traces(filtTs,Npoints=np.inf,)
-                # else:
-                #     self.fast_filter_traces(filtTs,Npoints=np.inf,filt_cutoff=0)
-                out += f"filtering for features shorter than ~{filtTs}s done."
-            else:
-                out += f"Traces filtered at {filtTs}s already exist"
-
-            options = [{"value":c,"label":c} for c in self.df.columns if \
-                              hasattr(self.df[c].iloc[0],"shape") \
-                              and len(self.df[c].iloc[0].shape)   \
-                             ]
-        except:
-            out += repr(exc_info())
-            options = no_update
-        return out, options
+                out += repr(exc_info())
+                options = no_update
+            return out, options
 
 
     return app
