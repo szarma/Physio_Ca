@@ -8,7 +8,6 @@ import numpy as np
 import warnings
 import ffmpeg
 import pandas as pd
-from . import cmovie, Recording, parse_leica
 from tqdm import tqdm
 from matplotlib import pyplot as plt
 
@@ -40,6 +39,7 @@ def load_tif(file_name, subindices = None):
                     else:  # 3D
                         shape = tffl.series[0].shape
                         ts = np.arange(shape[0])[subindices[0]]
+                        # noinspection PyUnresolvedReferences
                         input_arr = tffl.asarray(key=np.ravel(ts[:, None] * shape[1] +
                                                               np.arange(shape[1]))
                                                  ).reshape((len(ts),) + shape[1:])[
@@ -54,6 +54,7 @@ def load_tif(file_name, subindices = None):
                     else:  # 3D
                         shape = tffl.series[0].shape
                         ts = np.arange(shape[0])[subindices]
+                        # noinspection PyUnresolvedReferences
                         input_arr = tffl.asarray(key=np.ravel(ts[:, None] * shape[1] +
                                                               np.arange(shape[1]))
                                                  ).reshape((len(ts),) + shape[1:])
@@ -64,6 +65,7 @@ def load_tif(file_name, subindices = None):
         else:
             input_arr = tffl.asarray()
 
+        # noinspection PyUnresolvedReferences
         input_arr = np.squeeze(input_arr)
     return input_arr
 
@@ -78,6 +80,7 @@ def coltrans(x, vmin=None, vmax=None, tilt=1, offset=0.1):
     else:
         iterable = False
         x = np.array([x])
+    # noinspection PyUnresolvedReferences
     y = np.log(np.clip(x,vmin,vmax))**(1./tilt)
     if iterable:
         y -= y.min()
@@ -201,6 +204,7 @@ def split_unconnected_rois(B_, image=None):
                     k1 = tmppxs[0]
                 else:
                     vs = [image[px] for px in tmppxs]
+                    # noinspection PyUnresolvedReferences
                     k1 = tmppxs[np.argmax(vs)]
             B_[k1] = tmppxs
     return B_
@@ -246,6 +250,7 @@ def mode(l):
     return Counter(l).most_common(1)[0][0]
 
 def autocorr(sett, dtrange, nsplits = 1):
+    # noinspection PyUnresolvedReferences,PyUnresolvedReferences
     from numpy import zeros, corrcoef, array, mean, std
     if nsplits == 1:
         ret = zeros(len(dtrange))
@@ -757,6 +762,7 @@ def gentle_motion_correct(movie, m_rshifted, freqMC=1, max_dev=(5,5), plot_name=
     print (f'Extracting shifts finished.' )
 
     if n_rebin > 1:
+        from . import cmovie
         shifts = cmovie(shifts.reshape((1,) + shifts.shape)).resize(n_rebin, 1, 1)[0]
     # pad the remaining frames if exist:
     npad = len(movie)-len(shifts)
@@ -1081,19 +1087,24 @@ def getStatImages(movie_, debleach=False, downsampleFreq=2):
     return statImages
 
 
-def saveMovie(movie, filename, maxFreq=2, showtime=True, **kwargs):
+def saveMovie(movie, filename, maxFreq=2, maxdim=256, showtime=True, **kwargs):
     from .utils import show_movie
     from .numeric import rebin
     if maxFreq<movie.fr:
-        nrebin = int(np.ceil((movie.fr/maxFreq)))
-        if nrebin>1:
-            showMovie = rebin(movie, nrebin)
-            from . import cmovie
-            showMovie = cmovie(showMovie, fr=movie.fr/nrebin)
-        else:
-            showMovie = movie+1
+        nrebinT = int(np.ceil((movie.fr / maxFreq)))
+    else:
+        nrebinT = 1
+    nrebinV = int(np.round(movie.shape[1]/maxdim))
+    nrebinV = max(nrebinV,1)
+    nrebinH = int(np.round(movie.shape[2]/maxdim))
+    nrebinH = max(nrebinH,1)
+    if (nrebinT>1) or (nrebinV>1) or (nrebinH>1):
+        showMovie = rebin(movie, (nrebinT,nrebinV,nrebinH), axis=(0,1,2))
+        from . import cmovie
+        showMovie = cmovie(showMovie, fr=movie.fr / nrebinT)
     else:
         showMovie = movie+1
+
     if filename=="embed":
         return show_movie(showMovie,
                           NTimeFrames=len(showMovie),
@@ -1125,7 +1136,8 @@ def autocorr2d(sett, dxrange, dyrange):
 def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
     from .general_functions import td2str
     from tqdm import tqdm
-#     tqdm().pandas()
+    from .Recording import Recording, parse_leica
+    # tqdm().pandas()
     recordings = []
     for cur,ds,fs in os.walk(mainFolder):
         #### if you wish to restrict to only certain folders: ####

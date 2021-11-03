@@ -21,6 +21,8 @@ MYCOLORS = list(MYCOLORS.values())
 
 MYCOLORS = ["darkred"]
 
+
+# noinspection PyUnresolvedReferences
 def climb(x, a, diag=True, min_gradient=0, verbose=False):
     dims = a.shape
     xs = [x]
@@ -623,6 +625,7 @@ class Regions:
 
     def calcIntraCCs(self,movie_,diff=False,indices=None):
         intraCCs = []
+        C = self.df
         if indices is None:
             indices = self.df.index
         for roi in indices:

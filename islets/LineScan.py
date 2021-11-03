@@ -162,7 +162,7 @@ class LineScan:
         
     def infer_gain(self, plot=False, verbose=False):
         ts = 100/self.Freq
-        absSlow, absFast, _ = self.fast_filter_traces(ts,write=False, normalize=False,z_sp=0)
+        absSlow, absFast, _ = self.fast_filter_traces(ts, write=False, z_sp=0)
         di = 100
         slow_est, fast_vars = [],[]
         for i in range(absFast.shape[0]):

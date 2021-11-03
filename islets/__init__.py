@@ -1,6 +1,6 @@
-import pkg_resources
 import warnings
-import importlib
+
+import pkg_resources
 
 # noinspection PyUnresolvedReferences
 with warnings.catch_warnings():

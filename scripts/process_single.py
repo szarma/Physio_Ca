@@ -103,9 +103,9 @@ from slack_sdk.errors import SlackApiError
 
 from pandas import DataFrame
 
-from islets.Recording import Recording, saveMovie
+from islets.Recording import Recording
 from islets.LineScan import LineScan
-from islets.utils import saveRois, get_filterSizes, getStatImages
+from islets.utils import saveRois, get_filterSizes, getStatImages, saveMovie
 from islets.Regions import Regions
 
 with warnings.catch_warnings():
