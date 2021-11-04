@@ -55,7 +55,7 @@ indices = r.df.query("peakValue>15").index
 # r.plotEdges(indices)
 r.df = r.df.loc[indices]
 r.update()
-r.infer_gain()
+r.infer_TwoParFit()
 
 
 
