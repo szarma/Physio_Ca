@@ -199,7 +199,7 @@ for spFilt in filtSizes:
     regions.sortInOrder()
     regions.calcTraces(movie)
     #regions.time += metadata.frame_range[0]/metadata.Frequency
-    regions.infer_gain()
+    regions.infer_TwoParFit()
     regions.calc_interest()
     if not args.test: 
         saveRois(regions, saveDir, filename= ".".join(map(str,spFilt)), add_date=False, formats=["vienna"])

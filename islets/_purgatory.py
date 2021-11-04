@@ -239,3 +239,59 @@ def get_crawl_dict(image, pixels, diag=False, offset=(0,0)):
     return B_
 
 
+    def infer_gain(self, ts=None, plot=False, verbose=False, ret_points=False):
+        if ts is None:
+            minDt = np.diff(self.time).mean()
+            freq = 1 / minDt
+            ts = 30 / freq
+        absSlow, absFast, _ = self.fast_filter_traces(ts, write=False, normalize=False, filt_cutoff=0)
+        di = 30
+        slow_est, fast_vars = [], []
+        for i in range(absFast.shape[0]):
+            for j in range(di, absFast.shape[1] - di, absFast.shape[1] // 30):
+                slow_est += [absSlow[i, j]]
+                fast_vars += [absFast[i, j - di:j + di].var()]
+        fast_vars = np.array(fast_vars)
+        slow_est = np.array(slow_est)
+        logbs = np.log(np.logspace(np.log10(np.percentile(slow_est, 2)), np.log10(np.percentile(slow_est, 98))))
+        d = np.digitize(np.log(slow_est), logbs)
+        x = np.array([slow_est[d == i].mean() for i in np.unique(d)])
+        y = np.array([np.median(fast_vars[d == i]) if (d == i).sum() > 10 else np.nan for i in np.unique(d)])
+        x = x[np.isfinite(y)]
+        y = y[np.isfinite(y)]
+        if ret_points:
+            return x, y
+        gain = np.mean(y / x)
+        slow_est[slow_est <= 0] = np.nan
+        if plot:
+            ax = plt.subplot(111)
+            ax.hexbin(slow_est, fast_vars, bins="log",
+                      xscale="log",
+                      yscale="log",
+                      cmap="Greys",
+                      mincnt=1
+                      )
+            c = ax.plot(x, y, "o", mfc="none")[0].get_color()
+            ax.plot(x, x * gain, c=c)
+
+        if verbose: print("initial estimate of the gain is", gain)
+
+        for _ in range(5):
+            fast_vars[fast_vars > 5 * gain * slow_est] = np.nan
+            if np.isnan(fast_vars).any():
+                x = np.array([slow_est[d == i].mean() for i in np.unique(d)])
+                y = np.array([np.nanmedian(fast_vars[d == i]) if (d == i).sum() > 10 else np.nan for i in np.unique(d)])
+                x = x[np.isfinite(y)]
+                y = y[np.isfinite(y)]
+                y[y <= 0] = y[y > 0].min()
+                gain = np.nanmean(y / x)
+                if verbose: print("revised estimate of the gain", gain)
+                if plot:
+                    c = ax.plot(x, y, "o", mfc="none")[0].get_color()
+                    ax.plot(x, x * gain, c=c)
+        if plot:
+            ax.set_title("gain inference")
+            ax.set_xlabel("window means")
+            ax.set_ylabel("window variances")
+            ax.grid()
+        self.gain = gain
