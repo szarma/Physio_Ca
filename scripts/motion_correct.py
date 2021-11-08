@@ -121,7 +121,7 @@ else:
 
 m_rshifted.flush()
 
-del orig_movie, rec
+del orig_movie, rec, m_rshifted
 
 saveMovie(m_rshifted, outMovieFilename)
 
