@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from . import cmovie
 from nd2reader import ND2Reader
-
+from tifffile import memmap as tiffmemmap
 from .utils import autocorr2d
 
 
@@ -310,10 +310,9 @@ class Recording:
             print("loading")
             # load motion corrected
             if pathToTif.lower().endswith("tif") or pathToTif.lower().endswith("tiff"):
-                from tifffile import memmap
                 # from caiman import load as cload
                 try:
-                    data = cmovie(memmap(pathToTif))
+                    data = cmovie(tiffmemmap(pathToTif))
                 except:
                     from .utils import  load_tif
                     data = cmovie(load_tif(pathToTif))
@@ -389,7 +388,7 @@ class Recording:
             self.Series = {}
         self.Series[ser] = {}
         if isinstance(ser,str):
-            j = self.metadata.index[self.metadata.Name==ser].iloc[0]
+            j = self.metadata.index[self.metadata.Name==ser][0]
         else:
             j = ser
         metadata1 = self.metadata.loc[j]
@@ -400,7 +399,7 @@ class Recording:
             Nbytes = np.zeros(1,dtype=metadata1["bit depth"]).nbytes
             Nbytes = Nbytes * metadata1.SizeT * metadata1.SizeY * metadata1.SizeX * metadata1.SizeZ * metadata1.Nchannels
             if Nbytes>1e9:
-                mode="memmap"
+                mode="tif"
             else:
                 mode="ram"
         shape = (metadata1.SizeX, metadata1.SizeY)
@@ -411,27 +410,39 @@ class Recording:
         if metadata1.Nchannels > 1:
             shape = shape + (metadata1.Nchannels,)
 
-        if mode=="memmap":
-            if not hasattr(self, "tempdir"):
-                # import tempfile
-                # tempdir = tempfile.gettempdir()
-                tempdir = "/data/.tmp"
-                self.tempdir = os.path.join(tempdir,f"{np.random.randint(int(1e10))}")
-                os.makedirs(self.tempdir)
-            filename = os.path.join(self.tempdir, f"{ser}.mmap")
-
-            data =np.memmap(filename,
-                            dtype=metadata1["bit depth"],
-                            mode="w+",
-                            shape=shape
-                            )
-        elif mode=="ram":
+        if mode == "ram":
             data = np.zeros(
                 shape=shape,
                 dtype=metadata1["bit depth"],
             )
+        elif mode in ["memmap","tif"]:
+            if not hasattr(self, "tempdir"):
+                user = os.environ["USER"].split("jupyter-")[-1]
+                from datetime import date
+                today = date.today().strftime("%Y_%m_%d")
+                rndnumber = np.random.randint(int(1e10))
+                tempdir = f"/data/.tmp/{today}/{user}/{rndnumber}"
+                if not os.path.isdir(tempdir):
+                    os.makedirs(tempdir)
+                self.tempdir = tempdir
+
+            if mode=="memmap":
+                filename = os.path.join(self.tempdir, f"{ser}_d1_{metadata1.SizeX}_d2_{metadata1.SizeY}_d3_{metadata1.SizeZ}_order_C_frames_{metadata1.SizeT}_.mmap")
+                data =np.memmap(filename,
+                                dtype=metadata1["bit depth"],
+                                mode="w+",
+                                shape=shape
+                                )
+            if mode=="tif":
+                filename = os.path.join(self.tempdir, "tmp.tif")
+                shape = tuple(int(x) for x in shape)
+                data =tiffmemmap(filename,
+                                 shape=shape,
+                                 dtype=metadata1["bit depth"],
+                                 photometric="minisblack"
+                                 )
         else:
-            raise ValueError("mode can only take the following values: 'ram', 'memmap', and 'auto'.")
+            raise ValueError("mode can only take the following values: 'ram', 'memmap', 'tif', and 'auto'.")
 
         try:
             self.rdr
