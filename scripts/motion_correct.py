@@ -78,7 +78,7 @@ else:
 outMovieFilename =  movieFilename.replace(".mp4", "_rigshifted.mp4")
 outTifFilename = outMovieFilename.replace(".mp4", ".tif")
 
-orig_movie = cmovie(rec.Series[ser]["data"][:-1], fr=freq)
+orig_movie = cmovie(rec.Series[serToImport]["data"][:-1], fr=freq)
 bf.javabridge.kill_vm()
 
 if args.debug:
