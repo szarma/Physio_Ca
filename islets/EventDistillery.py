@@ -65,7 +65,8 @@ def sequential_filtering(
         if "correctZ" in regions.df.columns:
             regions.df["zScore_"+k] = [regions.df.loc[ix,"zScore_"+k]/regions.df.loc[ix,"correctZ"] for ix in regions.df.index]
         if rescale_z:
-            corr = regions.df["zScore_" + k].apply(median_abs_deviation).median()*mad2std
+#             corr = regions.df["zScore_" + k].apply(median_abs_deviation).median()*mad2std
+            corr = regions.df["zScore_" + k].apply(np.std).median()
             if verbose:
                 print("correcting z by", corr)
             regions.df["zScore_" + k] = [z / corr for z in regions.df["zScore_" + k]]
@@ -139,6 +140,7 @@ def distill_events_per_roi(roiEvents,
                            regions,
                            plot=False,
                            halfwidth_toll=.2,
+                           discardCloseToEdge=True,
                            freqShow=5,
                            take_best=False,
                            plotSlows=None,
@@ -197,8 +199,8 @@ def distill_events_per_roi(roiEvents,
                 # print (row.color)
                 draw_event(row, axs[0])
                 continue
-        if (row.t0-row.halfwidth/2 < regions.time[0]) or (row.tend+row.halfwidth/2 > regions.time[-1]):
-            status = "too close to begging/end"
+        if discardCloseToEdge and ((row.t0-row.halfwidth/2 < regions.time[0]) or (row.tend+row.halfwidth/2 > regions.time[-1])):
+            status = "too close to beginning/end"
             roiEvents.loc[ix, "status"] = status
             if plot:
                 if status not in colorDict:
