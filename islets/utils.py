@@ -832,7 +832,7 @@ def saveRois(regions,outDir,filename="",movie=None,col=["trace"],formats=["vienn
 
         for format in formats:
             if format=="vienna":
-                saving = ['statImages', 'mode', 'image', 'filterSize', 'df', 'trange', "FrameRange", "analysisFolder", "time", "Freq","metadata"]
+                saving = ['statImages', 'mode', 'image', 'filterSize', 'df', 'trange', "FrameRange", "analysisFolder", "time", "Freq","metadata","TwoParFit"]
                 juggleMovie = hasattr(regions, "movie")
                 if juggleMovie:
                     movie = regions.movie
@@ -846,7 +846,7 @@ def saveRois(regions,outDir,filename="",movie=None,col=["trace"],formats=["vienn
                     if k not in saving:
                         del subRegions.__dict__[k]
                 for k in regions.df.columns:
-                    if k not in ["peak", "pixels", "peakValue","tag","interest"]+col:
+                    if k not in ["peak", "pixels", "peakValue","tag","activity"]+col:
                         del subRegions.df[k]
                         
                 roifile = f"{outDir}/{filename}_rois.pkl"
