@@ -33,7 +33,6 @@ MYCOLORS = plc.qualitative.Plotly
 
 def load_regions(path,
                  baremin=False,
-                 calcInterest=False,
                  mergeDist=0,
                  mergeSizeTh=10,
                  plot=False,
@@ -57,8 +56,6 @@ def load_regions(path,
             if hasattr(regions,"gain"):
                 del regions.gain
         regions.merge_closest(mergeSizeTh=mergeSizeTh, mergeDist=mergeDist, plot=plot, Niter=15, verbose=verbose)
-        if calcInterest:
-            regions.calc_interest()
     except:
         print ("encountered error:", exc_info())
     
@@ -66,6 +63,12 @@ def load_regions(path,
 
 
 class Regions:
+    def __repr__(self):
+        try:
+            return self.df.__repr__()
+        except:
+            warnings.warn("no dataframe created yet.")
+            return self
     def __init__(self, movie_,
                  diag=False,
                  debleach=False,
@@ -685,27 +688,27 @@ class Regions:
             if labels:
                 ax.text(*p[::-1],s=" "+str(i),color=c, **kwargs)
     
-    def calc_interest(self, zth=3, timescales=[10,100,1000], save=True):
-        interesting = np.zeros(len(self.df))
+    def calc_activity(self, zth=3, timescales=[10, 100, 1000], save=True):
+        activity = np.zeros(len(self.df))
         for ts in timescales:
             if 1./self.Freq   > ts/10: continue
             if self.time[-1] < ts*5: continue
             s,f,z = self.fast_filter_traces(ts, write=False)
-            interesting += np.mean(z>zth,1)
-        interesting = interesting/len(timescales)
+            activity += np.mean(z>zth,1)
+        activity = activity/len(timescales)
         if save:
-            self.df["interest"] = interesting
+            self.df["activity"] = activity
         else:
-            return interesting
+            return activity
 
-    def plot_according_to_interest(self, timescale=None, ax=None,cmap="turbo",**kwargs):
+    def plot_according_to_activity(self, timescale=None, ax=None,cmap="turbo",**kwargs):
         # print ("hi")
         if timescale is None:
-            if "interest" not in self.df.columns:
-                raise ValueError("The regions' dataframe does not contain 'interest'. If timescale is not specified, regions must have 'interest'.")
-            x = self.df["interest"].values
+            if "activity" not in self.df.columns:
+                raise ValueError("The regions' dataframe does not contain 'activity'. If timescale is not specified, regions must have 'activity'.")
+            x = self.df["activity"].values
         else:
-            x = self.calc_interest(timescales=[timescale], save=False)
+            x = self.calc_activity(timescales=[timescale], save=False)
         x -= np.percentile(x,1)
         x /= np.percentile(x,95)
         self.df["color"] = [plt.cm.get_cmap(cmap)(xx) for xx in x]

@@ -432,10 +432,10 @@ def examine(self,
                 offset=float(offset)
                 toSum = bool(len(checklist))
                 if not toSum:
-                    if "interest" in self.df.columns:
+                    if "activity" in self.df.columns:
                         selectedIndices = list(
                             self.df.loc[selectedIndices].sort_values(
-                            "interest", ascending=False
+                            "activity", ascending=False
                             ).index)[:max_rois]
                     else:
                         selectedIndices = selectedIndices[:max_rois]
