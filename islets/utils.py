@@ -703,7 +703,7 @@ def createStaticImage(regions,im=None,showall=True,color="grey",separate=True, r
     return PilImage.open(bkg_img_file)
 
 
-def gentle_motion_correct(movie, m_rshifted, freqMC=1, max_dev=(5,5), plot_name="shifts.png", template=None,pinpoint_template=0):
+def gentle_motion_correct(movie, m_rshifted, freqMC=1, max_dev=(5,5), plot_name="shifts.png", template=None,pinpoint_template=0,Niter=4):
     from .numeric import rebin
     assert movie.shape == m_rshifted.shape
     freq = movie.fr
@@ -735,7 +735,7 @@ def gentle_motion_correct(movie, m_rshifted, freqMC=1, max_dev=(5,5), plot_name=
         ichoose = int(pinpoint_template*len(reb_movie))#np.argmin(np.abs(diffmovie))
         template = reb_movie[ichoose]
     i_extract = 0
-    while True:
+    for i_extract in range(Niter):
         dshifts = reb_movie.extract_shifts(
             max_shift_w=max_shift_hor,
             max_shift_h=max_shift_vert,
@@ -752,7 +752,6 @@ def gentle_motion_correct(movie, m_rshifted, freqMC=1, max_dev=(5,5), plot_name=
         i_extract += 1
         if (maxshifts[0] < max_dev[0]) and (maxshifts[1] < max_dev[1]):
             break
-        # if i_extract==2: break
     if i_extract>1:
         axs[0].legend()
     maxyl = np.abs([ax.get_ylim() for ax in axs]).max()
