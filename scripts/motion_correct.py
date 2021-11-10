@@ -101,7 +101,7 @@ if args.correct_phase:
         m_rshifted[:,::2],
         plot_name=movieFilename.split(".mp4")[0]+"_even_shifts.png",
         template=even_template,
-        max_dev = (max_dev_rig, max_dev_rig)
+        max_dev = (max_dev_rig//2+1, max_dev_rig)
     )
     odd_template = (even_template[:-1]+even_template[1:])/2
     gentle_motion_correct(
@@ -109,7 +109,7 @@ if args.correct_phase:
         m_rshifted[:,1::2],
         plot_name=movieFilename.split(".mp4")[0]+"_odd_shifts.png",
         template=odd_template,
-        max_dev = (max_dev_rig, max_dev_rig)
+        max_dev = (max_dev_rig//2+1, max_dev_rig)
     )
 else:
     gentle_motion_correct(
@@ -121,7 +121,7 @@ else:
 
 m_rshifted.flush()
 
-del orig_movie, rec, m_rshifted
+del orig_movie, rec
 
 saveMovie(m_rshifted, outMovieFilename)
 
