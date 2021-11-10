@@ -58,7 +58,9 @@ def load_regions(path,
         regions.merge_closest(mergeSizeTh=mergeSizeTh, mergeDist=mergeDist, plot=plot, Niter=15, verbose=verbose)
     except:
         print ("encountered error:", exc_info())
-    
+    if "interest" in regions.df.columns:
+        regions.df["activity"] = regions.df["interest"]
+        del regions.df["interest"]
     return regions
 
 
@@ -688,8 +690,10 @@ class Regions:
             if labels:
                 ax.text(*p[::-1],s=" "+str(i),color=c, **kwargs)
     
-    def calc_activity(self, zth=3, timescales=[10, 100, 1000], save=True):
+    def calc_activity(self, timescales=[10, 100], zth=3, save=True):
         activity = np.zeros(len(self.df))
+        if not hasattr(timescales,"__next__"):
+            timescales = [timescales]
         for ts in timescales:
             if 1./self.Freq   > ts/10: continue
             if self.time[-1] < ts*5: continue
