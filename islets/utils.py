@@ -714,6 +714,7 @@ def gentle_motion_correct(movie, m_rshifted, freqMC=1, max_dev=(5,5), plot_name=
     if n_rebin>1:
         print (f"The movie will be rebinned in time by {n_rebin} for shifts extraction.")
     reb_movie = movie.resize(1,1,1./n_rebin).astype("float32")
+    reb_movie.gaussian_blur_2D(max_dev[0]//2*2+1, max_dev[1]//2*2+1, -1,-1)
     # reb_movie = rebin(movie, n_rebin, dtype='float32')
     # reb_movie = cmovie(reb_movie, fr=freq / n_rebin)
 
