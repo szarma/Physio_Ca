@@ -691,6 +691,7 @@ class Regions:
                 ax.text(*p[::-1],s=" "+str(i),color=c, **kwargs)
     
     def calc_activity(self, timescales=[10, 100], zth=3, save=True):
+        print ("calc_activity is deprecated, this will work for now, but will print this warning every time. Please use get_activity(...), which also supports timeframe restriction.")
         activity = np.zeros(len(self.df))
         if not hasattr(timescales,"__next__"):
             timescales = [timescales]
@@ -705,23 +706,43 @@ class Regions:
         else:
             return activity
 
-    def plot_according_to_activity(self, timescale=None, ax=None,cmap="turbo",**kwargs):
-        # print ("hi")
-        if timescale is None:
-            if "activity" not in self.df.columns:
-                raise ValueError("The regions' dataframe does not contain 'activity'. If timescale is not specified, regions must have 'activity'.")
-            x = self.df["activity"].values
+    def get_activity(self, timescale, timeframe=None, zth=3, saveAs="activity"):
+        if hasattr(timescale,"__iter__"):
+            activity = np.zeros(len(self.df))
+            for ts in timescale:
+                activity += self.get_activity(ts,timeframe,zth,None)
         else:
-            x = self.calc_activity(timescales=[timescale], save=False)
-        x -= np.percentile(x,1)
-        x /= np.percentile(x,95)
-        self.df["color"] = [plt.cm.get_cmap(cmap)(xx) for xx in x]
-        if ax is None:
-            plt.figure()
-            ax = plt.subplot(111)
-#         im =ax.imshow([np.linspace(0,1)], cmap=cmap)
-#         plt.colorbar(im, ax=ax)
-        self.plotEdges(ax=ax,separate=True,**kwargs)
+            if 1./self.Freq > timescale/10:
+                warnings.warn(f"The requested timescale ({timescale}) is quite small with respect to frequency {self.Freq}. The results might not be the reasonable.")
+            duration = self.time[-1]-self.time[0]
+            if duration < timescale*5:
+                warnings.warn(f"The requested timescale ({timescale}) is large considering that the duration of the recording {duration}. The results might not be the reasonable.")
+            s,f,z = self.fast_filter_traces(timescale, write=False)
+            nRebin = len(self.time)/z.shape[1]
+            if timeframe is None:
+                activity = np.mean(z > zth, 1)
+            else:
+                if nRebin>=2:
+                    time = rebin(self.time,int(nRebin))
+                else:
+                    time = self.time
+                fltr = (time>timeframe[0]) & (time<timeframe[1])
+                activity = np.mean(z[:,fltr]>zth,1)
+        if saveAs is None:
+            return activity
+        else:
+            self.df[saveAs] = activity
+
+    def color_according_to(self,col,cmap="turbo"):
+        if self.df[col].dtype.kind not in "biufc":
+            raise ValueError(f"{col} elements not numeric.")
+        x = self.df[col].values
+        x -= np.percentile(x, 1)
+        x /= np.percentile(x, 95)
+        rgbs = np.array([plt.cm.get_cmap(cmap)(xx)[:3] for xx in x])
+        rgbs = (256*rgbs).astype(int)
+        rgbs = np.minimum(rgbs,255)
+        self.df["color"] = ['#%02x%02x%02x' % tuple(rgb) for rgb in rgbs]
         
     def change_frequency(self, fr=2):
         from .movies import movie as cmovie
