@@ -372,7 +372,7 @@ def plot_events(events,
         from .numeric import hillCurve
         events["coltrans"] = hillCurve(events.halfwidth,**hillkwargs)
     if ax is None:
-        h = .15 * len(events.roi.unique())+1
+        h = .05 * len(events.roi.unique())+1
         fig = plt.figure(figsize=(15,h))
         ax = fig.add_axes([0,1/h,1,1-1/h])
         ax.set_facecolor("k")
@@ -396,4 +396,5 @@ def plot_events(events,
                 alpha = row.alpha if "alpha" in row.index else 1
             )
         ir+=1
+    ax.set_xlim(0,None)
     return ax
