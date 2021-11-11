@@ -9,7 +9,7 @@ from . import cmovie
 from nd2reader import ND2Reader
 from tifffile import memmap as tiffmemmap
 from .utils import autocorr2d
-
+from IPython.display import display
 
 def parse_leica(rec,
                 merge=True,
@@ -380,6 +380,9 @@ class Recording:
             self.Series[Series]["data"] = data
         else:
             return metadata2, data
+    def __repr__(self):
+        display(self.metadata)
+        return ""
 
     def raw_import(self, ser, mode="auto", save=True):
         try:
