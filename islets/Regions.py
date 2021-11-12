@@ -27,7 +27,7 @@ from .general_functions import getCircularKernel
 from .numeric import rebin, bspline, crawl_dict_via_graph
 from .utils import multi_map, getGraph_of_ROIs_to_Merge, getPeak2BoundaryDF, getStatImages
 from .EventDistillery import define_legs, plot_events
-from .serialization import Hdf5Serializer
+from .serialization import Hdf5Serializer, IDataSerializer, JsonSerializer
 
 MYCOLORS = plc.qualitative.Plotly
 # MYCOLORS = ["darkred"]
@@ -142,6 +142,49 @@ class Regions:
                                #use_restricted=use_restricted
                               )
 
+    @staticmethod
+    def load(file_path: Union[str, Path],
+             file_format: str = 'infer') -> object:
+        """Loads a regions object from a supported file type.
+
+        This function is intended to load data from a supported file type into a ready-to-use regions object.
+        Supported file types are:
+          - HDF5-files
+            - HDF5-files need to have two collections. One collections contains the dataframe at "/df". The other
+              collection contains the class dictionary at "/__dict__".
+          - JSON-files
+            - JSON-files need to be encoded in UTF-8.
+            - compressed JSON-files are supported to save disk space.
+
+        Parameters
+        ----------
+        file_path : Union[str, Path]
+            Path of the file, which shall be deserialized.
+        file_format : {'hdf5', 'json', 'infer'}, default: 'infer'
+            Format, which shall be used to load the file. If 'infer' is passed, the function will automatically try to
+            use the right format by guessing based on the file suffix.
+
+        Returns
+        -------
+        Deserialized Regions object.
+        """
+        serializer : IDataSerializer
+
+        if file_format == 'infer':
+            if file_path.suffix in ['.hdf', '.h5']:
+                file_format = 'hdf5'
+            if file_path.suffix in ['.json', '.gz']:
+                file_format = 'json'
+
+        if file_format == 'hdf5':
+            serializer = Hdf5Serializer(file_path=file_path)
+        elif file_format == 'json':
+            serializer = JsonSerializer(file_path=file_path)
+        else:
+            raise KeyError
+
+        return serializer.load()
+
     def to_hdf5(self,
                 file_path: Union[str, Path],
                 movie: np.ndarray = None,
@@ -170,175 +213,64 @@ class Regions:
         """
         Imports regions from a HDF5 file.
 
-        :param file_path: Path of the file to load.
-        :return: Regions object contained by the file.
+        Parameters
+        ----------
+        file_path : Union[str, Path]
+            Path of the file to load.
+
+        Returns
+        -------
+        Regions
+            Regions object contained by the file.
         """
         return Hdf5Serializer(file_path).load()
 
     def to_json(self,
-                output_dir: Union[str, Path],
-                file_name: str = '',
+                file_path : Union[str, Path],
                 movie=None,
-                col: Optional[list] = None,
-                formats: Optional[List] = None,
+                col: Optional[List[str]] = None,
                 add_date: bool = True,
                 use_compression: bool = False) -> None:
+        """Exports the current regions object to json-format.
+
+        Parameters
+        ----------
+        file_path : Union[str, Path]
+            Path of the file, where the regions object shall be saved to.
+        movie : numpy.ndarray, optional
+            Movie, which is used to update regions before saving. If movie is None no update will be performed before.
+        col : List[str], optional
+            List of columns indicating columns to save. If None only standard columns get saved.
+        add_date : bool, default: True
+            Indicates whether the date shall be added to the name of the file.
+        use_compression: bool, default: True
+            Indicates whether compression should be used for serialization of the data.
         """
-        Exports the current regions object to json-format.
 
-        :param output_dir: Directory, where the output will be written to.
-        :param file_name: Base filename (will be extended automatically e.g. "5.6" becomes "5.6_rois.json.gz"
-        :param movie: Movie, which shall be manually connected to the regions object.
-        :param col: Columns, which are required to serialize. Default: ['trace']
-        :param formats: Format, which should be used to store json-data. Default: ['vienna']
-        :param add_date: If True then the current date will be added to the filename. Default: True
-        :param use_compression: If True then the .json file will be compressed to .gz
-        :return: None
-        """
-
-        if col is None:
-            col = ['trace']
-        if formats is None:
-            formats = ['vienna']
-        if type(output_dir) == str:
-            output_dir = Path(output_dir)
-        if movie is not None:
-            self.update(movie)
-        file_name = file_name.replace(' ', '_')
-        if add_date:
-            today = date.today()
-            if len(file_name):
-                file_name = '_'.join([today.strftime('%Y_%m_%d'), file_name])
-            else:
-                file_name = today.strftime('%Y_%m_%d')
-        if not output_dir.is_dir():
-            output_dir.mkdir(parents=True)
-
-        for format in formats:
-            if format == 'vienna':
-                saving = ['statImages',
-                          'mode',
-                          'image',
-                          'filterSize',
-                          'df',
-                          'trange',
-                          'FrameRange',
-                          'analysisFolder',
-                          'time',
-                          'Freq',
-                          'metadata']
-                juggle_movie = hasattr(self, 'movie')
-                if juggle_movie:
-                    movie = self.movie
-                    del self.movie
-                all_keys = list(self.__dict__.keys())
-                subregions = deepcopy(self)
-                if juggle_movie:
-                    self.movie = movie
-                    del movie
-                for k in all_keys:
-                    if k not in saving:
-                        del subregions.__dict__[k]
-                for k in self.df.columns:
-                    if k not in ['peak', 'pixels', 'peakValue','tag','interest'] + col:
-                        del subregions.df[k]
-
-                json_dict = {}
-                for k, v in subregions.__dict__.items():
-                    value = v
-                    if isinstance(v, (pd.DataFrame, pd.Series)):
-                        value = json.JSONDecoder().decode(v.to_json(double_precision=8))
-                    if isinstance(v, (np.float64, np.int64)):
-                        value = str(v)
-                    if isinstance(v, np.ndarray):
-                        value = v.tolist()
-                    if isinstance(v, dict):
-                        for k_, v_ in v.items():
-                            if isinstance(v_, np.ndarray):
-                                # v[k_] = json.dumps(v_.tolist())
-                                v[k_] = v_.astype("float16").tolist()
-                        value = v
-
-                    json_dict[k] = value
-
-                json_string = orjson.dumps(json_dict,option=orjson.OPT_INDENT_2).decode()
-
-                roi_file = f'{output_dir.as_posix()}/{file_name}_rois.json'
-                if use_compression:
-                    if not roi_file.endswith('.gz'):
-                        roi_file += '.gz'
-                    with mgzip.open(roi_file, 'wt') as file:
-                        file.write(json_string)
-                else:
-                    with open(roi_file, 'wt') as file:
-                        file.write(json_string)
-
-                self.pathToPickle = roi_file
-                # create_preview_image(self)
-                # TODO: Add json to creation process to let it work
-            elif format == 'maribor':
-                raise NotImplementedError
-            else:
-                raise NotImplementedError(f'Output format {format} not recognized.')
+        JsonSerializer(file_path).save(
+            regions=self,
+            movie=movie,
+            columns_to_save=col,
+            add_date=add_date,
+            use_compression=use_compression
+        )
 
     @staticmethod
-    def from_json(file_path: Union[str, Path], use_compression: Union[bool, None] = None) -> object:
+    def from_json(file_path: Union[str, Path]) -> object:
         """
         Static method, which enabled creation of a regions object by reading a (compressed) json file.
 
-        :param file_path: Path to the file, which will be read.
-        :param use_compression: Specifies the usage of compression. None means the algorithm decides it by file suffix.
-        :return: Regions object.
-        :raises FileNotFoundError: Gets raised if file_path does not exist.
+        Parameters
+        ----------
+        file_path : Union[str, Path]
+            Path to the file, which will be read.
+
+        Returns
+        -------
+        Deserialized regions object.
         """
-        if type(file_path) == str:
-            file_path = Path(file_path)
-        if not file_path.exists():
-            raise FileNotFoundError
 
-        if use_compression is None:
-            use_compression = True if file_path.suffix == '.gz' else False
-
-        if use_compression:
-            with mgzip.open(file_path.as_posix(), 'rt') as file:
-                file_content = file.read()
-        else:
-            with open(file_path.as_posix(), 'rt') as file:
-                file_content = file.read()
-
-        # Load JSON-object from file-content:
-        json_obj = orjson.loads(file_content.encode())
-
-        # Restoring data types:
-        df = pd.DataFrame.from_dict(json_obj['df'])
-        df['peak'] = df['peak'].apply(lambda x: tuple(x))
-        df['pixels'] = df['pixels'].apply(lambda x: [tuple(y) for y in x])
-        del json_obj['df']
-
-        json_obj['metadata'] = pd.Series(json_obj['metadata'])
-        json_obj['Freq'] = np.float64(json_obj['Freq'])
-        json_obj['image'] = np.array(json_obj['image'])
-
-        for key, value in json_obj['statImages'].items():
-            json_obj['statImages'][key] = np.array(value)
-
-        # Create Regions object and set all attributes stored in the JSON file:
-        regions = Regions(dict(zip(df['peak'], df['pixels'])))
-        for key, value in json_obj.items():
-            regions.__setattr__(key, value)
-        regions.df = df
-        regions.update()
-        pickle_dir = file_path.parent
-        regions = Regions(regions)
-        protocol_files = list(file_path.parent.glob('*protocol*.*'))
-        if len(protocol_files) > 0:
-            regions.import_protocol(protocol_files[0].as_posix())
-        regions.pathToPickle = file_path.as_posix()
-        regions.detrend_traces()
-        regions.infer_TwoParFit(plot=False)
-        regions.merge_closest(Niter=15)
-
-        return regions
+        return JsonSerializer(file_path).load()
 
 
     def defineImage(self, mode, gSig_filt=None, ):
