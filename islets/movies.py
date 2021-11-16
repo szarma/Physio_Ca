@@ -390,16 +390,17 @@ class movie(np.ndarray):
             sh_y_n = -(sh_y - ms_w)
             # if max is internal, check for subpixel shift using gaussian
             # peak registration
-            four_log = 4 * np.log(res[sh_x, sh_y])
+            safelog = lambda xi: np.log(xi) if xi>0 else -500
+            four_log = 4 * safelog(res[sh_x, sh_y])
             if 0 < sh_y < 2 * ms_w - 1:
-                logm1 = np.log(res[sh_x, sh_y - 1])
-                logp1 = np.log(res[sh_x, sh_y + 1])
+                logm1 = safelog(res[sh_x, sh_y - 1])
+                logp1 = safelog(res[sh_x, sh_y + 1])
                 dshift = (logm1 - logp1)/(2 * logm1 + 2 * logp1 - four_log)
                 sh_y_n -= dshift
 
             if 0 < sh_x < 2 * ms_h - 1:
-                logm1 = np.log(res[sh_x-1, sh_y])
-                logp1 = np.log(res[sh_x+1, sh_y])
+                logm1 = safelog(res[sh_x-1, sh_y])
+                logp1 = safelog(res[sh_x+1, sh_y])
                 dshift = (logm1 - logp1)/(2 * logm1 + 2 * logp1 - four_log)
                 sh_x_n -= dshift
 
