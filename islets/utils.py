@@ -890,6 +890,22 @@ def saveRois(regions,outDir,filename="",movie=None,col=["trace"],formats=["vienn
 #         feedback += ["ERROR: "+ exc_info().__repr__()]
         return feedback
 
+def add_protocol(ax, protocol, color="grey"):
+    yl = ax.get_ylim()
+    dy = yl[1]-yl[0]
+    offset = yl[0]/2 - dy/20
+    for comp, df in protocol.groupby("compound"):
+        for ii in df.index:
+            t0,t1 = df.loc[ii].iloc[-2:]
+            conc = df.loc[ii,"concentration"]
+            x,y = [t0,t1,t1,t0,t0],[-1,-1,-2,-2,-1]
+            y = np.array(y)
+            y = y*dy/20 + offset
+            ax.fill(x,y,color=color,alpha =.3)
+            ax.text(t0,y[:-1].mean(), " "+conc,va="center", ha="left")
+            ax.plot(x,y,color=color,)
+        ax.text(df.t_begin.min(),y[:-1].mean(),comp+" ",va="center", ha="right")
+        offset -= 1.3*dy/20
 
 def getGraph_of_ROIs_to_Merge(df,rreg, plot=False, ax=None,lw=.5,arrow_width=.5):
     if plot:
