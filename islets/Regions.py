@@ -1484,18 +1484,9 @@ class Regions:
         :param plot_raster: Trigger to plot the raster of the given rois at the bottom.
         :return: None
         """
-        def determine_offset(n_rebin: int) -> float:
-            new_offset = 0
-            for roi in rois:
-                trace = rebin(self.df.loc[roi, 'detrended'], n_rebin)
-                diff = trace.max() - trace.min()
-                diff /= 2
-                if diff > new_offset:
-                    new_offset = diff
-            return new_offset
 
-        original_font_size = plt.rcParams['font.size']
-        plt.rcParams['font.size'] = 25
+        # original_font_size = plt.rcParams['font.size']
+        # plt.rcParams['font.size'] = 25
 
         fig: Optional[plt.Figure] = None
         spec: Optional[GridSpec] = None
@@ -1507,7 +1498,7 @@ class Regions:
         ax6: Optional[Axes] = None
 
         if plot_sum and plot_raster:
-            fig = plt.figure(figsize=(32, 28), constrained_layout=True)
+            fig = plt.figure(figsize=(16, 14), constrained_layout=True)
             spec = GridSpec(figure=fig,
                             ncols=2, nrows=4,
                             width_ratios=[1, 3],
@@ -1515,7 +1506,7 @@ class Regions:
             ax5 = fig.add_subplot(spec[2, 1])
             ax6 = fig.add_subplot(spec[3, 1])
         elif plot_sum or plot_raster:
-            fig = plt.figure(figsize=(32, 24), constrained_layout=True)
+            fig = plt.figure(figsize=(16, 12), constrained_layout=True)
             spec = GridSpec(figure=fig,
                             ncols=2, nrows=3,
                             width_ratios=[1, 3],
@@ -1525,8 +1516,8 @@ class Regions:
             elif plot_raster:
                 ax6 = fig.add_subplot(spec[2, 1])
         else:
-            fig = plt.figure(figsize=(32, 16), constrained_layout=True)
-            GridSpec(figure=fig,
+            fig = plt.figure(figsize=(16, 8), constrained_layout=True)
+            spec = GridSpec(figure=fig,
                      ncols=2, nrows=2,
                      width_ratios=[1, 3], height_ratios=[1, 1])
 
