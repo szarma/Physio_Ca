@@ -804,9 +804,18 @@ def load_json(path):
         setattr(regions, k, data[k])
         del data[k]
     regions.df["peak"] = regions.df["peak"].apply(tuple)
+    regions.df["pixels"] = [[tuple(px) for px in pxs] for pxs in regions.df["pixels"]]
+    regions.df.index=list([int(j) for j in regions.df.index])
     regions.image = np.array(regions.image)
     regions.time = np.array(regions.time)
+    if hasattr(regions,"metadata"):
+        regions.metadata = pd.Series(regions.metadata)
     regions.update()
+    try:
+        protocolFile = os.path.join(pickleDir, [f for f in os.listdir(pickleDir) if "protocol" in f][0])
+        regions.import_protocol(protocolFile)
+    except:
+        pass
     return regions
 
 def saveRois(regions,outDir,filename="",movie=None,col=["trace"],formats=["vienna"],add_date=True):
