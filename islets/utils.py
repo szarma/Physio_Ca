@@ -780,8 +780,10 @@ def gentle_motion_correct(movie, m_rshifted, freqMC=1, max_dev=(5,5), plot_name=
         tmpm = movie[sl].astype("float32").apply_shifts(shifts[sl])
         tmpm[tmpm < 0] = 0
         tmpm[tmpm > maxv] = maxv
-        tmpm = np.round(tmpm)
-        m_rshifted[sl] = tmpm
+        # tmpm = np.round(tmpm)
+        # tmpm = dst.poisson.rvs(mu=tmpm)
+        # tmpm[tmpm > maxv] = maxv
+        m_rshifted[sl] = tmpm.astype(m_rshifted.dtype)
     print ("Done.")
     # return m_rshifted
 
