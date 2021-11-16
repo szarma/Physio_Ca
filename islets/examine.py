@@ -75,7 +75,7 @@ def examine(self,
             style={"display":"inline-block","width":"200px"},
         ),
         html.Div([
-            html.Button('Mark for merging', id='mark-button', n_clicks=0,style={"display":"block" if debug else "none"}),
+            html.Button('Mark for merging', id='mark-button', n_clicks=0,style={"display":"block"}),
             html.Button('Merge', id='merge-button', n_clicks=0),], 
             style={"display":"inline-block","width":"200px"},
         ),
@@ -255,7 +255,12 @@ def examine(self,
                     self.df["tag"] = [""]*len(self.df)
                 selected = list(eval(selectedData))
                 for i in selected:
-                    self.df.loc[i,"tag"] = "|".join([self.df.loc[i,"tag"]]+tags).strip("|")
+                    for tag in tags:
+                        if tag in self.df.loc[i,"tag"]:
+                            continue
+                        else:
+                            tagExists = bool(len(self.df.loc[i,"tag"]))
+                            self.df.loc[i,"tag"] += "|"*int(tagExists)+tag
                 return f"Successfully applied tags for {len(selected)} rois."
         except:
             return str(exc_info())
@@ -354,25 +359,23 @@ def examine(self,
                     out += [html.Br(), "%i rois removed."%(nremoved)]
                     self.update()
             if mode in ["discard_sel","discard_unsel","plot"]:
-#                 if mode=="discard_sel":
-#                     seeIndices = np.array([j for j in seeIndices if j not in selectedIndices])
-#                 else:
-#                     seeIndices = np.intersect1d(seeIndices, selectedIndices)
                 seeIndices = [isee for isee in seeIndices if isee in self.df.index]
+                out += [html.Br(),seeIndices.__repr__()]
                 fig = showRoisOnly(self, im=self.statImages[imagemode], showall=True, lw=lw, indices=seeIndices)
+        
             ##########
 #             if mode=="plot":
 #                 fig = showRoisOnly(self, indices=self.df.index, im=self.statImages[imagemode], showall=False)
             ##########
             if mode=="mark" or (mode=="merge" and (not hasattr(self,"mergeGraph"))):
-                p2b = getPeak2BoundaryDF(self.df.loc[selectedIndices])
+                p2b = getPeak2BoundaryDF(self.df.loc[selectedIndices], distTh=np.inf)
+                p2b = p2b[p2b[["i","j"]].isin(selectedIndices).all(axis=1)]
                 gph = getGraph_of_ROIs_to_Merge(p2b[["i","j"]],self)
                 self.mergeGraph = gph
             if mode=="mark":
-                A = adjacency_matrix(gph, nodelist=range(len(self.df)))
                 out += [ html.Br(), "If you now merge, this is how rois will be merged"]
                 fig = showRoisOnly(self, indices=selectedIndices, im=self.statImages[imagemode], showall=True, lw=lw)
-                for j,i in zip(*A.nonzero()):
+                for j,i in self.mergeGraph.edges:
                     fig.add_annotation(
                       x=self.df.loc[i,"peak"][1],  # arrows' head
                       y=self.df.loc[i,"peak"][0],  # arrows' head
@@ -394,7 +397,7 @@ def examine(self,
                 dn = self.mergeBasedOnGraph(self.mergeGraph)
                 del self.mergeGraph
                 out += [ html.Br(), f"{dn} rois merged into existing roi(s)"]
-                fig = showRoisOnly(self, indices=self.df.index, im=self.statImages[imagemode], showall=True, lw=lw)
+                fig = showRoisOnly(self, im=self.statImages[imagemode], showall=True, lw=lw)
             
 
         except:
