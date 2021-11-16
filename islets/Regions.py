@@ -1654,23 +1654,23 @@ class Regions:
         plt.rcParams['font.size'] = original_font_size
         fig.show()
 
-    def plotTraces(regions, indices, axratios = [1,2], figsize=5, freqShow=2, col="detrended",Offset=5,separate=False):
+    def plotTraces(regions, indices, axratios=[1,2], figsize=5, freqShow=2, col="detrended",Offset=5,separate=False, axs=None, protocol=True):
         if col not in regions.df.columns:
             if col=="detrended":
                 regions.detrend_traces()
             else:
                 raise ValueError(f"{col} not found in the dataframe.")
-            
-        xratios = np.array([.1,axratios[0],.1,axratios[1],.1])
-        yratios = xratios[:3]
-        xr = xratios/sum(xratios)
-        yr = yratios/sum(yratios)
+        if axs is None:
+            xratios = np.array([.1,axratios[0],.1,axratios[1],.1])
+            yratios = xratios[:3]
+            xr = xratios/sum(xratios)
+            yr = yratios/sum(yratios)
 
-        fig = plt.figure(figsize=(xratios.sum()*figsize,yratios.sum()*figsize))
-        axs = [
-            fig.add_axes([xr[0],yr[0],xr[1],yr[1]]),
-            fig.add_axes([xr[:3].sum(),yr[0],xr[3],yr[1]]),
-        ]
+            fig = plt.figure(figsize=(xratios.sum()*figsize,yratios.sum()*figsize))
+            axs = [
+                fig.add_axes([xr[0],yr[0],xr[1],yr[1]]),
+                fig.add_axes([xr[:3].sum(),yr[0],xr[3],yr[1]]),
+            ]
         regions.plotEdges(ax=axs[0],lw=.5,separate=separate)
         regions.plotEdges(ax=axs[0],ix=indices, separate=True, fill=True, alpha=.5, image=False)
         regions.plotPeaks(ax=axs[0],ix=indices, labels=True)
@@ -1700,7 +1700,7 @@ class Regions:
         axs[0].set_yticks([])
         axs[0].set_xticks([])
         for sp in ["left","right","top"]: axs[1].spines[sp].set_visible(False)
-        if not hasattr(regions,"protocol"):
+        if not protocol or not hasattr(regions,"protocol"):
             return None
         yl = axs[1].get_ylim()
         dy = yl[1]-yl[0]
