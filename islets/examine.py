@@ -147,9 +147,11 @@ def examine(self,
                 value=np.round(self.df["detrended"].apply(np.std).mean()*5) if "detrended" in self.df.columns else 0 ,
                 style={"display":"inline-block","margin-right":"20px","margin-left":"3px"}
              ),
-            html.Div(dcc.Checklist(id="sum-checklist",
-                options = [{"label":"sum","value":"sum"}],
-                value=[]),style={"display":"inline-block"}),
+            html.Div([
+                dcc.Checklist(id="sum-checklist",
+                    options = [{"label":"sum","value":"sum"},{"label":"remove median","value":"remove"}],
+                    value=["remove"]),
+            ],style={"display":"inline-block"}),
         ]),
     ])
     initNcs = {"discard_unsel":0,"discard_sel":0,"mark":0,"merge":0}
@@ -360,7 +362,7 @@ def examine(self,
                     self.update()
             if mode in ["discard_sel","discard_unsel","plot"]:
                 seeIndices = [isee for isee in seeIndices if isee in self.df.index]
-                out += [html.Br(),seeIndices.__repr__()]
+                # out += [html.Br(),seeIndices.__repr__()]
                 fig = showRoisOnly(self, im=self.statImages[imagemode], showall=True, lw=lw, indices=seeIndices)
         
             ##########
@@ -433,7 +435,8 @@ def examine(self,
                 selectedIndices = np.intersect1d(selectedIndices, shownIndices)
                 nRebin=int(nRebin)
                 offset=float(offset)
-                toSum = bool(len(checklist))
+                toSum = "sum" in checklist
+                removeMedian = "remove" in checklist
                 if not toSum:
                     if "activity" in self.df.columns:
                         selectedIndices = list(
@@ -480,8 +483,23 @@ def examine(self,
                             try:
                                 cl = self.df.loc[ix,"color"]
                             except:
-                                cl = MYCOLORS[ix%len(MYCOLORS)]
-                        fg.add_trace(go.Scatter(x=t,y=y+iy*offset,line_width=.7,line_color=cl,hovertext=f"{col} [ix={ix}]",hoverinfo="text", ),row=1,col=1)
+                                cl = MYCOLORS[ix%len(MYCOLORS)  ]
+                        if removeMedian:
+                            y = y-np.median(y)
+                        fg.add_trace(
+                            go.Scatter(
+                                x=t,
+                                y=y+iy*offset,
+                                line_width=.7,
+                                line_color=cl,
+                                hovertemplate = "t = %{x}",
+                                # hovertext=f"{col} [ix={ix}]",
+                                # hoverinfo="text",
+                                name=f"{col}[{ix}]"
+                            ),
+                            row=1,
+                            col=1
+                        )
                 it = 0
                 treatments = [tr for tr in treatments if tr[:3].lower()!="glu"] + [tr for tr in treatments if tr.lower()[:3]=="glu"]
                 for treat in treatments:
@@ -529,6 +547,14 @@ def examine(self,
                 fg.update_yaxes(showline=True, linewidth=1, linecolor='black',mirror=True,
                                 ticks="outside", ticklen=2, row=1, col=1,
                                 showgrid=False)
+                # fg.update_layout(hovermode = 'x')
+                fg.update_xaxes(showspikes = True,
+                                spikethickness = 1,
+                                spikedash = "solid",
+                                # spikecolor = "green",
+                                spikesnap = "cursor",
+                                spikemode = "across"
+                                )
                 try:
                     fg.update_xaxes(range=[rlod["xaxis.range[0]"], rlod["xaxis.range[1]"]])
                     fg.update_yaxes(range=[rlod["yaxis.range[0]"], rlod["yaxis.range[1]"]])
