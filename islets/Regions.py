@@ -1645,13 +1645,25 @@ class Regions:
         plt.rcParams['font.size'] = original_font_size
         fig.show()
 
-    def plotTraces(regions, indices, axratios=[1,2], figsize=5, freqShow=2, col="detrended",Offset=5,separate=False, axs=None, protocol=True):
-        if col not in regions.df.columns:
+    def plotTraces(self, indices, axratios=[1, 2],
+                   figsize=5,
+                   freqShow=2,
+                   col="detrended",
+                   Offset=5,
+                   separate=False,
+                   axs=None,
+                   protocol=True,
+                   roiColor="black",
+                   roiAlpha = .6,
+                   traceColor = None
+                   ):
+        if col not in self.df.columns:
             if col=="detrended":
-                regions.detrend_traces()
+                self.detrend_traces()
             else:
                 raise ValueError(f"{col} not found in the dataframe.")
-        if axs is None:
+        createAxes = axs is None
+        if createAxes:
             xratios = np.array([.1,axratios[0],.1,axratios[1],.1])
             yratios = xratios[:3]
             xr = xratios/sum(xratios)
@@ -1662,55 +1674,51 @@ class Regions:
                 fig.add_axes([xr[0],yr[0],xr[1],yr[1]]),
                 fig.add_axes([xr[:3].sum(),yr[0],xr[3],yr[1]]),
             ]
-        regions.plotEdges(ax=axs[0],lw=.5,separate=separate)
-        regions.plotEdges(ax=axs[0],ix=indices, separate=True, fill=True, alpha=.5, image=False)
-        regions.plotPeaks(ax=axs[0],ix=indices, labels=True)
-        nr = int(np.round(regions.Freq/freqShow))
+        if hasattr(axs,"__iter__"):
+            roiAxes, traceAxes = axs[:2]
+            self.plotEdges(ax=roiAxes, lw=.5, separate=separate, color=roiColor)
+            self.plotEdges(ax=roiAxes, ix=indices, separate=True, fill=False, alpha=roiAlpha, image=False, lw=1.5)
+            self.plotPeaks(ax=roiAxes, ix=indices, labels=True)
+        else:
+            traceAxes = axs
+
+        nr = int(np.round(self.Freq / freqShow))
         if nr==0:
             nr=1
-        xs = np.vstack(regions.df.loc[indices,col].values)
+        xs = np.vstack(self.df.loc[indices, col].values)
         if nr>1:
-            t = rebin(regions.time, nr)
+            t = rebin(self.time, nr)
             xs = rebin(xs,nr,1)
         else:
-            t = regions.time
+            t = self.time
 
         for i in range(len(xs)):
             xs[i] = xs[i]-np.median(xs[i])
         offset = 0
-        if "color" in regions.df.columns:
-            colors = regions.df.loc[indices,"color"]
+        if traceColor is None:
+            if "color" in self.df.columns:
+                colors = self.df.loc[indices, "color"]
+            else:
+                colors = [MYCOLORS[ix%len(MYCOLORS)] for ix in indices]
         else:
-            colors = [MYCOLORS[ix%len(MYCOLORS)] for ix in indices]
+            colors = [traceColor]*len(indices)
         for x,ix,c in zip(xs, indices, colors):
-            axs[1].plot(t,x+offset,lw=.5,color=c)
-            axs[1].text(0,offset,str(ix)+" ",color=c,ha="right")
+            traceAxes.plot(t,x+offset,lw=.5,color=c)
+            traceAxes.text(0,offset,str(ix)+" ",color=c,ha="right")
             offset += xs.std()*Offset
-        axs[1].set_yticks([])
-        axs[1].set_xlabel("time [s]")
-        axs[0].set_yticks([])
-        axs[0].set_xticks([])
-        for sp in ["left","right","top"]: axs[1].spines[sp].set_visible(False)
-        if not protocol or not hasattr(regions,"protocol"):
+        if createAxes:
+            axs[1].set_yticks([])
+            axs[1].set_xlabel("time [s]")
+            axs[0].set_yticks([])
+            axs[0].set_xticks([])
+            for sp in ["left","right","top"]: axs[1].spines[sp].set_visible(False)
+        if not protocol or not hasattr(self, "protocol"):
             return None
-        yl = axs[1].get_ylim()
-        dy = yl[1]-yl[0]
-        offset = yl[0]/2 - dy/20
+        else:
+            from .utils import add_protocol
+            add_protocol(traceAxes, self.protocol)
 
-        for comp, df in regions.protocol.groupby("compound"):
-            for ii in df.index:
-                t0,t1 = df.loc[ii].iloc[-2:]
-                conc = df.loc[ii,"concentration"]
-                x,y = [t0,t1,t1,t0,t0],[-1,-1,-2,-2,-1]
-                y = np.array(y)
-                y = y*dy/20 + offset
-                plt.fill(x,y,color="grey",alpha =.3)
-                plt.text(t0,y[:-1].mean(), " "+conc,va="center", ha="left")
-                plt.plot(x,y,color="grey",)
 
-            plt.text(df.t_begin.min(),y[:-1].mean(),comp+" ",va="center", ha="right")
-            offset -= 1.3*dy/20
-            
     def plot_trace(regions, indices, axratios = [1,2.5], figsize=5, freqShow=2, cols=["trace"], Offset=10, separate=False,showProtocol=True, spacing=.1):
         for col in cols:
             if col not in regions.df.columns:
