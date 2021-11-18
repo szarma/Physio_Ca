@@ -94,18 +94,24 @@ class HBclass:
         shapes = []
         centers = []
         for k in range(len(offsets)):
-            shape, center = make_hexagon(
-                hexagon_vertices,
-                offsets[k],
-                "blue"#cell_color[k]
-            )
-            shapes.append(shape)
-            centers.append(center)
+            if counts[k]:
+                shape, center = make_hexagon(
+                    hexagon_vertices,
+                    offsets[k],
+                    "blue"#cell_color[k]
+                )
+                shapes.append(shape)
+                centers.append(center)
 
         # plcmap = mpl_to_plotly(plt.cm.hot, 101)
 
         X, Y = zip(*centers)
-        self.df["bin_id"] = np.argmin(distance_matrix(self.df.values,centers),1)
+        xrescale = max(X)-min(X)
+        yrescale = max(Y)-min(Y)
+        centers = np.array(centers)
+        rescaled_centers = np.transpose([centers.T[0]/xrescale, centers.T[1]/yrescale])
+        rescaled_points = np.transpose([self.df[xshow].values/xrescale, self.df[yshow].values/yrescale])
+        self.df["bin_id"] = np.argmin(distance_matrix(rescaled_points,rescaled_centers),1)
         text = [f'x: {round(X[k],2)}<br>y: {round(Y[k],2)}<br>counts: {int(counts[k])}<br>bin id: {k}' for k in range(len(X))]
         maxgsize = hexbin_kwargs.get("gridsize",100)
         if not isinstance(maxgsize, int):
@@ -119,7 +125,7 @@ class HBclass:
                      marker=dict(size=350/maxgsize*sizeScaling, 
                                  # symbol="hexagon",
                                  color=np.log(1+counts) if hexbin_kwargs.get("bins")=="log" else counts, 
-                                #  colorscale="hot",
+                                 colorscale="hot",
                                 #  showscale=True,
                                 #  colorbar=dict(
                                 #              thickness=20,  
