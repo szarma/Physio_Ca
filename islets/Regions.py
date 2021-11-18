@@ -663,8 +663,8 @@ class Regions:
             if "pxUnit" in self.metadata:
                 txt += self.metadata["pxUnit"]
             ax.text((x0+x1)/2, y1+.3*(y1-y0), txt, va="center", ha="center", size=scaleFontSize)
-            
-    def plotPeaks(self, ix=None, ax=None, image=False, ms=3, labels=False,color=None, imkw_args={},absMarker=True, marker=".", **kwargs):
+
+    def plotPeaks(self, ix=None, ax=None, image=False, ms=3, labels=False,color=None, imkw_args={},absMarker=True, marker=".", location="peak",**kwargs):
         if ax is None:
             ax = plt.subplot(111)
         if image:
@@ -678,7 +678,10 @@ class Regions:
         else:
             sizes = ms * self.df.loc[ix,"size"]**.5
         for i,ms in zip(ix,sizes):
-            p = self.df.loc[i,"peak"]
+            if location=="peak":
+                p = self.df.loc[i,"peak"]
+            elif location=="center":
+                p = np.vstack(self.df.loc[i,"pixels"]).mean(0)
             if color is None:
                 try:
                     c = self.df.loc[i,"color"]
@@ -688,8 +691,8 @@ class Regions:
                 c = color
             ax.plot(*p[::-1],marker=marker,ms=ms,c=c, **kwargs)
             if labels:
-                ax.text(*p[::-1],s=" "+str(i),color=c, **kwargs)
-    
+                ax.text(*p[::-1],s=" "+str(i),color=c, ha="center",va="center",**kwargs)
+
     def calc_activity(self, timescales=[10, 100], zth=3, save=True):
         print ("calc_activity is deprecated, this will work for now, but will print this warning every time. Please use get_activity(...), which also supports timeframe restriction.")
         activity = np.zeros(len(self.df))
