@@ -16,6 +16,7 @@ def examine_events(self, spikeDF, x, y,
     name=None,
     fitDF=None,
     show_diagonal=False,
+    maxpoints = 1000
     ):
     if name is None:
         name = __name__
@@ -42,6 +43,8 @@ def examine_events(self, spikeDF, x, y,
     from dash import no_update
     
 #     time = self.time
+    if hasattr(self,"hb"):
+        del self.hb
     from .plotly_hexbin import HBclass
     self.hb = HBclass(spikeDF,x=x,y=y)
     scatterImage = self.hb._hexbin(gridsize=50,return_figure=True)
@@ -50,27 +53,14 @@ def examine_events(self, spikeDF, x, y,
         if "fshape" in spikeDF.columns:
             fitDF = spikeDF
     if show_diagonal:
-#         minv = min(
-#             scatterImage.layout["xaxis"]["range"][0],
-#             scatterImage.layout["yaxis"]["range"][0],
-#             )
-#         maxv = min(
-#             scatterImage.layout["xaxis"]["range"][1],
-#             scatterImage.layout["yaxis"]["range"][1],
-#             )
         maxv = np.nanmax(self.hb.df.iloc[:,:2].values)
         minv = np.nanmin(self.hb.df.iloc[:,:2].values)
         scatterImage.add_trace(go.Scatter(x=[minv,maxv], y=[minv,maxv], mode="lines",line_color="grey", line_width=.7,showlegend=False,name="y=x"))
-#     if cols2show is None:
-#         cols2show = [
-#             c for c in self.df.columns if \
-#             "trace" in c \
-#             or "slower" in c
-#                     ]
+
     if mode=="jupyter":
         app = Dash(name,
                   width=1500,
-                  height=500,
+                  height=600,
                  )
     else:
         app = Dash(name)
@@ -79,14 +69,7 @@ def examine_events(self, spikeDF, x, y,
     app.layout = html.Div([
         html.Div([
             dcc.Graph(id="scatterplot", figure = scatterImage),
-#             html.Pre(id="selected",
-#                      style={"overflowX":"scroll",
-#                             "overflowY":"scroll",
-#                             "border": "thin navy solid",
-#                             "width":"30%",
-#                             "height":"200px",
-#                             "display":"inline-block"
-#             }),
+            html.Div(id="selected-indices-feedback",style = {"width": "%ipx"%scatterImage.layout.width}),
             dcc.Input(id="selected-indices",
                      style={"border": "thin navy solid",
                             "width":"99%",
@@ -118,22 +101,39 @@ def examine_events(self, spikeDF, x, y,
             
     @app.callback(
 #         Output("selected", "children"),
-        Output("selected-indices", "value"),
+        [Output("selected-indices", "value"),
+         Output("selected-indices-feedback", "children")],
         [Input("scatterplot", "selectedData"),],
         )
     def showSelected(selData):
+        output = None
+        feedback = ""
         try:
             if selData is None:
-                return None
+                output = None
+                feedback = "Use the graph tools (lasso, rectangle) from the upper right corner to select points to show on the right plot"
             else:
                 bin_ids = [pt["pointIndex"] for pt in selData["points"]]
                 # return json.dumps(bin_ids, indent=2)   
                 orig_indices = list(self.hb.df[
                     self.hb.df.bin_id.isin(bin_ids)
                 ].index)
-                return json.dumps(orig_indices)
+                if len(orig_indices)>maxpoints:
+                    show_indices = orig_indices[::(len(orig_indices)//maxpoints+1)]
+                    feedback = f"Uh, there is {len(orig_indices)} here. Showing them all will probably crash your browser. I'll show you a subset of {len(show_indices)}."
+                else:
+                    show_indices = orig_indices
+                    feedback = f"{len(show_indices)} data point(s) selected."
+                output = json.dumps(show_indices)
+
         except:
-            return "Error: "+str(exc_info())
+            exc_type, exc_value, exc_traceback = exc_info()
+            feedback += "\nError: "+str(exc_type)
+            feedback += "\nvalue: " + str(exc_value)
+            for el in traceback.format_tb(exc_traceback):
+                for el_ in str(el).splitlines():
+                    feedback += "\n"+el_
+        return output, feedback
         
     
     @app.callback(
