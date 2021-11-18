@@ -582,7 +582,7 @@ class Regions:
                   image=True,
                   imkw_args=None,
                   separate=False,
-                  color="darkred",
+                  color=None,
                   lw=None,
                   alpha=1,
                   fill=False,
@@ -618,9 +618,11 @@ class Regions:
         smoothness = min(list(fs)+[3] )
         if separate:
             for i in ix:
-                try:
+                if color is not None:
+                    c = color
+                elif "color" in self.df.columns:
                     c = self.df.loc[i,"color"]
-                except:
+                else:
                     c = MYCOLORS[i%len(MYCOLORS)]
                 points = self.df.loc[i,"boundary"]+self.df.loc[i,"boundary"][:3]
                 if spline:
@@ -633,6 +635,8 @@ class Regions:
                 if fill:
                     ax.fill(x,y,c=c,alpha=alpha*.8,**kwargs)
         else:
+            if color is None:
+                color="darkred"
             tmp = []
             for el in self.df.loc[ix,"boundary"]:
                 if spline:
@@ -648,7 +652,7 @@ class Regions:
             dim = self.image.shape
             ax.set_xlim(-.5,dim[1]-.5)
             ax.set_ylim(dim[0]-.5, -.5,)
-            
+
         if scaleFontSize<=0: return None
         if hasattr(self, "metadata") and "pxSize" in self.metadata:
             lengths = [10,20,50,100,200,500]
