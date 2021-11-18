@@ -6,12 +6,14 @@ from scipy.stats import median_abs_deviation
 
 
 def define_legs(events, legs):
+    if "leg" in events.columns:
+        del events["leg"]
     if "tend" not in events.columns:
         events["tend"] = events['t0']+events["halfwidth"]
     for leg in legs:
         t0,tend = legs[leg]
         indices = events.query(f"t0>{t0} and tend<{tend}").index
-        events.loc[indices,"leg"] = leg
+        events.loc[indices,"leg"] = [leg]*len(indices)
     events['leg'] = events['leg'].astype("category")
 
 def event_diff(events_0, events_1, hw_toll=.2):
@@ -39,7 +41,7 @@ def sequential_filtering(
         z_th=3,
         npass=3,
         debug=False,
-        rescale_z=True
+        rescale_z="hard"
         ):
     if timescales is None:
         timescales = 2. ** np.arange(-1, 20, .25)
@@ -64,8 +66,13 @@ def sequential_filtering(
         from .numeric import mad2std
         if "correctZ" in regions.df.columns:
             regions.df["zScore_"+k] = [regions.df.loc[ix,"zScore_"+k]/regions.df.loc[ix,"correctZ"] for ix in regions.df.index]
-        if rescale_z:
-#             corr = regions.df["zScore_" + k].apply(median_abs_deviation).median()*mad2std
+        if rescale_z=="hard":
+            rescale_factor = [ median_abs_deviation(z) * mad2std for z in regions.df["zScore_" + k] ]
+            if verbose:
+                print("correcting each z: mean %.3g, std %.3g"%(np.mean(rescale_factor), np.std(rescale_factor)))
+            regions.df["zScore_" + k] = [ z/rescale_factor[i] for i,z in enumerate(regions.df["zScore_" + k]) ]
+        if rescale_z=="soft":
+            # corr = regions.df["zScore_" + k].apply(median_abs_deviation).median()*mad2std
             corr = regions.df["zScore_" + k].apply(np.std).median()
             if verbose:
                 print("correcting z by", corr)
