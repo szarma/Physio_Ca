@@ -812,7 +812,8 @@ def load_json(path):
         regions.metadata = pd.Series(regions.metadata)
     regions.update()
     try:
-        protocolFile = os.path.join(pickleDir, [f for f in os.listdir(pickleDir) if "protocol" in f][0])
+        folder = os.path.split(path)[0]
+        protocolFile = os.path.join(folder, [f for f in os.listdir(folder) if "protocol" in f][0])
         regions.import_protocol(protocolFile)
     except:
         pass
@@ -890,22 +891,34 @@ def saveRois(regions,outDir,filename="",movie=None,col=["trace"],formats=["vienn
 #         feedback += ["ERROR: "+ exc_info().__repr__()]
         return feedback
 
-def add_protocol(ax, protocol, color="grey"):
+def add_protocol(ax, protocol, color="lightgrey", location="bottom"):
     yl = ax.get_ylim()
     dy = yl[1]-yl[0]
-    offset = yl[0]/2 - dy/20
+    if location not in ["top","bottom","all"]:
+        raise ValueError("location can be either 'top' or 'bottom'")
+    if location=="all":
+        offset = 0
+    else:
+        dy = dy/20
+    if location=="top":
+        offset = yl[1] + dy
+    if location=="bottom":
+        offset = yl[0] - dy
+
     for comp, df in protocol.groupby("compound"):
         for ii in df.index:
-            t0,t1 = df.loc[ii].iloc[-2:]
+            t0,t1 = df.loc[ii,["t_begin","t_end"]]
             conc = df.loc[ii,"concentration"]
-            x,y = [t0,t1,t1,t0,t0],[-1,-1,-2,-2,-1]
+            x,y = [t0,t1,t1,t0,t0],[1,1,0,0,1]
             y = np.array(y)
-            y = y*dy/20 + offset
-            ax.fill(x,y,color=color,alpha =.3)
-            ax.text(t0,y[:-1].mean(), " "+conc,va="center", ha="left")
-            ax.plot(x,y,color=color,)
+            y = y*dy + offset
+            c = df.loc[ii].get("color",color)
+            ax.fill(x,y,color=c,)
+            ax.text(t0,y.mean()-dy*0.15, " "+conc,va="center", ha="left")
+            ax.plot(x,y,color="black",lw=1)
         ax.text(df.t_begin.min(),y[:-1].mean(),comp+" ",va="center", ha="right")
-        offset -= 1.3*dy/20
+        offset += 1.3*dy*(-1)**int(location=="bottom")
+
 
 def getGraph_of_ROIs_to_Merge(df,rreg, plot=False, ax=None,lw=.5,arrow_width=.5):
     if plot:
