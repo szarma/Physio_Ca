@@ -364,7 +364,7 @@ class Regions:
                 from .utils import split_unconnected_rois
                 # TODO: this needs review
                 B_ = split_unconnected_rois(B_, self.image)
-        
+
         self.df = pd.DataFrame(OrderedDict([
             ("peak",  list(B_.keys())),
             ("pixels",list(B_.values()))
@@ -443,7 +443,7 @@ class Regions:
         #     except:
         #         pass
         return len(toDrop)
-    
+
     def reassign_peaks(self, image, write=True):
         newPeaks = []
         newValues = []
@@ -460,7 +460,7 @@ class Regions:
             # self.update()
         else:
             return newPeaks, newValues
-    
+
     def get_fov_trace(self, showFreq = 2, pixels=None):
         from .numeric import fit_bleaching, rebin
         i0, ie = self.FrameRange
@@ -516,8 +516,8 @@ class Regions:
             ia += 1
         if plot:
             plt.tight_layout()
-    
-        
+
+
     def update(self, movie_=None):
         self.df["size"] = self.df["pixels"].apply(len)
         self.calcEdges()
@@ -533,7 +533,7 @@ class Regions:
                 self.calcTraces()
             except:
                 pass
-    
+
     def calcEdgeIds(self):
         dround = np.vstack([(-1,-1),(-1, 1),( 1, 1),( 1,-1),(-1,-1)])
         dedges = []
@@ -556,7 +556,7 @@ class Regions:
                     if len(edgeID[edge])==2 and tuple(edgeID[edge][0])==tuple(edgeID[edge][1]):
                         del edgeID[edge]
         self.edgeIDs = edgeID
-    
+
     def calcEdges(self):
         invEdgeID = OrderedDict()
 #         if "edgeIDs" not in locals():
@@ -567,7 +567,7 @@ class Regions:
                     invEdgeID[p] = []
                 invEdgeID[p] += [k]
         self.df["edges"] = [invEdgeID[p] for p in self.df.peak]
-    
+
     def getEdges(self,ix=None):
         if ix is None:
             out = sum(self.df.edges,[])
@@ -575,7 +575,7 @@ class Regions:
             out = sum(self.df.loc[ix,"edges"],[])
         out = np.unique(out,axis=0)
         return out
-    
+
     def plotEdges(self,
                   ix=None,
                   ax=None,
@@ -750,7 +750,7 @@ class Regions:
         rgbs = (256*rgbs).astype(int)
         rgbs = np.minimum(rgbs,255)
         self.df["color"] = ['#%02x%02x%02x' % tuple(rgb) for rgb in rgbs]
-        
+
     def change_frequency(self, fr=2):
         from .movies import movie as cmovie
         traces = np.vstack(self.df.trace)
@@ -779,7 +779,7 @@ class Regions:
                         neighborsMap[e1] += [e2]
         self.df["neighbors"] = [[self.peak2idx[pp] for pp in neighborsMap[p]] for p in self.df["peak"]]
         self.df["Nneighbors"] = self.df["neighbors"].apply(len)
-        
+
     def purge_lones(self,min_size=4, verbose=False):
         toDel = []
         for i in self.df.index:
@@ -788,7 +788,7 @@ class Regions:
         self.df = self.df.drop(index=toDel)
         if verbose:
             print (f"deleted {len(toDel)} rois. {len(self.df)} remain.")
-    
+
     def calcTraces(self, movie_=None, FrameRange=None):
         if movie_ is None:
             movie_ = self.movie
@@ -809,13 +809,13 @@ class Regions:
         time = np.arange(len(movie_))/movie_.fr
         self.time = time[i0:ie]
         self.Freq = movie_.fr
-    
+
     def reset_filtered(self):
         for col in self.df.columns:
             if "slower" in col or "faster" in col or "zScore" in col:
                 del self.df[col]
         self.showTime = {}
-        
+
     def detrend_traces(self,method="debleach", timescale=None):
 #         from .numeric import mydebleach
 #         traces = np.vstack(self.df.trace.values)
@@ -931,7 +931,7 @@ class Regions:
             ax.grid()
 
         self.TwoParFit = k,n
-    
+
     def slow_filter_traces(self,ironScale, n_processes=10, percentile = [10.], calcStd=False,
                            avg=True, verbose=False, write=True, indices=None, autorebin=True):
         from .numeric import lowPass
@@ -957,11 +957,11 @@ class Regions:
         if wIron%2==0:
             wIron += 1
         if avg:
-            def iterf(x_): 
+            def iterf(x_):
                 out = lowPass(x_, wIron, wIron, percentile)
                 return out
         else:
-            def iterf(x_): 
+            def iterf(x_):
                 out = lowPass(x_, wIron, perc=percentile)
                 return out
         if indices is None:
@@ -993,17 +993,17 @@ class Regions:
                 self.df[k] = list(tmp)
         else:
             return fast, slow, zScore
-            
-            
+
+
 #         def iterf(x_):
 #             mad2std = 1.4826
 #             out = mad2std*lowPass(np.abs(x_),wIron,wIron*2+1,50.)
 #             return out
 #         if calcStd:
 #             self.df["faster_%g_std"%ironScale] = multi_map(iterf,self.df["faster_%g"%ironScale].values,processes=n_processes)
-    
-    
-    
+
+
+
     def prep_filtering(self,
                        ironTimeScale,
                        Npoints=None,
@@ -1032,7 +1032,7 @@ class Regions:
             trend = C.trend.values
         else:
             raise ValueError("usecol can only be a 'trace' (or 'trace_*' or 'detrended'")
-            
+
         if Nrebin>1:
             freq = freq/Nrebin
             data = rebin(data, Nrebin, axis=1)
@@ -1056,7 +1056,7 @@ class Regions:
             "Nrebin":  Nrebin,
             "filter":  sf,
         }
-    
+
     def mean2std_funct(self, absmean, reg=3):
         absmean = np.maximum(absmean, reg)
         if hasattr(self, "TwoParFit"):
@@ -1067,7 +1067,7 @@ class Regions:
         else:
             var = absmean
         return var**.5
-    
+
     def fast_filter_traces(self,
                             ironTimeScale,
                             filt_cutoff=3,
@@ -1152,7 +1152,7 @@ class Regions:
             self.df["zScore_%g"%ironTimeScale] = list(z)
         else:
             return np.array(slower), np.array(faster), z
-    
+
 #     def fast_filter_traces(self,
 #                            ironTimeScale,
 #                            filt_cutoff=3,
@@ -1270,7 +1270,7 @@ class Regions:
         except:
             self.raster = {}
         self.raster[k] = zScores>z_th
-        
+
     def events2raster(self, ts, npoints = 1000, onlyRaster=True, z_th = 3):
         k = "%g"%ts
         try:
@@ -1302,7 +1302,7 @@ class Regions:
         })
             # fig.update_xaxes(showticklabels=False)
         return rr, fig
-        
+
     def detect_events(self, ts, z_th=3, Npoints=None, smooth=None, verbose=False, save=True, t=None, zScores=None, min_rel_hw=0.1, debug=False):
         from .numeric import runningAverage
         from scipy.signal import find_peaks, peak_widths
@@ -1359,7 +1359,7 @@ class Regions:
             self.events[k] = events
         else:
             return events
-        
+
     def show_scatter_events(self,ts,timeWindows=None,log_x=False):
         from plotly_express import scatter
         events = self.events[str(ts)].copy()
@@ -1397,7 +1397,7 @@ class Regions:
                       width=450,
                       height=450,
                      )
-#         fig.update_traces(hovertemplate='x: %{x} <br>y: %{y} <br>roi: %{roi}') # 
+#         fig.update_traces(hovertemplate='x: %{x} <br>y: %{y} <br>roi: %{roi}') #
         fig.update_layout({
         "plot_bgcolor":"white","margin":dict(l=10, r=10, t=20, b=40),"showlegend":False})
         fig.update_layout(
@@ -1408,7 +1408,7 @@ class Regions:
                 xanchor="right",
             )
         )
-        
+
         fig.update_xaxes(showline=True, linewidth=1, linecolor='black', mirror=True, ticks="outside", ticklen=2,
 #                          gridcolor="none"
                         )
@@ -1649,7 +1649,6 @@ class Regions:
         else:
             ax4.get_xaxis().set_visible(False)
 
-        plt.rcParams['font.size'] = original_font_size
         fig.show()
 
     def plotTraces(self, indices, axratios=[1, 2],
