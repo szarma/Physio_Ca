@@ -707,7 +707,12 @@ class Regions:
                 c = color
             ax.plot(*p[::-1],marker=marker,ms=ms,c=c, **kwargs)
             if labels:
-                ax.text(*p[::-1],s=" "+str(i),color=c, ha="center",va="center",**kwargs)
+                from matplotlib import patheffects
+                tx = ax.text(*p[::-1],s=" "+str(i),color=c, ha="center",va="center",**kwargs)
+                tx.set_path_effects([
+                    patheffects.Stroke(linewidth=1.5, foreground='w'),
+                    patheffects.Normal()
+                ])
 
     def calc_activity(self, timescales=[10, 100], zth=3, save=True):
         print ("calc_activity is deprecated, this will work for now, but will print this warning every time. Please use get_activity(...), which also supports timeframe restriction.")
