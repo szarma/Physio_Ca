@@ -41,7 +41,7 @@ def sequential_filtering(
         z_th=3,
         npass=3,
         debug=False,
-        rescale_z="hard"
+        rescale_z="soft"
         ):
     if timescales is None:
         timescales = 2. ** np.arange(-1, 20, .25)
