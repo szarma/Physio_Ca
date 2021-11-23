@@ -652,7 +652,19 @@ class Regions:
             dim = self.image.shape
             ax.set_xlim(-.5,dim[1]-.5)
             ax.set_ylim(dim[0]-.5, -.5,)
-
+        else:
+            try:
+                xlim, ylim = [np.nan] * 2, [np.nan] * 2
+                for ln in ax.lines:
+                    x, y = ln.get_data()
+                    xlim[0] = np.nanmin(list(x) + [xlim[0]])
+                    xlim[1] = np.nanmax(list(x) + [xlim[1]])
+                    ylim[0] = np.nanmin(list(y) + [ylim[0]])
+                    ylim[1] = np.nanmax(list(y) + [ylim[1]])
+                ax.set_ylim(ylim)
+                ax.set_xlim(xlim)
+            except:
+                pass
         if scaleFontSize<=0: return None
         if hasattr(self, "metadata") and "pxSize" in self.metadata:
             lengths = [10,20,50,100,200,500]
