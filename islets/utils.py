@@ -986,18 +986,18 @@ def plotRoi_to_be_connected(Gph, rreg, nplot=35):
                          node_size=30,
                          node_color="w",
                          pos=dict(zip(cl,pos)),
-                         font_size=6
+                         font_size=10
                         )
-        rreg.plotEdges(ax=ax,image=False,ix=cl, spline=False)
+        rreg.plotEdges(ax=ax,image=True,ix=cl, spline=False,scaleFontSize=0,bound=False)
         attr = sum(list(map(list,nx.attracting_components(gph))),[])
-        rreg.plotEdges(ax=ax,image=False,ix=attr,color="red",spline=False)
+        rreg.plotEdges(ax=ax,image=False,ix=attr,color="red",spline=False,scaleFontSize=0,bound=False)
         rreg.plotPeaks(ax=ax,image=False,ix=attr,color="red",ms=1)
         for sp in ax.spines: ax.spines[sp].set_visible(False)
         ax.set_aspect("equal")
 
     for i in range(i+1,axs.size):
         axs.flat[i].remove()
-    plt.subplots_adjust(wspace=0,hspace=0)
+    plt.subplots_adjust(wspace=3e-2,hspace=3e-2)
 
 
 def getPeak2BounAndTraceDF(C):
