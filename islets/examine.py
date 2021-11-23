@@ -246,10 +246,8 @@ def examine(self,
         Output("tag-feedback","children"),
         [Input("tag-button", "n_clicks"),],
         [State("tag-drop", "value"),
-         State("selected-rois", "value")
-        ],
+         State("selected-rois", "value")]
         )
-    
     def tag(n_clicks,tags,selectedData):
         try:
             if n_clicks>0:
@@ -305,9 +303,10 @@ def examine(self,
          Input("merge-button","n_clicks"),
          Input("selectspec-rois","value"),],
         [State("selected-rois", "value"),
-         State("hidden","children")]
+         State("hidden","children"),
+         State("roi-selector", "relayoutData")]
                  )
-    def mark_discard_callback(discard_unsel_clicks,discard_sel_clicks,mark_clicks,merge_clicks,selspec,selected,curnc):
+    def mark_discard_callback(discard_unsel_clicks,discard_sel_clicks,mark_clicks,merge_clicks,selspec,selected,curnc,rlout):
         out = ["-"*40]
         fig = getFigure()
         outcurns = "nothing"
@@ -354,7 +353,7 @@ def examine(self,
             if mode=="discard_sel":
                 nremoved = len(selectedIndices)
                 if nremoved>len(self.df)/2:
-                    out += [html.Br(), "Can remove max 50% of existing rois in one go. Sorry, this is for your own safety :-)"]
+                    out += [html.Br(), "Can not remove max 50% of existing rois in one go. Sorry, this is for your own safety :-)"]
                 else:
                     # out += [html.Br(), "removing: "+",".join(selectedIndices.astype(str))]
                     self.df.drop(index=selectedIndices, inplace=True)
@@ -400,7 +399,13 @@ def examine(self,
                 del self.mergeGraph
                 out += [ html.Br(), f"{dn} rois merged into existing roi(s)"]
                 fig = showRoisOnly(self, im=self.statImages[imagemode], showall=True, lw=lw)
-            
+
+
+            try:
+                fig.update_xaxes(range = [rlout["xaxis.range[0]"], rlout["xaxis.range[1]"]])
+                fig.update_yaxes(range = [rlout["yaxis.range[0]"], rlout["yaxis.range[1]"]])
+            except:
+                pass
 
         except:
             out += [html.Br(),"  "+str(exc_info())]
