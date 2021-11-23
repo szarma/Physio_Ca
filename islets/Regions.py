@@ -753,9 +753,10 @@ class Regions:
             self.df[saveAs] = activity
 
     def color_according_to(self,col,cmap="turbo"):
+        # check if column type is numeric
         if self.df[col].dtype.kind not in "biufc":
             raise ValueError(f"{col} elements not numeric.")
-        x = self.df[col].values.copy()
+        x = self.df[col].values.copy().astype("float")
         x -= np.percentile(x, 1)
         x /= np.percentile(x, 95)
         rgbs = np.array([plt.cm.get_cmap(cmap)(xx)[:3] for xx in x])
