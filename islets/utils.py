@@ -532,32 +532,7 @@ def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None):
         colors = regions.df.loc[indices,"color"]
     else:
         colors = [MYCOLORS[i%len(MYCOLORS)] for i in indices]
-#     for i in indices:
-#         try:
-#             cl = regions.df.loc[i, "color"]
-#         except:
-#             cl = MYCOLORS[i%len(MYCOLORS)]
-#         bds = regions.df.loc[i,"boundary"]
-#         bds += [bds[0]]
-#         y,x = np.array(bds).T
-#         ypts,xpts = np.array(regions.df.pixels[i]).T
-#         ln = go.Scatter(x=x,y=y,
-#                         line=dict(width=.7,color=cl),
-#                         #mode="markers+lines",
-#                         mode="lines",
-#                         #marker={"size":2},
-#                         hoveron = 'points+fills',
-#                         showlegend = False,
-#                         name = str(i),
-#                         hoverinfo='text',
-#                         hovertext=["%i"%(i)]*len(bds),
-#                         fill="toself",
-#                         #opacity = .5,
-#                         fillcolor='rgba(255, 0, 0, 0.05)',
-#                      )
-#         f.add_trace(ln)
-    if len(indices):    
-#         y,x = np.vstack([np.mean(regions.df.pixels[i],axis=0) for i in indices]).T
+    if len(indices):
         y,x = np.vstack([regions.df.loc[i,"peak"] for i in indices]).T
         pts = go.Scatter(x=x,y=y,
                     mode="markers",
@@ -569,15 +544,8 @@ def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None):
                     hoverinfo="text"
                  )
         f.add_trace(pts)
-#     else:
-#         f.add_trace(go.Scatter(x=[0],y=[0],
-#                     mode="markers",
-#                     marker=dict(color="blue",size=3, opacity=0),
-#                     hovertext=None,
-#                  ))
         
     if im!="none":
-        # f.add_heatmap(z=im, hoverinfo='skip',showscale=False,colorscale=plxcolors.sequential.Greys)
         imgpointer = createStaticImage(regions,
                                        showall=showall,
                                        lw=lw
@@ -634,36 +602,12 @@ def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None):
         scaleanchor = "x",
         scaleratio = 1,
       )
-    try:
-        lengths = [10,20,50]
-        il = np.searchsorted(lengths,regions.metadata.pxSize*regions.image.shape[1]/10)
-        length=lengths[il]
-        x0,x1,y0,y1 = np.array([0,length,0,length*3/50])/regions.metadata.pxSize + regions.image.shape[0]*.02
-        f.add_shape(
-                    type="rect",
-                    x0=x0,y0=y0,x1=x1,y1=y1,
-                    line=dict(width=0),
-                    fillcolor="black",
-                    xref='x', yref='y'
-                )
-        f.add_trace(go.Scatter(
-            x=[(x0+x1)/2],
-            y=[y1*1.2],
-            text=[f"<b>{length}µm</b>"],
-            mode="text",
-            showlegend=False,
-            textposition='bottom center',
-            textfont={"color":"black"},
-            hoverinfo="skip",
-        ))
-    except:
-        pass
     
     return f
     
     
 
-def createStaticImage(regions,im=None,showall=True,color="grey",separate=True, returnPath=False, cmap=None,origin="lower",lw=None):
+def createStaticImage(regions,im=None,showall=True,returnPath=False,origin="lower",lw=None):
     if im is None:
         im = regions.statImages[regions.mode]
     if lw is None:
@@ -688,7 +632,7 @@ def createStaticImage(regions,im=None,showall=True,color="grey",separate=True, r
     for sp in ax.spines: ax.spines[sp].set_visible(False)
     if showall:
         try:
-            regions.plotEdges(ax=ax,color=color,image=False,lw=figsize[0]*lw,separate=separate,scaleFontSize=0)
+            regions.plotEdges(ax=ax,image=False,lw=figsize[0]*lw,separate=True,scaleFontSize=50)
         except:
             pass
     plt.xticks([])
