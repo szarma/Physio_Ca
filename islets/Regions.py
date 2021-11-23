@@ -67,7 +67,7 @@ def load_regions(path,
 class Regions:
     def __repr__(self):
         try:
-            return self.df.__repr__()
+            return self.df[[c for c in self.df.columns if self.df[c].dtype.kind in "biufc" or c in ["peak"]]].__repr__()
         except:
             warnings.warn("no dataframe created yet.")
             return self
