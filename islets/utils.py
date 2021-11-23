@@ -737,6 +737,8 @@ def load_json(path):
     with open( path ) as f:
         txt = f.read()
     data = loads(txt)
+    if "Freq" in data:
+        data["Freq"] = float(data["Freq"])
     data["df"] = pd.DataFrame(data["df"])
     data["df"]["trace"] = data["df"]["trace"].apply(np.array)
     for k in data["statImages"]:
@@ -748,6 +750,10 @@ def load_json(path):
         setattr(regions, k, data[k])
         del data[k]
     regions.df["peak"] = regions.df["peak"].apply(tuple)
+    if "interest" in regions.df.columns:
+        regions.df["activity"] = regions.df["interest"]
+        del regions.df["interest"]
+    regions.df["peak"] = regions.df["peak"].apply(tuple)
     regions.df["pixels"] = [[tuple(px) for px in pxs] for pxs in regions.df["pixels"]]
     regions.df.index=list([int(j) for j in regions.df.index])
     regions.image = np.array(regions.image)
@@ -755,6 +761,7 @@ def load_json(path):
     if hasattr(regions,"metadata"):
         regions.metadata = pd.Series(regions.metadata)
     regions.update()
+    regions.pathToRois = path
     try:
         folder = os.path.split(path)[0]
         protocolFile = os.path.join(folder, [f for f in os.listdir(folder) if "protocol" in f][0])
