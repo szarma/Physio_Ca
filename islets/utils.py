@@ -1136,10 +1136,9 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
         for f in fs:
             if not (f.endswith(".lif") or f.endswith(".nd2")):
                 continue
-            if any([constr.strip() not in cur+f for constr in constrain.split(",")]):
-                continue
-            path = os.path.join(cur,f)
-            recordings += [path]
+            if any([constr.strip() in cur+f for constr in constrain.split(",")]):
+                path = os.path.join(cur,f)
+                recordings += [path]
     recordings = sorted(recordings)
 
     from .utils import get_series_dir, get_filterSizes
