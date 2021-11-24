@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from scipy.stats import median_abs_deviation
+from tqdm import tqdm
 
 
 def define_legs(events, legs):
@@ -35,7 +36,7 @@ def event_diff(events_0, events_1, hw_toll=.2):
 def sequential_filtering(
         regions,
         timescales=None,
-        verbose=True,
+        verbose=False,
         smooth=None,
         filt_cutoff=2.,
         z_th=3,
@@ -44,7 +45,7 @@ def sequential_filtering(
         rescale_z="soft"
         ):
     if timescales is None:
-        timescales = 2. ** np.arange(-1, 20, .25)
+        timescales = 2. ** np.arange(2, 8+1e-10, .25)
     timescales = np.unique([float("%.3g" % ts) for ts in timescales])
     timescales = timescales[timescales < regions.time[-1] / 3]
     timescales = timescales[timescales > 5/regions.Freq]
@@ -52,7 +53,10 @@ def sequential_filtering(
         print("defined:", "  ".join(["%g" % ts for ts in timescales]))
     regions.timescales = timescales
     allEvents = []
-    for its in range(len(timescales)):
+    trange = range(len(timescales))
+    if not verbose:
+        trange = tqdm(trange)
+    for its in trange:
         ts = timescales[its]
         k = "%g"%ts
         if verbose:
