@@ -1216,7 +1216,33 @@ def getPeak2EdgesDF(C, regions):
     return peak2bnd
 
 
-def getStatImages(movie_, debleach=False, downsampleFreq=2):
+def _init_logger():
+    """This is so that Javabridge doesn't spill out a lot of DEBUG messages
+    during runtime.
+    Originally from CellProfiler/python-bioformats.
+    We copied it from https://github.com/pskeshu/microscoper
+    """
+    from bioformats import javabridge as jb
+
+    rootLoggerName = jb.get_static_field("org/slf4j/Logger",
+                                         "ROOT_LOGGER_NAME",
+                                         "Ljava/lang/String;")
+
+    rootLogger = jb.static_call("org/slf4j/LoggerFactory",
+                                "getLogger",
+                                "(Ljava/lang/String;)Lorg/slf4j/Logger;",
+                                rootLoggerName)
+
+    logLevel = jb.get_static_field("ch/qos/logback/classic/Level",
+                                   "ERROR",
+                                   "Lch/qos/logback/classic/Level;")
+
+    jb.call(rootLogger,
+            "setLevel",
+            "(Lch/qos/logback/classic/Level;)V",
+            logLevel)
+
+def getStatImages(movie_, debleach=False, downsampleFreq=1):
     if movie_.fr>downsampleFreq:
         n_rebin = int(np.round(movie_.fr/downsampleFreq))
         if n_rebin>1:
