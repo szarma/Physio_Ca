@@ -13,7 +13,7 @@ Pillow~=8.1.1
 setuptools~=49.6.0.post20210108
 mgzip~=0.2.1
 orjson~=3.4.8
-
+python-bioformats
 visdcc~=0.0.40
 traitlets~=5.0.5
 ipywidgets~=7.6.3
