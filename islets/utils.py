@@ -177,9 +177,10 @@ def get_filterSizes(px, physSize=5.5):
     base = int(np.ceil(physSize/px))
     wider = int(np.ceil(base*1.1))
     if wider==base: wider += 1
-    toComb = int(np.ceil(base*1.3))
-    if toComb <= wider: toComb += 1
-    return [(base,), (wider,), (base,wider), (base,toComb)]
+    return [(wider,), (base, wider)]
+    # toComb = int(np.ceil(base*1.3))
+    # if toComb <= wider: toComb += 1
+    # return [(base,), (wider,), (base,wider), (base,toComb)]
 
 def split_unconnected_rois(B_, image=None):
     import networkx as nx
