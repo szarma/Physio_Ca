@@ -1,5 +1,4 @@
 import warnings
-import json
 import os
 import pickle
 from collections import OrderedDict
@@ -10,10 +9,8 @@ from pathlib import Path
 from sys import exc_info
 from typing import Union
 import matplotlib.pyplot as plt
-import mgzip
 import networkx as nx
 import numpy as np
-import orjson
 import pandas as pd
 from scipy.stats import median_abs_deviation
 import plotly.graph_objects as go
@@ -27,7 +24,7 @@ from .general_functions import getCircularKernel
 from .numeric import rebin, bspline, crawl_dict_via_graph
 from .utils import multi_map, getGraph_of_ROIs_to_Merge, getPeak2BoundaryDF, getStatImages
 from .EventDistillery import define_legs, plot_events
-from .serialization import Hdf5Serializer, IDataSerializer, JsonSerializer
+from .serialization import get_serializer
 
 MYCOLORS = plc.qualitative.Plotly
 # MYCOLORS = ["darkred"]
@@ -168,110 +165,55 @@ class Regions:
         -------
         Deserialized Regions object.
         """
-        serializer : IDataSerializer
-
-        if file_format == 'infer':
-            if file_path.suffix in ['.hdf', '.h5']:
-                file_format = 'hdf5'
-            if file_path.suffix in ['.json', '.gz']:
-                file_format = 'json'
-
-        if file_format == 'hdf5':
-            serializer = Hdf5Serializer(file_path=file_path)
-        elif file_format == 'json':
-            serializer = JsonSerializer(file_path=file_path)
-        else:
-            raise KeyError
-
+        serializer = get_serializer(file_path=file_path, file_format=file_format)
         return serializer.load()
 
-    def to_hdf5(self,
-                file_path: Union[str, Path],
-                movie: np.ndarray = None,
-                col: Optional[List[str]] = None,
-                add_date: bool = True) -> None:
-        """Exports the current regions object to HDF5 format.
+    def save(self,
+             file_path: Union[str, Path],
+             file_format: str = 'infer',
+             movie: np.ndarray = None,
+             columns: Optional[List[str]] = None,
+             add_date: bool = True,
+             **kwargs) -> None:
+        """Stores a regions object into a supported file format.
+
+        This function is intended to store data into a supported file type into a ready-to-use regions object.
+        Supported file types are:
+          - HDF5-files
+            - HDF5-files will have two collections. One collection contains the dataframe at "/df". The other
+              collection contains the class dictionary at "/__dict__".
+          - JSON-files
+            - JSON-files will be encoded in UTF-8.
+            - compressed JSON-files are supported to save disk space.
 
         Parameters
         ----------
-        file_path : Union[Path, str]
-            Path of the file, where the regions object should be written to.
-        movie : numpy.ndarray, optional
+        file_path : Union[str, Path]
+            Path of the file, which shall be deserialized.
+        file_format : {'hdf5', 'json', 'infer'}, default: 'infer'
+            Format, which shall be used to load the file. If 'infer' is passed, the function will automatically try to
+            use the right format by guessing based on the file suffix.
+        movie : numpy.ndarray
             Movie, which shall be applied as an update before saving regions.
-        col : List[str], optional
+        columns : List[str], optional
             Columns of the dataframe to save except the necessary ones.
-        add_date : bool, default: True
+        add_date : bool
             Determines whether the current date should get added to the name of the saved file.
-        """
-        Hdf5Serializer(file_path).save(self,
-                                       movie=movie,
-                                       columns_to_save=col,
-                                       add_date=add_date)
-
-    @staticmethod
-    def from_hdf5(file_path: Union[str, Path]) -> object:
-        """
-        Imports regions from a HDF5 file.
-
-        Parameters
-        ----------
-        file_path : Union[str, Path]
-            Path of the file to load.
+        kwargs
+            Arguments to pass, which are special to the serializers. Please consult the save functions of the to check
+            which parameters are supported.
 
         Returns
         -------
-        Regions
-            Regions object contained by the file.
-        """
-        return Hdf5Serializer(file_path).load()
-
-    def to_json(self,
-                file_path : Union[str, Path],
-                movie=None,
-                col: Optional[List[str]] = None,
-                add_date: bool = True,
-                use_compression: bool = False) -> None:
-        """Exports the current regions object to json-format.
-
-        Parameters
-        ----------
-        file_path : Union[str, Path]
-            Path of the file, where the regions object shall be saved to.
-        movie : numpy.ndarray, optional
-            Movie, which is used to update regions before saving. If movie is None no update will be performed before.
-        col : List[str], optional
-            List of columns indicating columns to save. If None only standard columns get saved.
-        add_date : bool, default: True
-            Indicates whether the date shall be added to the name of the file.
-        use_compression: bool, default: True
-            Indicates whether compression should be used for serialization of the data.
+        None
         """
 
-        JsonSerializer(file_path).save(
-            regions=self,
-            movie=movie,
-            columns_to_save=col,
-            add_date=add_date,
-            use_compression=use_compression
-        )
-
-    @staticmethod
-    def from_json(file_path: Union[str, Path]) -> object:
-        """
-        Static method, which enabled creation of a regions object by reading a (compressed) json file.
-
-        Parameters
-        ----------
-        file_path : Union[str, Path]
-            Path to the file, which will be read.
-
-        Returns
-        -------
-        Deserialized regions object.
-        """
-
-        return JsonSerializer(file_path).load()
-
+        serializer = get_serializer(file_path=file_path, file_format=file_format)
+        serializer.save(self,
+                        movie=movie,
+                        columns_to_save=columns,
+                        add_date=add_date,
+                        **kwargs)
 
     def defineImage(self, mode, gSig_filt=None, ):
         from .numeric import robust_max
