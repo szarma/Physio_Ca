@@ -769,6 +769,94 @@ class Regions:
         rgbs = np.minimum(rgbs,255)
         self.df["color"] = ['#%02x%02x%02x' % tuple(rgb) for rgb in rgbs]
 
+    def propose_merging_based_on_shared_edges(self, rois=None, debug=False,breakTies="peakValue"):
+        if self.df[breakTies].dtype.kind not in "biufc":
+            raise ValueError(f"{breakTies} elements need to be numeric.")
+        if rois is None:
+            rois = self.df.index
+        C = self.df
+        # if len(rois)>len(C.index)/2:
+        #     warnings.warn("You want to run on more than half of the rois. This will not end well. I'll restrict this to running on the half rois of the smallest size.")
+        #     rois = C.loc[rois,"size"].sort_values().index[:len(C)//2]
+        # outDF = []
+        G = nx.DiGraph()
+        for i in rois:
+            if debug:
+                print("roi:", i)
+            edges0 = set(C.loc[i, "edges"])
+            if len(C.loc[i, "neighbors"]) == 0:
+                continue
+            tmp = pd.DataFrame()
+            for j in C.loc[i, "neighbors"]:
+                if debug:
+                    print("neighbor:", j)
+                edges = C.loc[j, "edges"]
+                tmp.loc[j,"N_common_edges"] = len(edges0.intersection(edges))
+                tmp.loc[j,"size"] = C.loc[j,"size"]
+            tmp = tmp.sort_values(["N_common_edges", "size"], ascending = [False, False])
+            if debug:
+                print (tmp)
+            jchoose = tmp.index[0]
+            # outDF += [(i,jchoose)]
+            G.add_edge(i,jchoose,weight=tmp.loc[jchoose,'N_common_edges']/len(edges0))
+        a = nx.adj_matrix(G).toarray()
+        b = a.T * a
+        nodes = list(G.nodes)
+        redundantPairs = [[nodes[p] for p in pair] for pair in zip(*np.where(np.triu(b)))]
+        for pair in redundantPairs:
+            toDel = C.loc[pair,breakTies].sort_values(ascending = False).index
+            G.remove_edge(*toDel)
+        # outDF = pd.DataFrame(outDF,columns = ["from","to"])
+        return G
+
+    def propose_merging_based_on_close_peaks(self, rois=None, debug=False,breakTies="peakValue"):
+        if self.df[breakTies].dtype.kind not in "biufc":
+            raise ValueError(f"{breakTies} elements need to be numeric.")
+        if rois is None:
+            rois = self.df.index
+        C = self.df
+        if len(rois)>len(C.index)/2:
+            warnings.warn("You want to run on more than half of the rois. This will not end well. I'll restrict this to running on the half rois of the smallest size.")
+            rois = C.loc[rois,"size"].sort_values().index[:len(C)//2]
+        # outDF = []
+        G = nx.DiGraph()
+        for i in rois:
+            if debug:
+                print("roi:", i)
+            if len(C.loc[i, "neighbors"]) == 0:
+                continue
+            peak0 = np.array(C.loc[i, "peak"])
+            peaks = np.vstack(C.loc[C.loc[i, "neighbors"], "peak"])
+            dists = np.linalg.norm(peaks - peak, axis = 1)
+
+            tmp = pd.DataFrame()
+            for j in C.loc[i, "neighbors"]:
+                if debug:
+                    print("neighbor:", j)
+                peak = C.loc[j, "edges"]
+
+
+                peak = np.array(C.loc[i, "peak"])
+
+
+                tmp.loc[j,"N_common_edges"] = len(edges0.intersection(edges))
+                tmp.loc[j,"size"] = C.loc[j,"size"]
+            tmp = tmp.sort_values(["N_common_edges", "size"], ascending = [False, False])
+            if debug:
+                print (tmp)
+            jchoose = tmp.index[0]
+            # outDF += [(i,jchoose)]
+            G.add_edge(i,jchoose)
+        a = nx.adj_matrix(G).toarray()
+        b = a.T * a
+        nodes = list(G.nodes)
+        redundantPairs = [[nodes[p] for p in pair] for pair in zip(*np.where(np.triu(b)))]
+        for pair in redundantPairs:
+            toDel = C.loc[pair,breakTies].sort_values(ascending = False).index
+            G.remove_edge(*toDel)
+        # outDF = pd.DataFrame(outDF,columns = ["from","to"])
+        return G
+
     def change_frequency(self, fr=2):
         from .movies import movie as cmovie
         traces = np.vstack(self.df.trace)
