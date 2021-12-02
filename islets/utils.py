@@ -334,7 +334,7 @@ def create_preview_image(regions, filepath=None, show=False):
 def show_movie(m_show,
                figScale = 1,
                out="jshtml",
-               fps = 30,
+               fps = 60,
                saveName=None,
                NTimeFrames=100,
                log=True,
@@ -1267,7 +1267,7 @@ def getStatImages(movie_, debleach=False, downsampleFreq=1):
     return statImages
 
 
-def saveMovie(movie, filename, maxFreq=2, maxdim=256, showtime=True, **kwargs):
+def saveMovie(movie, filename, maxFreq=1, maxdim=256, showtime=True, **kwargs):
     from .utils import show_movie
     from .numeric import rebin
     if maxFreq<movie.fr:
