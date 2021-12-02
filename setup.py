@@ -16,5 +16,5 @@ setup(
     packages=find_packages(),
     long_description=long_description,
     install_requires=requirements,
-    author='CTN'
+    authors='Srdjan Sarikas, Johannes Pfabe'
 )
