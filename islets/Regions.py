@@ -714,22 +714,6 @@ class Regions:
                     patheffects.Normal()
                 ])
 
-    def calc_activity(self, timescales=[10, 100], zth=3, save=True):
-        print ("calc_activity is deprecated, this will work for now, but will print this warning every time. Please use get_activity(...), which also supports timeframe restriction.")
-        activity = np.zeros(len(self.df))
-        if not hasattr(timescales,"__next__"):
-            timescales = [timescales]
-        for ts in timescales:
-            if 1./self.Freq   > ts/10: continue
-            if self.time[-1] < ts*5: continue
-            s,f,z = self.fast_filter_traces(ts, write=False)
-            activity += np.mean(z>zth,1)
-        activity = activity/len(timescales)
-        if save:
-            self.df["activity"] = activity
-        else:
-            return activity
-
     def get_activity(self, timescale, timeframe=None, zth=3, saveAs="activity"):
         if hasattr(timescale,"__iter__"):
             activity = np.zeros(len(self.df))
