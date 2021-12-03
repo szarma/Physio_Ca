@@ -73,7 +73,11 @@ def create_movie_from_tif(recording, frequency, restrict):
 
 
 def create_movie(recording, frequency, restrict, series, input_type, channel, verbose=True):
-    # global rec
+    try:
+        if args.debug:
+            global rec
+    except:
+        global rec
     if input_type == "tif":
         movie, metadata = create_movie_from_tif(recording, frequency, restrict)
 
@@ -88,7 +92,7 @@ def create_movie(recording, frequency, restrict, series, input_type, channel, ve
         rec = islets.Recording(recording)
 
         if input_type == "leica":
-            if series is None:
+            if series is None or series=="all":
                 from islets.Recording import parse_leica
                 try:
                     parse_leica(rec, merge = True, verbose = verbose)
@@ -152,49 +156,7 @@ def slack_notify(text):
         assert e.response['error']
         print(f'Error while sending slack notification: {e.response["error"]}')
 
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description = 'Process a recording: correct phase, correct for motion, segment and save.')
-    parser.add_argument('recording', type = str,
-                        help = 'path to the recording, can be tif, lif, or nd2', metavar = "--recording")
-    parser.add_argument('--series', '-ser', type = str, default = None,
-                        help = 'name of the series (relevant only for lif files)')
-    parser.add_argument('--restrict', type = str, default = None,
-                        help = 'restrict analysis to the time interval (in seconds!), e.g. "0_100" will only process '
-                               'first 100 seconds of the movie, and "200_-10" will process the time region from 200s '
-                               'until 10s before the end.')
-    parser.add_argument('--verbose', const = True, default = False, action = "store_const",
-                        help = 'toggle verbose output on')
-    # parser.add_argument('--rebin', default = None, type = "int", help = '''spatial rebin. By default, for lif and
-    # nd2 files, the optimal rebin is inferred from the pxSize, if available. If it is not available, ''')
-    parser.add_argument('--spatial-filter', "-sp", default = None,
-                        help = '''produce roi pickles with exactly these filter sizes,
-                        e.g. -sp="5" or -sp="5+6" to produce simple rois with indicated sizes,
-                        or sp="5,5+6" to produce both 5 and 5+6. Default (None) will guess four
-                        sizes based on pxSize in the metadata if there are.''')
-    parser.add_argument('--frequency', "-fr", default = None, type = float,
-                        help = '''Frequency (frame rate) of the recording. Default (None) will try to get it from the 
-                        metadata.''')
-    # parser.add_argument('--line-scan', default="none", type=str,
-    #                     help='indicate if it is a line scan, and if yes, what kind ("single" or "multi")')
-    parser.add_argument('--channel', default = 0, type = int,
-                        help = 'specify a channel to be used for construction of rois (for multi-channel recording). '
-                               'Default is 0')
-    parser.add_argument('--notify', dest = 'notify', action = 'store_true',
-                        help = 'Triggers notification on slack when the script starts/finishes.')
-    parser.add_argument('--notification-user', '-nu', default = None, dest = 'slack_userlist',
-                        help = 'List of users to notify with the slack notifications')
-    parser.add_argument('--debug', action = "store_true", dest = "debug",
-                        help = 'toggle debug mode')
-
-    args = parser.parse_args()
-
-    if args.debug:
-        args.verbose = True
-        for k in args.__dict__.keys():
-            print("%20s" % k, args.__dict__[k])
-
+def main(args):
     if args.recording.lower().endswith("tif") or args.recording.lower().endswith("tiff"):
         input_type = "tif"
     elif args.recording.lower().endswith("lif"):
@@ -212,7 +174,8 @@ if __name__ == "__main__":
     ## import data
     movie, metadata = create_movie(args.recording, args.frequency, args.restrict, args.series, input_type, args.channel,
                                    verbose = args.verbose)
-
+    if movie[::len(movie)//10+1].std()/movie[::len(movie)//10+1].mean()<.1:
+        raise NotImplementedError("Sorry, this movie seems to be just a still image.")
     ### prepare outputs
     outputDir = os.path.join(args.recording + "_analysis", metadata["Name"])
     if not os.path.isdir(outputDir):
@@ -265,13 +228,13 @@ if __name__ == "__main__":
     # if args.debug: raise InterruptedError()
 
     # correct phase
-    islets.utils.correct_phase(movie, m_correct, max_dev = max_dev_rig, plot_name = baseName + "phase_shifts.png")
+    phase_shifts = islets.utils.correct_phase(movie, m_correct, max_dev = max_dev_rig, plot_name = baseName + "phase_shifts.png")
+    np.savetxt(baseName+"phase_shifts.txt", phase_shifts, fmt = "%.4f", delimiter = ",")
 
     # correct for motion
-    islets.utils.motion_correct(movie, m_correct, max_dev = (max_dev_rig, max_dev_rig),
+    motion_shifts = islets.utils.motion_correct(movie, m_correct, max_dev = (max_dev_rig, max_dev_rig),
                                 plot_name = baseName + "motion_shifts.png", verbose = args.verbose, mode = "full")
-
-    # m_correct.flush()
+    np.savetxt(baseName+"motion_shifts.txt", motion_shifts, fmt = "%.4f", delimiter = ",")
 
     ####### Write corrected movie #######
     islets.utils.saveMovie(m_correct, filename = mp4Filename_corrected)
@@ -284,7 +247,7 @@ if __name__ == "__main__":
         pklBase = ".".join(map(str, spFilt))
         pickleFile = os.path.join(outputDir, pklBase + "_rois.pkl")
         if args.verbose: print("processing with filter size of ", spFilt)
-        regions = islets.Regions(statistics, gSig_filt = spFilt)
+        regions = islets.Regions(statistics, gSig_filt = spFilt, img_th = args.pixels_cutoff)
         if args.verbose:
             print(f"initialized with {len(regions.df)} rois.")
         regions.merge_closest(verbose = args.verbose)
@@ -293,8 +256,7 @@ if __name__ == "__main__":
         regions.calcTraces(movie)
         if "frame_range" in metadata and "Frequency" in metadata:
             regions.time += metadata.frame_range[0] / metadata.Frequency
-        if not args.debug:
-            islets.utils.saveRois(regions, outputDir, filename = pklBase, add_date = False, formats = ["vienna"])
+        islets.utils.saveRois(regions, outputDir, filename = pklBase, add_date = False, formats = ["vienna"])
 
     ## Cleanup and notification
     bioformats.javabridge.kill_vm()
@@ -303,4 +265,60 @@ if __name__ == "__main__":
         text = text.replace("Started", "Finished")
         slack_notify(text)
 
-    sys.exit(0)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description = 'Process a recording: correct phase, correct for motion, segment and save.')
+    parser.add_argument('recording', type = str,
+                        help = 'path to the recording, can be tif, lif, or nd2', metavar = "--recording")
+    parser.add_argument('--series', '-ser', type = str, default = None,
+                        help = 'name of the series (relevant only for lif files)')
+    parser.add_argument('--restrict', type = str, default = None,
+                        help = 'restrict analysis to the time interval (in seconds!), e.g. "0_100" will only process '
+                               'first 100 seconds of the movie, and "200_-10" will process the time region from 200s '
+                               'until 10s before the end.')
+    parser.add_argument('--verbose', const = True, default = False, action = "store_const",
+                        help = 'toggle verbose output on')
+    # parser.add_argument('--rebin', default = None, type = "int", help = '''spatial rebin. By default, for lif and
+    # nd2 files, the optimal rebin is inferred from the pxSize, if available. If it is not available, ''')
+    parser.add_argument('--spatial-filter', "-sp", default = None,
+                        help = '''produce roi pickles with exactly these filter sizes,
+                        e.g. -sp="5" or -sp="5+6" to produce simple rois with indicated sizes,
+                        or sp="5,5+6" to produce both 5 and 5+6. Default (None) will guess four
+                        sizes based on pxSize in the metadata if there are.''')
+    parser.add_argument('--frequency', "-fr", default = None, type = float,
+                        help = '''Frequency (frame rate) of the recording. Default (None) will try to get it from the 
+                        metadata.''')
+    # parser.add_argument('--line-scan', default="none", type=str,
+    #                     help='indicate if it is a line scan, and if yes, what kind ("single" or "multi")')
+    parser.add_argument('--channel', default = 0, type = int,
+                        help = 'specify a channel to be used for construction of rois (for multi-channel recording). '
+                               'Default is 0')
+    parser.add_argument('--pixels-cutoff', default = 0.02, type = float,
+                        help =
+                     """specifies the cutoff value of what will be considered noise in the filtered image. The lower
+                        the value, the fewer pixels will be considered noise and discarded, and the result will have
+                        more ROIs. If you wish to capture more potential cells, put this parameter to 0 (or even 
+                        negative, but I did not test that). The default (0.02) is chosen as a reasonable compromise for
+                        most applications in recordings of tissue slices."""
+                        )
+    parser.add_argument('--notify', dest = 'notify', action = 'store_true',
+                        help = 'Triggers notification on slack when the script starts/finishes.')
+    parser.add_argument('--notification-user', '-nu', default = None, dest = 'slack_userlist',
+                        help = 'List of users to notify with the slack notifications')
+    parser.add_argument('--debug', action = "store_true", dest = "debug",
+                        help = 'toggle debug mode')
+
+    args = parser.parse_args()
+
+    if args.debug:
+        args.verbose = True
+        for k in args.__dict__.keys():
+            print("%20s" % k, args.__dict__[k])
+
+    try:
+        main(args)
+    except Exception as e:
+        raise e
+    finally:
+        sys.exit(0)
