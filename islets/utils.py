@@ -670,12 +670,13 @@ def motion_correct(movie, m_rshifted, freqMC=0.5, max_dev=(5, 5), plot_name="shi
     axs[1].set_xlabel("time [s]")
     max_shift_vert, max_shift_hor = max_dev
 
+    shifts = np.zeros(shape = (len(reb_movie), 2), dtype = "float32")
     if mode in ["pairwise","full"]:
         dshifts = [[0, 0]]
         for iframe in range(reb_movie.shape[0]-1):
             mtmp = reb_movie[iframe:iframe + 2]
             dshifts += [mtmp.extract_shifts(max_shift_vert//2+1, max_shift_hor//2+1, template = mtmp[0])[0][1]]
-        shifts = np.cumsum(np.array(dshifts), axis = 0)
+        shifts += np.cumsum(np.array(dshifts), axis = 0)
 
         shifts[:, 0] -= np.median(shifts[:, 0])
         shifts[:, 1] -= np.median(shifts[:, 1])
@@ -685,21 +686,22 @@ def motion_correct(movie, m_rshifted, freqMC=0.5, max_dev=(5, 5), plot_name="shi
         c = axs[0].plot([])[0].get_color()
         axs[0].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 0], label = "pairwise inference", c = c)
         axs[1].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 1], "--", c = c)
-        fig.savefig(plot_name)
+        plt.tight_layout();fig.savefig(plot_name)
 
     if mode in ["template-based", "full"]:
 
         ichoose = int(pinpoint_template * len(reb_movie))
         template = reb_movie[ichoose]
 
-        shifts = np.zeros(shape = (len(reb_movie),2), dtype = "float32")
+
         for i_extract in range(Niter):
             dshifts = reb_movie.extract_shifts(
                 max_shift_w = max_shift_hor,
                 max_shift_h = max_shift_vert,
                 template = template
             )[0]
-            shifts += dshifts
+            shifts += np.array(dshifts)
+            reb_movie.apply_shifts(dshifts)
             maxshifts = np.abs(dshifts).max(axis = 0)
             if verbose:
                 print("maximal shifts are ", maxshifts)
@@ -707,7 +709,7 @@ def motion_correct(movie, m_rshifted, freqMC=0.5, max_dev=(5, 5), plot_name="shi
             c = axs[0].plot([])[0].get_color()
             axs[0].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 0], label = i_extract, c = c)
             axs[1].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 1], "--", c = c)
-            fig.savefig(plot_name)
+            plt.tight_layout();fig.savefig(plot_name)
             i_extract += 1
             if (maxshifts[0] < max_dev[0]) and (maxshifts[1] < max_dev[1]):
                 break
@@ -716,7 +718,7 @@ def motion_correct(movie, m_rshifted, freqMC=0.5, max_dev=(5, 5), plot_name="shi
     maxyl = np.abs([ax.get_ylim() for ax in axs]).max()
     for ax in axs:
         ax.set_ylim(-maxyl, maxyl)
-    fig.savefig(plot_name)
+    plt.tight_layout();fig.savefig(plot_name)
     if verbose: print(f'Extracting shifts finished.')
 
     #### if rebinned, then need to expand shift to fit the whole movie
@@ -746,6 +748,7 @@ def motion_correct(movie, m_rshifted, freqMC=0.5, max_dev=(5, 5), plot_name="shi
         # tmpm[tmpm > maxv] = maxv
         m_rshifted[sl] = tmpm.astype(m_rshifted.dtype)
     if verbose: print("Done.")
+    return shifts
 
 
 def correct_phase(movie, m_phasecor, freqMC=.5, max_dev=5, plot_name="phase_shift.png", verbose = False):
@@ -781,6 +784,7 @@ def correct_phase(movie, m_phasecor, freqMC=.5, max_dev=5, plot_name="phase_shif
     shifts[:,0] = 0
 
     if verbose: print(f'Extracting shifts finished.')
+    plt.tight_layout()
     fig.savefig(plot_name)
 
     if n_rebin > 1:
@@ -807,7 +811,7 @@ def correct_phase(movie, m_phasecor, freqMC=.5, max_dev=5, plot_name="phase_shif
         # tmpm[tmpm > maxv] = maxv
         m_phasecor[sl,1::2] = tmpm.astype(m_phasecor.dtype)
     if verbose: print("Done.")
-    # return m_rshifted
+    return shifts
 
 def gentle_motion_correct(movie, m_rshifted, freqMC=1, max_dev=(5,5), plot_name="shifts.png", template=None,pinpoint_template=0,Niter=4):
     from .numeric import rebin
@@ -855,7 +859,7 @@ def gentle_motion_correct(movie, m_rshifted, freqMC=1, max_dev=(5,5), plot_name=
         c = axs[0].plot([])[0].get_color()
         axs[0].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 0], label=i_extract,c=c)
         axs[1].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 1], "--",c=c)
-        fig.savefig(plot_name)
+        plt.tight_layout();fig.savefig(plot_name)
         i_extract += 1
         if (maxshifts[0] < max_dev[0]) and (maxshifts[1] < max_dev[1]):
             break
@@ -864,7 +868,7 @@ def gentle_motion_correct(movie, m_rshifted, freqMC=1, max_dev=(5,5), plot_name=
     maxyl = np.abs([ax.get_ylim() for ax in axs]).max()
     for ax in axs:
         ax.set_ylim(-maxyl, maxyl)
-    fig.savefig(plot_name)
+    plt.tight_layout();fig.savefig(plot_name)
     print (f'Extracting shifts finished.' )
 
     if n_rebin > 1:
