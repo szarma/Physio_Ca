@@ -1,0 +1,1 @@
+SUPPORTED_FORMATS = ['.nd2', '.lif']
