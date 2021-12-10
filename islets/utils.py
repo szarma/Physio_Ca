@@ -177,9 +177,10 @@ def get_filterSizes(px, physSize=5.5):
     base = int(np.ceil(physSize/px))
     wider = int(np.ceil(base*1.1))
     if wider==base: wider += 1
-    toComb = int(np.ceil(base*1.3))
-    if toComb <= wider: toComb += 1
-    return [(base,), (wider,), (base,wider), (base,toComb)]
+    return [(wider,), (base, wider)]
+    # toComb = int(np.ceil(base*1.3))
+    # if toComb <= wider: toComb += 1
+    # return [(base,), (wider,), (base,wider), (base,toComb)]
 
 def split_unconnected_rois(B_, image=None):
     import networkx as nx
@@ -333,7 +334,7 @@ def create_preview_image(regions, filepath=None, show=False):
 def show_movie(m_show,
                figScale = 1,
                out="jshtml",
-               fps = 30,
+               fps = 60,
                saveName=None,
                NTimeFrames=100,
                log=True,
@@ -532,32 +533,7 @@ def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None):
         colors = regions.df.loc[indices,"color"]
     else:
         colors = [MYCOLORS[i%len(MYCOLORS)] for i in indices]
-#     for i in indices:
-#         try:
-#             cl = regions.df.loc[i, "color"]
-#         except:
-#             cl = MYCOLORS[i%len(MYCOLORS)]
-#         bds = regions.df.loc[i,"boundary"]
-#         bds += [bds[0]]
-#         y,x = np.array(bds).T
-#         ypts,xpts = np.array(regions.df.pixels[i]).T
-#         ln = go.Scatter(x=x,y=y,
-#                         line=dict(width=.7,color=cl),
-#                         #mode="markers+lines",
-#                         mode="lines",
-#                         #marker={"size":2},
-#                         hoveron = 'points+fills',
-#                         showlegend = False,
-#                         name = str(i),
-#                         hoverinfo='text',
-#                         hovertext=["%i"%(i)]*len(bds),
-#                         fill="toself",
-#                         #opacity = .5,
-#                         fillcolor='rgba(255, 0, 0, 0.05)',
-#                      )
-#         f.add_trace(ln)
-    if len(indices):    
-#         y,x = np.vstack([np.mean(regions.df.pixels[i],axis=0) for i in indices]).T
+    if len(indices):
         y,x = np.vstack([regions.df.loc[i,"peak"] for i in indices]).T
         pts = go.Scatter(x=x,y=y,
                     mode="markers",
@@ -569,15 +545,8 @@ def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None):
                     hoverinfo="text"
                  )
         f.add_trace(pts)
-#     else:
-#         f.add_trace(go.Scatter(x=[0],y=[0],
-#                     mode="markers",
-#                     marker=dict(color="blue",size=3, opacity=0),
-#                     hovertext=None,
-#                  ))
         
     if im!="none":
-        # f.add_heatmap(z=im, hoverinfo='skip',showscale=False,colorscale=plxcolors.sequential.Greys)
         imgpointer = createStaticImage(regions,
                                        showall=showall,
                                        lw=lw
@@ -634,36 +603,12 @@ def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None):
         scaleanchor = "x",
         scaleratio = 1,
       )
-    try:
-        lengths = [10,20,50]
-        il = np.searchsorted(lengths,regions.metadata.pxSize*regions.image.shape[1]/10)
-        length=lengths[il]
-        x0,x1,y0,y1 = np.array([0,length,0,length*3/50])/regions.metadata.pxSize + regions.image.shape[0]*.02
-        f.add_shape(
-                    type="rect",
-                    x0=x0,y0=y0,x1=x1,y1=y1,
-                    line=dict(width=0),
-                    fillcolor="black",
-                    xref='x', yref='y'
-                )
-        f.add_trace(go.Scatter(
-            x=[(x0+x1)/2],
-            y=[y1*1.2],
-            text=[f"<b>{length}µm</b>"],
-            mode="text",
-            showlegend=False,
-            textposition='bottom center',
-            textfont={"color":"black"},
-            hoverinfo="skip",
-        ))
-    except:
-        pass
     
     return f
     
     
 
-def createStaticImage(regions,im=None,showall=True,color="grey",separate=True, returnPath=False, cmap=None,origin="lower",lw=None):
+def createStaticImage(regions,im=None,showall=True,returnPath=False,origin="lower",lw=None):
     if im is None:
         im = regions.statImages[regions.mode]
     if lw is None:
@@ -688,7 +633,7 @@ def createStaticImage(regions,im=None,showall=True,color="grey",separate=True, r
     for sp in ax.spines: ax.spines[sp].set_visible(False)
     if showall:
         try:
-            regions.plotEdges(ax=ax,color=color,image=False,lw=figsize[0]*lw,separate=separate,scaleFontSize=0)
+            regions.plotEdges(ax=ax,image=False,lw=figsize[0]*lw,separate=True,scaleFontSize=50)
         except:
             pass
     plt.xticks([])
@@ -702,6 +647,171 @@ def createStaticImage(regions,im=None,showall=True,color="grey",separate=True, r
     
     return PilImage.open(bkg_img_file)
 
+def motion_correct(movie, m_rshifted, freqMC=0.5, max_dev=(5, 5), plot_name="shifts.png", pinpoint_template = 0, Niter = 4, mode = "full", verbose = True):
+    freq = movie.fr
+    n_rebin = int(np.round(freq / freqMC))
+    if n_rebin < 1:
+        n_rebin = 1
+    if verbose: (f"The original frequency is {freq}.")
+    if n_rebin > 1:
+        if verbose: print(f"The movie will be rebinned in time by {n_rebin} for shifts extraction.")
+    reb_movie = movie.resize(1, 1, 1. / n_rebin).astype("float32")
+    reb_movie = reb_movie.gaussian_blur_2D(max_dev[0] * 2 + 1, max_dev[1] * 2 + 1, -1, -1)
+
+    if verbose: print(f'Extracting shifts started. The output will be saved in {plot_name} file.')
+    #     fig, axs = plt.subplots(2, 1, figsize=(8, 8), sharex=True, sharey=True, dpi=150)
+    fig, axs = plt.subplots(1, 1, figsize = (8, 3.5), sharex = True, sharey = True, dpi = 150)
+    axs = [axs, axs]
+    #     axs[0].set_title("shifts (in pixels)")
+    axs[0].set_title("vertical: sold, horizontal: dashed")
+    axs[0].set_ylabel("shifts (in pixels)")
+    #     axs[0].set_ylabel("vertical")
+    #     axs[1].set_ylabel("horizontal")
+    axs[1].set_xlabel("time [s]")
+    max_shift_vert, max_shift_hor = max_dev
+
+    shifts = np.zeros(shape = (len(reb_movie), 2), dtype = "float32")
+    if mode in ["pairwise","full"]:
+        dshifts = [[0, 0]]
+        for iframe in range(reb_movie.shape[0]-1):
+            mtmp = reb_movie[iframe:iframe + 2]
+            dshifts += [mtmp.extract_shifts(max_shift_vert//2+1, max_shift_hor//2+1, template = mtmp[0])[0][1]]
+        shifts += np.cumsum(np.array(dshifts), axis = 0)
+
+        shifts[:, 0] -= np.median(shifts[:, 0])
+        shifts[:, 1] -= np.median(shifts[:, 1])
+
+        reb_movie = reb_movie.apply_shifts(shifts)
+
+        c = axs[0].plot([])[0].get_color()
+        axs[0].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 0], label = "pairwise inference", c = c)
+        axs[1].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 1], "--", c = c)
+        plt.tight_layout();fig.savefig(plot_name)
+
+    if mode in ["template-based", "full"]:
+
+        ichoose = int(pinpoint_template * len(reb_movie))
+        template = reb_movie[ichoose]
+
+
+        for i_extract in range(Niter):
+            dshifts = reb_movie.extract_shifts(
+                max_shift_w = max_shift_hor,
+                max_shift_h = max_shift_vert,
+                template = template
+            )[0]
+            shifts += np.array(dshifts)
+            reb_movie.apply_shifts(dshifts)
+            maxshifts = np.abs(dshifts).max(axis = 0)
+            if verbose:
+                print("maximal shifts are ", maxshifts)
+            # print ("all dshifts ", dshifts)
+            c = axs[0].plot([])[0].get_color()
+            axs[0].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 0], label = i_extract, c = c)
+            axs[1].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 1], "--", c = c)
+            plt.tight_layout();fig.savefig(plot_name)
+            i_extract += 1
+            if (maxshifts[0] < max_dev[0]) and (maxshifts[1] < max_dev[1]):
+                break
+
+    axs[0].legend()
+    maxyl = np.abs([ax.get_ylim() for ax in axs]).max()
+    for ax in axs:
+        ax.set_ylim(-maxyl, maxyl)
+    plt.tight_layout();fig.savefig(plot_name)
+    if verbose: print(f'Extracting shifts finished.')
+
+    #### if rebinned, then need to expand shift to fit the whole movie
+    if n_rebin > 1:
+        from . import cmovie
+        shifts = cmovie(shifts.reshape((1,) + shifts.shape)).resize(n_rebin, 1, 1)[0]
+    # pad the remaining frames if exist:
+    npad = len(movie) - len(shifts)
+    if npad > 0:
+        shifts = np.vstack([shifts, [shifts[-1]] * npad])
+
+    # prepare for saving
+    chunkSize = 3e9 # gigabytes
+    singleFrameSize32 = movie[0].astype("float32").nbytes
+    di = int(chunkSize/singleFrameSize32)+1
+    range_ = range(0, len(shifts), di)
+    if verbose:
+        print(f'Applying shifts...', flush=True)
+        range_ = tqdm(range_)
+
+    for i in range_:
+        sl = slice(i, min(len(shifts), i + di))
+        tmpm = movie[sl].astype("float32").apply_shifts(shifts[sl])
+        tmpm[tmpm < 0] = 0
+        # tmpm = np.round(tmpm)
+        # tmpm = dst.poisson.rvs(mu=tmpm)
+        # tmpm[tmpm > maxv] = maxv
+        m_rshifted[sl] = tmpm.astype(m_rshifted.dtype)
+    if verbose: print("Done.")
+    return shifts
+
+
+def correct_phase(movie, m_phasecor, freqMC=.5, max_dev=5, plot_name="phase_shift.png", verbose = False):
+    from . import cmovie
+    freq = movie.fr
+    n_rebin = int(np.round(freq / freqMC))
+    if n_rebin < 1:
+        n_rebin = 1
+    if verbose: print(f"The original frequency is {freq}.")
+    if n_rebin > 1:
+        if verbose: print(f"The movie will be rebinned in time by {n_rebin} for shifts extraction.")
+    reb_movie = movie.resize(1, 1, 1. / n_rebin).astype("float32")
+
+    fig, ax = plt.subplots(1, 1, figsize = (8, 3.5))
+    ax.set_title("shifts for odd lines")
+    ax.set_ylabel("shifts (in pixels)")
+    ax.set_xlabel("time [s]")
+
+
+    # first pass on the pairs of neighboring frames:
+
+    dshifts = []
+    for iframe in range(reb_movie.shape[0]):
+        evenFrame = reb_movie[iframe,::2]
+        evenFrame = (evenFrame[1:]+evenFrame[:-1])/2
+        oddFrame = reb_movie[iframe,1::2][:-1]
+        tmpshift = cmovie.extract_shifts(oddFrame.reshape((1,)+oddFrame.shape), max_dev, 0, template=evenFrame)[0][0]
+        dshifts += [tmpshift]
+    shifts = np.array(dshifts).astype("float32")
+
+    ax.plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:,1], label = "pairwise inference", c = "darkgrey")
+    # ax.plot(np.arange(len(shifts)) / reb_movie.fr, np.array(dshifts), label = "pairwise inference", c = "darkgrey")
+    shifts[:,0] = 0
+
+    if verbose: print(f'Extracting shifts finished.')
+    plt.tight_layout()
+    fig.savefig(plot_name)
+
+    if n_rebin > 1:
+        from . import cmovie
+        shifts = cmovie(shifts.reshape((1,) + shifts.shape)).resize(n_rebin, 1, 1)[0]
+    # pad the remaining frames if exist:
+    npad = len(movie) - len(shifts)
+    if npad > 0:
+        shifts = np.vstack([shifts, [shifts[-1]] * npad])
+
+    # prepare for saving
+    chunkSize = 3e9 # gigabytes
+    singleFrameSize32 = movie[0].astype("float32").nbytes
+    di = int(chunkSize/singleFrameSize32)+1
+    range_ = range(0, len(shifts), di)
+    if verbose:
+        print(f'Applying shifts...', flush=True)
+        range_ = tqdm(range_)
+
+    for i in range_:
+        sl = slice(i, min(len(shifts), i + di))
+        tmpm = movie[sl,1::2].astype("float32").apply_shifts(shifts[sl])
+        tmpm[tmpm < 0] = 0
+        # tmpm[tmpm > maxv] = maxv
+        m_phasecor[sl,1::2] = tmpm.astype(m_phasecor.dtype)
+    if verbose: print("Done.")
+    return shifts
 
 def gentle_motion_correct(movie, m_rshifted, freqMC=1, max_dev=(5,5), plot_name="shifts.png", template=None,pinpoint_template=0,Niter=4):
     from .numeric import rebin
@@ -749,7 +859,7 @@ def gentle_motion_correct(movie, m_rshifted, freqMC=1, max_dev=(5,5), plot_name=
         c = axs[0].plot([])[0].get_color()
         axs[0].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 0], label=i_extract,c=c)
         axs[1].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 1], "--",c=c)
-        fig.savefig(plot_name)
+        plt.tight_layout();fig.savefig(plot_name)
         i_extract += 1
         if (maxshifts[0] < max_dev[0]) and (maxshifts[1] < max_dev[1]):
             break
@@ -758,7 +868,7 @@ def gentle_motion_correct(movie, m_rshifted, freqMC=1, max_dev=(5,5), plot_name=
     maxyl = np.abs([ax.get_ylim() for ax in axs]).max()
     for ax in axs:
         ax.set_ylim(-maxyl, maxyl)
-    fig.savefig(plot_name)
+    plt.tight_layout();fig.savefig(plot_name)
     print (f'Extracting shifts finished.' )
 
     if n_rebin > 1:
@@ -793,6 +903,8 @@ def load_json(path):
     with open( path ) as f:
         txt = f.read()
     data = loads(txt)
+    if "Freq" in data:
+        data["Freq"] = float(data["Freq"])
     data["df"] = pd.DataFrame(data["df"])
     data["df"]["trace"] = data["df"]["trace"].apply(np.array)
     for k in data["statImages"]:
@@ -804,6 +916,10 @@ def load_json(path):
         setattr(regions, k, data[k])
         del data[k]
     regions.df["peak"] = regions.df["peak"].apply(tuple)
+    if "interest" in regions.df.columns:
+        regions.df["activity"] = regions.df["interest"]
+        del regions.df["interest"]
+    regions.df["peak"] = regions.df["peak"].apply(tuple)
     regions.df["pixels"] = [[tuple(px) for px in pxs] for pxs in regions.df["pixels"]]
     regions.df.index=list([int(j) for j in regions.df.index])
     regions.image = np.array(regions.image)
@@ -811,8 +927,10 @@ def load_json(path):
     if hasattr(regions,"metadata"):
         regions.metadata = pd.Series(regions.metadata)
     regions.update()
+    regions.pathToRois = path
     try:
-        protocolFile = os.path.join(pickleDir, [f for f in os.listdir(pickleDir) if "protocol" in f][0])
+        folder = os.path.split(path)[0]
+        protocolFile = os.path.join(folder, [f for f in os.listdir(folder) if "protocol" in f][0])
         regions.import_protocol(protocolFile)
     except:
         pass
@@ -890,22 +1008,34 @@ def saveRois(regions,outDir,filename="",movie=None,col=["trace"],formats=["vienn
 #         feedback += ["ERROR: "+ exc_info().__repr__()]
         return feedback
 
-def add_protocol(ax, protocol, color="grey"):
+def add_protocol(ax, protocol, color="lightgrey", location="bottom"):
     yl = ax.get_ylim()
     dy = yl[1]-yl[0]
-    offset = yl[0]/2 - dy/20
+    if location not in ["top","bottom","all"]:
+        raise ValueError("location can be either 'top' or 'bottom'")
+    if location=="all":
+        offset = 0
+    else:
+        dy = dy/20
+    if location=="top":
+        offset = yl[1] + dy
+    if location=="bottom":
+        offset = yl[0] - dy
+
     for comp, df in protocol.groupby("compound"):
         for ii in df.index:
-            t0,t1 = df.loc[ii].iloc[-2:]
+            t0,t1 = df.loc[ii,["t_begin","t_end"]]
             conc = df.loc[ii,"concentration"]
-            x,y = [t0,t1,t1,t0,t0],[-1,-1,-2,-2,-1]
+            x,y = [t0,t1,t1,t0,t0],[1,1,0,0,1]
             y = np.array(y)
-            y = y*dy/20 + offset
-            ax.fill(x,y,color=color,alpha =.3)
-            ax.text(t0,y[:-1].mean(), " "+conc,va="center", ha="left")
-            ax.plot(x,y,color=color,)
+            y = y*dy + offset
+            c = df.loc[ii].get("color",color)
+            ax.fill(x,y,color=c,)
+            ax.text(t0,y.mean()-dy*0.15, " "+conc,va="center", ha="left")
+            ax.plot(x,y,color="black",lw=1)
         ax.text(df.t_begin.min(),y[:-1].mean(),comp+" ",va="center", ha="right")
-        offset -= 1.3*dy/20
+        offset += 1.3*dy*(-1)**int(location=="bottom")
+
 
 def getGraph_of_ROIs_to_Merge(df,rreg, plot=False, ax=None,lw=.5,arrow_width=.5):
     if plot:
@@ -973,18 +1103,18 @@ def plotRoi_to_be_connected(Gph, rreg, nplot=35):
                          node_size=30,
                          node_color="w",
                          pos=dict(zip(cl,pos)),
-                         font_size=6
+                         font_size=10
                         )
-        rreg.plotEdges(ax=ax,image=False,ix=cl, spline=False)
+        rreg.plotEdges(ax=ax,image=True,ix=cl, spline=False,scaleFontSize=0,bound=False)
         attr = sum(list(map(list,nx.attracting_components(gph))),[])
-        rreg.plotEdges(ax=ax,image=False,ix=attr,color="red",spline=False)
+        rreg.plotEdges(ax=ax,image=False,ix=attr,color="red",spline=False,scaleFontSize=0,bound=False)
         rreg.plotPeaks(ax=ax,image=False,ix=attr,color="red",ms=1)
         for sp in ax.spines: ax.spines[sp].set_visible(False)
         ax.set_aspect("equal")
 
     for i in range(i+1,axs.size):
         axs.flat[i].remove()
-    plt.subplots_adjust(wspace=0,hspace=0)
+    plt.subplots_adjust(wspace=3e-2,hspace=3e-2)
 
 
 def getPeak2BounAndTraceDF(C):
@@ -1090,7 +1220,33 @@ def getPeak2EdgesDF(C, regions):
     return peak2bnd
 
 
-def getStatImages(movie_, debleach=False, downsampleFreq=2):
+def _init_logger():
+    """This is so that Javabridge doesn't spill out a lot of DEBUG messages
+    during runtime.
+    Originally from CellProfiler/python-bioformats.
+    We copied it from https://github.com/pskeshu/microscoper
+    """
+    from bioformats import javabridge as jb
+
+    rootLoggerName = jb.get_static_field("org/slf4j/Logger",
+                                         "ROOT_LOGGER_NAME",
+                                         "Ljava/lang/String;")
+
+    rootLogger = jb.static_call("org/slf4j/LoggerFactory",
+                                "getLogger",
+                                "(Ljava/lang/String;)Lorg/slf4j/Logger;",
+                                rootLoggerName)
+
+    logLevel = jb.get_static_field("ch/qos/logback/classic/Level",
+                                   "ERROR",
+                                   "Lch/qos/logback/classic/Level;")
+
+    jb.call(rootLogger,
+            "setLevel",
+            "(Lch/qos/logback/classic/Level;)V",
+            logLevel)
+
+def getStatImages(movie_, debleach=False, downsampleFreq=1):
     if movie_.fr>downsampleFreq:
         n_rebin = int(np.round(movie_.fr/downsampleFreq))
         if n_rebin>1:
@@ -1115,7 +1271,7 @@ def getStatImages(movie_, debleach=False, downsampleFreq=2):
     return statImages
 
 
-def saveMovie(movie, filename, maxFreq=2, maxdim=256, showtime=True, **kwargs):
+def saveMovie(movie, filename, maxFreq=1, maxdim=256, showtime=True, **kwargs):
     from .utils import show_movie
     from .numeric import rebin
     if maxFreq<movie.fr:
@@ -1172,10 +1328,9 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
         for f in fs:
             if not (f.endswith(".lif") or f.endswith(".nd2")):
                 continue
-            if any([constr.strip() not in cur+f for constr in constrain.split(",")]):
-                continue
-            path = os.path.join(cur,f)
-            recordings += [path]
+            if any([constr.strip() in cur+f for constr in constrain.split(",")]):
+                path = os.path.join(cur,f)
+                recordings += [path]
     recordings = sorted(recordings)
 
     from .utils import get_series_dir, get_filterSizes

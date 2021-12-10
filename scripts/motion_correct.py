@@ -87,7 +87,7 @@ if args.debug:
 m_rshifted = tifmemmap(
     outTifFilename,
     shape=orig_movie.shape,
-    dtype=orig_movie.dtype,
+    dtype=np.float32,
     photometric="minisblack"
 )
 cell_half_width_in_px = int(np.ceil(6 / metadata.pxSize))

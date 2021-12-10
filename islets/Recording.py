@@ -325,33 +325,54 @@ class Recording:
             data = data[FrameRange[0]:FrameRange[1]]
         else:
             if mode == "auto":
-                Nbytes = np.zeros(1, dtype=metadata1["bit depth"]).nbytes
+                Nbytes = np.zeros(1, dtype="float32").nbytes
                 Nbytes = Nbytes * metadata1.SizeT * metadata1.SizeY * metadata1.SizeX
                 if Nbytes > 1e9:
-                    mode = "memmap"
+                    mode = "tif"
                 else:
                     mode = "ram"
-            if mode == "memmap":
+            if mode in ["memmap","tif"]:
                 if not hasattr(self, "tempdir"):
-                    # import tempfile
-                    # tempdir = tempfile.gettempdir()
-                    tempdir = "/data/.tmp"
-                    self.tempdir = os.path.join(tempdir, f"{np.random.randint(int(1e10))}")
-                    os.makedirs(self.tempdir)
+                    user = os.environ["USER"].split("jupyter-")[-1]
+                    from datetime import date
+                    today = date.today().strftime("%Y_%m_%d")
+                    rndnumber = np.random.randint(int(1e10))
+                    today_dir = f"/data/.tmp/{today}"
+                    if not os.path.isdir(today_dir):
+                        os.makedirs(today_dir)
+                        #os.chown(today_dir, -1, "jupyterhub-users")
+                        os.chmod(today_dir, 0o777)
+                    tempdir = os.path.join(today_dir, f"{user}/{rndnumber}")
+                    if not os.path.isdir(tempdir):
+                        os.makedirs(tempdir)
+                    self.tempdir = tempdir
+                    # tempdir = "/data/.tmp"
+                    # self.tempdir = os.path.join(tempdir, f"{np.random.randint(int(1e10))}")
+                    # os.makedirs(self.tempdir)
                 filename = os.path.join(self.tempdir,
-                                        f"{Series}_d1_{metadata1.SizeX}_d2_{metadata1.SizeY}_d3_{metadata1.SizeZ}_order_C_frames_{metadata1.SizeT}_.mmap")
-                data = np.memmap(filename,
-                                 dtype = metadata1["bit depth"],
-                                 mode ="w+",
-                                 shape=(metadata1.SizeT, metadata1.SizeY, metadata1.SizeX)
-                                 )
+                                        f"{Series}_d1_{metadata1.SizeX}_d2_{metadata1.SizeY}_d3_{metadata1.SizeZ}_order_C_frames_{metadata1.SizeT}_.{mode}")
+                if mode=="memmap":
+                    data = np.memmap(
+                        filename,
+                        dtype = "float32",
+                        mode = "w+",
+                        shape = (metadata1.SizeT, metadata1.SizeY, metadata1.SizeX)
+                    )
+                else: # it is tiff
+                    data = tiffmemmap(
+                        filename,
+                        dtype = "float32",
+                        mode = "w+",
+                        photometric = "minisblack",
+                        shape = (int(metadata1.SizeT), int(metadata1.SizeY), int(metadata1.SizeX))
+                    )
             elif mode == "ram":
                 data = np.zeros(
                     shape=(metadata1.SizeT, metadata1.SizeY, metadata1.SizeX),
-                    dtype=metadata1["bit depth"],
+                    dtype="float32",
                 )
             else:
-                raise ValueError("mode can only take the following values: 'ram', 'memmap', and 'auto'.")
+                raise ValueError("mode can only take the following values: 'ram', 'memmap', 'tif', and 'auto'.")
 
             try:
                 self.rdr
@@ -424,7 +445,12 @@ class Recording:
                 from datetime import date
                 today = date.today().strftime("%Y_%m_%d")
                 rndnumber = np.random.randint(int(1e10))
-                tempdir = f"/data/.tmp/{today}/{user}/{rndnumber}"
+                today_dir = f"/data/.tmp/{today}"
+                if not os.path.isdir(today_dir):
+                    os.makedirs(today_dir)
+                    #os.chown(today_dir, -1, "jupyterhub-users")
+                    os.chmod(today_dir, "777")
+                tempdir = os.path.join(today_dir, f"{user}/{rndnumber}")
                 if not os.path.isdir(tempdir):
                     os.makedirs(tempdir)
                 self.tempdir = tempdir

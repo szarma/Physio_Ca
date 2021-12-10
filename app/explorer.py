@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+import difflib
+import subprocess
+
 import dash
 from dash import html, dcc, dash_table
 from dash.dash_table.Format import Format, Scheme#, Sign, Symbol
@@ -19,6 +22,35 @@ slice number
 part of pancreas
 microscope
 """.splitlines()
+
+
+def save_meta(n_clicks, txt, path, filetype):
+    if n_clicks > 0:
+        path = path.split(")")[0].split("(")[-1]
+        folder = os.path.split(path)[0]
+        nConflicts = len([f for f in os.listdir(folder) if filetype in f]) - 1
+        if nConflicts:
+            out = html.Div(
+                f"There is at least one other {filetype} file in the same folder. Please remove it before saving.",
+                style = {"font-size": "small", "font-color": "darkred"})
+        else:
+            # with open(path, "w") as f:
+            #     f.write(txt)
+            proc = subprocess.Popen(
+                f'''sudo sh -c "echo -n '{txt}' > {path}"''',
+                shell = True,
+                stdout = subprocess.PIPE
+            )
+            outs, errs = proc.communicate()
+            txt1 = open(path).read()
+            if txt == txt1:
+                out = "File saved ✔"
+            else:
+                out = "File not saved ✘"
+                output_list = [li for li in difflib.ndiff(txt, txt1) if li[0] != ' ']
+                # out += " | ".join(output_list)
+                out += "difference: > "+ repr(output_list) + " <"
+        return out
 
 def serve_examiner(username="srdjan", 
                    rec="",
@@ -252,21 +284,7 @@ def update_table(n_clicks, main, restrict):
      State("protocol-path","children"),]
 )
 def save_protocol(n_clicks, txt, path):
-    if n_clicks>0:
-        path = path.split(")")[0].split("(")[-1]
-        folder = os.path.split(path)[0]
-        nConflicts = len([f for f in os.listdir(folder) if "protocol" in f])-1
-        if nConflicts:
-            out = html.Div("There is at least one other protocol file in the same folder. Please remove it before saving.", style={"font-size":"small","font-color":"darkred"})
-        else:
-            with open(path,"w") as f:
-                f.write(txt)
-            txt1 = open(path).read()
-            if txt==txt1:
-                out = "File saved ✔"
-            else:
-                out = "File not saved ✘"
-        return out
+    return save_meta(n_clicks, txt, path, filetype="protocol")
     
 @app.callback(
     Output("addinfo-save-out","children"),
@@ -275,17 +293,7 @@ def save_protocol(n_clicks, txt, path):
      State("addinfo-path","children"),]
 )
 def save_addinfo(n_clicks, txt, path):
-    if n_clicks>0:
-        path = path.split(")")[0].split("(")[-1]
-        with open(path,"w") as f:
-            f.write(txt)
-        txt1 = open(path).read()
-        if txt==txt1:
-            out = "File saved ✔"
-        else:
-            out = "File not saved ✘"
-        return out
-
+    return save_meta(n_clicks, txt, path, filetype="additional_info")
 
 
 @app.callback(

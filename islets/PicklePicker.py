@@ -1,27 +1,16 @@
 from jupyter_plotly_dash import JupyterDash
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
-import plotly.graph_objects as go
 import os
-import numpy as np
-from IPython.core.display import HTML
 
 from sys import exc_info
-from islets import cmovie
-import json
-import pickle
-
 import pandas as pd
 from dash import no_update
 
 from .Recording import Recording
-from .Regions import Regions,load_regions
+from .Regions import load_regions
 from .LineScan import LineScan
-from .utils import getFigure, showRoisOnly
-from .numeric import rebin
 
-
-from collections import OrderedDict
 outputStyle = {
     "color":"navy",
     "font-family":"Courier New",
@@ -33,8 +22,6 @@ infoStyle = {
     }
 bodyStyle = {
     }
-# global regions
-# regions = None
 
 class PicklePicker:
     def __init__(self, pathToRec=None, series=None, appWidth=1500,
@@ -165,7 +152,7 @@ class PicklePicker:
             return val, opts, feedback
 
         @app.callback(
-            [Output("pickle-radio", "value"),
+            [
              Output("pickle-radio", "options"),
              Output("pickle-previews", "children"),
              Output("frase-container", "children")
@@ -206,17 +193,17 @@ class PicklePicker:
                 if len(options):
                     frase = "Select series"
 
-            if len(options):
-                val = options[0]["value"]
-            else:
-                val = None
+            # if len(options):
+            #     val = options[0]["value"]
+            # else:
+            #     val = None
             previews = [html.Div(children=[html.Div(k, style={"padding-left": "20px"}), preview[k]], style=dict(
                 height="%ipx" % height,
                 width="%ipx" % width,
                 display="inline-block",
                 border='thin lightgrey solid'
             )) for k in preview]
-            return val, options, html.Div(previews, style={"width": "%ipx" % (width * 4.1)}), frase
+            return options, html.Div(previews, style={"width": "%ipx" % (width * 4.1)}), frase
 
         @app.callback(
             [Output("pickle-feedback", "children"),
@@ -236,6 +223,7 @@ class PicklePicker:
                     return no_update
                 if path.endswith("pkl"):  ####### pickles ################
                     self.regions = load_regions(path)
+                    self.regions.get_activity(10)
                     feedback += [
                         "Regions imported successfully.",
                         "Original movie:",

@@ -11,15 +11,15 @@ with warnings.catch_warnings():
         from caiman import movie as cmovie
     except:
         from .movies import movie as cmovie
-        print("Managed to import cmovie from .movies")
-    try:
-        from caiman import load as cload
-    except:
-        try:
-            from .movies import load as cload
-            print("Managed to import cload from .load. Perhaps we can depart from full caiman?")
-        except:
-            print("could not import load from anywhere.")
+        # print("Managed to import cmovie from .movies")
+    # try:
+    #     from caiman import load as cload
+    # except:
+    #     try:
+    #         from .movies import load as cload
+    #         print("Managed to import cload from .load. Perhaps we can depart from full caiman?")
+    #     except:
+    #         print("could not import load from anywhere.")
 
         # except:
         #     print("But, not all that's necessary. Do not depart from caiman yet.")

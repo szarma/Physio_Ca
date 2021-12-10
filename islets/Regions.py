@@ -1,5 +1,4 @@
 import warnings
-import json
 import os
 import pickle
 from collections import OrderedDict
@@ -10,10 +9,8 @@ from pathlib import Path
 from sys import exc_info
 from typing import Union
 import matplotlib.pyplot as plt
-import mgzip
 import networkx as nx
 import numpy as np
-import orjson
 import pandas as pd
 from scipy.stats import median_abs_deviation
 import plotly.graph_objects as go
@@ -27,6 +24,7 @@ from .general_functions import getCircularKernel
 from .numeric import rebin, bspline, crawl_dict_via_graph
 from .utils import multi_map, getGraph_of_ROIs_to_Merge, getPeak2BoundaryDF, getStatImages
 from .EventDistillery import define_legs, plot_events
+from .serialization import get_serializer
 
 MYCOLORS = plc.qualitative.Plotly
 # MYCOLORS = ["darkred"]
@@ -67,7 +65,7 @@ def load_regions(path,
 class Regions:
     def __repr__(self):
         try:
-            return self.df.__repr__()
+            return self.df[[c for c in self.df.columns if self.df[c].dtype.kind in "biufc" or c in ["peak"]]].__repr__()
         except:
             warnings.warn("no dataframe created yet.")
             return self
@@ -141,171 +139,81 @@ class Regions:
                                #use_restricted=use_restricted
                               )
 
-    def to_json(self,
-                output_dir: Union[str, Path],
-                file_name: str = '',
-                movie=None,
-                col: Union[list, None] = None,
-                formats: Union[list, None] = None,
-                add_date: bool = True,
-                use_compression: bool = False) -> None:
-        """
-        Exports the current regions object to json-format.
-
-        :param output_dir: Directory, where the output will be written to.
-        :param file_name: Base filename (will be extended automatically e.g. "5.6" becomes "5.6_rois.json.gz"
-        :param movie: Movie, which shall be manually connected to the regions object.
-        :param col: Columns, which are required to serialize. Default: ['trace']
-        :param formats: Format, which should be used to store json-data. Default: ['vienna']
-        :param add_date: If True then the current date will be added to the filename. Default: True
-        :param use_compression: If True then the .json file will be compressed to .gz
-        :return: None
-        """
-
-        if col is None:
-            col = ['trace']
-        if formats is None:
-            formats = ['vienna']
-        if type(output_dir) == str:
-            output_dir = Path(output_dir)
-        if movie is not None:
-            self.update(movie)
-        file_name = file_name.replace(' ', '_')
-        if add_date:
-            today = date.today()
-            if len(file_name):
-                file_name = '_'.join([today.strftime('%Y_%m_%d'), file_name])
-            else:
-                file_name = today.strftime('%Y_%m_%d')
-        if not output_dir.is_dir():
-            output_dir.mkdir(parents=True)
-
-        for format in formats:
-            if format == 'vienna':
-                saving = ['statImages',
-                          'mode',
-                          'image',
-                          'filterSize',
-                          'df',
-                          'trange',
-                          'FrameRange',
-                          'analysisFolder',
-                          'time',
-                          'Freq',
-                          'metadata']
-                juggle_movie = hasattr(self, 'movie')
-                if juggle_movie:
-                    movie = self.movie
-                    del self.movie
-                all_keys = list(self.__dict__.keys())
-                subregions = deepcopy(self)
-                if juggle_movie:
-                    self.movie = movie
-                    del movie
-                for k in all_keys:
-                    if k not in saving:
-                        del subregions.__dict__[k]
-                for k in self.df.columns:
-                    if k not in ['peak', 'pixels', 'peakValue','tag','interest'] + col:
-                        del subregions.df[k]
-
-                json_dict = {}
-                for k, v in subregions.__dict__.items():
-                    value = v
-                    if isinstance(v, (pd.DataFrame, pd.Series)):
-                        value = json.JSONDecoder().decode(v.to_json(double_precision=8))
-                    if isinstance(v, (np.float64, np.int64)):
-                        value = str(v)
-                    if isinstance(v, np.ndarray):
-                        value = v.tolist()
-                    if isinstance(v, dict):
-                        for k_, v_ in v.items():
-                            if isinstance(v_, np.ndarray):
-                                # v[k_] = json.dumps(v_.tolist())
-                                v[k_] = v_.astype("float16").tolist()
-                        value = v
-
-                    json_dict[k] = value
-
-                json_string = orjson.dumps(json_dict,option=orjson.OPT_INDENT_2).decode()
-
-                roi_file = f'{output_dir.as_posix()}/{file_name}_rois.json'
-                if use_compression:
-                    if not roi_file.endswith('.gz'):
-                        roi_file += '.gz'
-                    with mgzip.open(roi_file, 'wt') as file:
-                        file.write(json_string)
-                else:
-                    with open(roi_file, 'wt') as file:
-                        file.write(json_string)
-
-                self.pathToPickle = roi_file
-                # create_preview_image(self)
-                # TODO: Add json to creation process to let it work
-            elif format == 'maribor':
-                raise NotImplementedError
-            else:
-                raise NotImplementedError(f'Output format {format} not recognized.')
-
     @staticmethod
-    def from_json(file_path: Union[str, Path], use_compression: Union[bool, None] = None) -> object:
+    def load(file_path: Union[str, Path],
+             file_format: str = 'infer') -> object:
+        """Loads a regions object from a supported file type.
+
+        This function is intended to load data from a supported file type into a ready-to-use regions object.
+        Supported file types are:
+          - HDF5-files
+            - HDF5-files need to have two collections. One collections contains the dataframe at "/df". The other
+              collection contains the class dictionary at "/__dict__".
+          - JSON-files
+            - JSON-files need to be encoded in UTF-8.
+            - compressed JSON-files are supported to save disk space.
+
+        Parameters
+        ----------
+        file_path : Union[str, Path]
+            Path of the file, which shall be deserialized.
+        file_format : {'hdf5', 'json', 'infer'}, default: 'infer'
+            Format, which shall be used to load the file. If 'infer' is passed, the function will automatically try to
+            use the right format by guessing based on the file suffix.
+
+        Returns
+        -------
+        Deserialized Regions object.
         """
-        Static method, which enabled creation of a regions object by reading a (compressed) json file.
+        serializer = get_serializer(file_path=file_path, file_format=file_format)
+        return serializer.load()
 
-        :param file_path: Path to the file, which will be read.
-        :param use_compression: Specifies the usage of compression. None means the algorithm decides it by file suffix.
-        :return: Regions object.
-        :raises FileNotFoundError: Gets raised if file_path does not exist.
+    def save(self,
+             file_path: Union[str, Path],
+             file_format: str = 'infer',
+             movie: np.ndarray = None,
+             columns: Optional[List[str]] = None,
+             add_date: bool = True,
+             **kwargs) -> None:
+        """Stores a regions object into a supported file format.
+
+        This function is intended to store data into a supported file type into a ready-to-use regions object.
+        Supported file types are:
+          - HDF5-files
+            - HDF5-files will have two collections. One collection contains the dataframe at "/df". The other
+              collection contains the class dictionary at "/__dict__".
+          - JSON-files
+            - JSON-files will be encoded in UTF-8.
+            - compressed JSON-files are supported to save disk space.
+
+        Parameters
+        ----------
+        file_path : Union[str, Path]
+            Path of the file, which shall be deserialized.
+        file_format : {'hdf5', 'json', 'infer'}, default: 'infer'
+            Format, which shall be used to load the file. If 'infer' is passed, the function will automatically try to
+            use the right format by guessing based on the file suffix.
+        movie : numpy.ndarray
+            Movie, which shall be applied as an update before saving regions.
+        columns : List[str], optional
+            Columns of the dataframe to save except the necessary ones.
+        add_date : bool
+            Determines whether the current date should get added to the name of the saved file.
+        kwargs
+            Arguments to pass, which are special to the serializers. Please consult the save functions of the to check
+            which parameters are supported.
+
+        Returns
+        -------
+        None
         """
-        if type(file_path) == str:
-            file_path = Path(file_path)
-        if not file_path.exists():
-            raise FileNotFoundError
 
-        if use_compression is None:
-            use_compression = True if file_path.suffix == '.gz' else False
-
-        if use_compression:
-            with mgzip.open(file_path.as_posix(), 'rt') as file:
-                file_content = file.read()
-        else:
-            with open(file_path.as_posix(), 'rt') as file:
-                file_content = file.read()
-
-        # Load JSON-object from file-content:
-        json_obj = orjson.loads(file_content.encode())
-
-        # Restoring data types:
-        df = pd.DataFrame.from_dict(json_obj['df'])
-        df['peak'] = df['peak'].apply(lambda x: tuple(x))
-        df['pixels'] = df['pixels'].apply(lambda x: [tuple(y) for y in x])
-        del json_obj['df']
-
-        json_obj['metadata'] = pd.Series(json_obj['metadata'])
-        json_obj['Freq'] = np.float64(json_obj['Freq'])
-        json_obj['image'] = np.array(json_obj['image'])
-
-        for key, value in json_obj['statImages'].items():
-            json_obj['statImages'][key] = np.array(value)
-
-        # Create Regions object and set all attributes stored in the JSON file:
-        regions = Regions(dict(zip(df['peak'], df['pixels'])))
-        for key, value in json_obj.items():
-            regions.__setattr__(key, value)
-        regions.df = df
-        regions.update()
-        pickle_dir = file_path.parent
-        regions = Regions(regions)
-        protocol_files = list(file_path.parent.glob('*protocol*.*'))
-        if len(protocol_files) > 0:
-            regions.import_protocol(protocol_files[0].as_posix())
-        regions.pathToPickle = file_path.as_posix()
-        regions.detrend_traces()
-        regions.infer_TwoParFit(plot=False)
-        regions.merge_closest(Niter=15)
-
-        return regions
-
+        serializer = get_serializer(file_path=file_path, file_format=file_format)
+        serializer.save(self,
+                        movie=movie,
+                        columns_to_save=columns,
+                        add_date=add_date,
+                        **kwargs)
 
     def defineImage(self, mode, gSig_filt=None, ):
         from .numeric import robust_max
@@ -364,7 +272,7 @@ class Regions:
                 from .utils import split_unconnected_rois
                 # TODO: this needs review
                 B_ = split_unconnected_rois(B_, self.image)
-        
+
         self.df = pd.DataFrame(OrderedDict([
             ("peak",  list(B_.keys())),
             ("pixels",list(B_.values()))
@@ -443,7 +351,7 @@ class Regions:
         #     except:
         #         pass
         return len(toDrop)
-    
+
     def reassign_peaks(self, image, write=True):
         newPeaks = []
         newValues = []
@@ -460,7 +368,7 @@ class Regions:
             # self.update()
         else:
             return newPeaks, newValues
-    
+
     def get_fov_trace(self, showFreq = 2, pixels=None):
         from .numeric import fit_bleaching, rebin
         i0, ie = self.FrameRange
@@ -516,8 +424,8 @@ class Regions:
             ia += 1
         if plot:
             plt.tight_layout()
-    
-        
+
+
     def update(self, movie_=None):
         self.df["size"] = self.df["pixels"].apply(len)
         self.calcEdges()
@@ -533,7 +441,7 @@ class Regions:
                 self.calcTraces()
             except:
                 pass
-    
+
     def calcEdgeIds(self):
         dround = np.vstack([(-1,-1),(-1, 1),( 1, 1),( 1,-1),(-1,-1)])
         dedges = []
@@ -556,7 +464,7 @@ class Regions:
                     if len(edgeID[edge])==2 and tuple(edgeID[edge][0])==tuple(edgeID[edge][1]):
                         del edgeID[edge]
         self.edgeIDs = edgeID
-    
+
     def calcEdges(self):
         invEdgeID = OrderedDict()
 #         if "edgeIDs" not in locals():
@@ -567,7 +475,7 @@ class Regions:
                     invEdgeID[p] = []
                 invEdgeID[p] += [k]
         self.df["edges"] = [invEdgeID[p] for p in self.df.peak]
-    
+
     def getEdges(self,ix=None):
         if ix is None:
             out = sum(self.df.edges,[])
@@ -575,14 +483,14 @@ class Regions:
             out = sum(self.df.loc[ix,"edges"],[])
         out = np.unique(out,axis=0)
         return out
-    
+
     def plotEdges(self,
                   ix=None,
                   ax=None,
                   image=True,
                   imkw_args=None,
                   separate=False,
-                  color="darkred",
+                  color=None,
                   lw=None,
                   alpha=1,
                   fill=False,
@@ -618,9 +526,11 @@ class Regions:
         smoothness = min(list(fs)+[3] )
         if separate:
             for i in ix:
-                try:
+                if color is not None:
+                    c = color
+                elif "color" in self.df.columns:
                     c = self.df.loc[i,"color"]
-                except:
+                else:
                     c = MYCOLORS[i%len(MYCOLORS)]
                 points = self.df.loc[i,"boundary"]+self.df.loc[i,"boundary"][:3]
                 if spline:
@@ -633,6 +543,8 @@ class Regions:
                 if fill:
                     ax.fill(x,y,c=c,alpha=alpha*.8,**kwargs)
         else:
+            if color is None:
+                color="darkred"
             tmp = []
             for el in self.df.loc[ix,"boundary"]:
                 if spline:
@@ -648,7 +560,19 @@ class Regions:
             dim = self.image.shape
             ax.set_xlim(-.5,dim[1]-.5)
             ax.set_ylim(dim[0]-.5, -.5,)
-            
+        else:
+            try:
+                xlim, ylim = [np.nan] * 2, [np.nan] * 2
+                for ln in ax.lines:
+                    x, y = ln.get_data()
+                    xlim[0] = np.nanmin(list(x) + [xlim[0]])
+                    xlim[1] = np.nanmax(list(x) + [xlim[1]])
+                    ylim[0] = np.nanmin(list(y) + [ylim[0]])
+                    ylim[1] = np.nanmax(list(y) + [ylim[1]])
+                ax.set_ylim(ylim)
+                ax.set_xlim(xlim)
+            except:
+                pass
         if scaleFontSize<=0: return None
         if hasattr(self, "metadata") and "pxSize" in self.metadata:
             lengths = [10,20,50,100,200,500]
@@ -663,8 +587,8 @@ class Regions:
             if "pxUnit" in self.metadata:
                 txt += self.metadata["pxUnit"]
             ax.text((x0+x1)/2, y1+.3*(y1-y0), txt, va="center", ha="center", size=scaleFontSize)
-            
-    def plotPeaks(self, ix=None, ax=None, image=False, ms=3, labels=False,color=None, imkw_args={},absMarker=True, marker=".", **kwargs):
+
+    def plotPeaks(self, ix=None, ax=None, image=False, ms=3, labels=False,color=None, imkw_args={},absMarker=True, marker=".", location="peak",**kwargs):
         if ax is None:
             ax = plt.subplot(111)
         if image:
@@ -678,7 +602,10 @@ class Regions:
         else:
             sizes = ms * self.df.loc[ix,"size"]**.5
         for i,ms in zip(ix,sizes):
-            p = self.df.loc[i,"peak"]
+            if location=="peak":
+                p = self.df.loc[i,"peak"]
+            elif location=="center":
+                p = np.vstack(self.df.loc[i,"pixels"]).mean(0)
             if color is None:
                 try:
                     c = self.df.loc[i,"color"]
@@ -688,23 +615,12 @@ class Regions:
                 c = color
             ax.plot(*p[::-1],marker=marker,ms=ms,c=c, **kwargs)
             if labels:
-                ax.text(*p[::-1],s=" "+str(i),color=c, **kwargs)
-    
-    def calc_activity(self, timescales=[10, 100], zth=3, save=True):
-        print ("calc_activity is deprecated, this will work for now, but will print this warning every time. Please use get_activity(...), which also supports timeframe restriction.")
-        activity = np.zeros(len(self.df))
-        if not hasattr(timescales,"__next__"):
-            timescales = [timescales]
-        for ts in timescales:
-            if 1./self.Freq   > ts/10: continue
-            if self.time[-1] < ts*5: continue
-            s,f,z = self.fast_filter_traces(ts, write=False)
-            activity += np.mean(z>zth,1)
-        activity = activity/len(timescales)
-        if save:
-            self.df["activity"] = activity
-        else:
-            return activity
+                from matplotlib import patheffects
+                tx = ax.text(*p[::-1],s=" "+str(i),color=c, ha="center",va="center",**kwargs)
+                tx.set_path_effects([
+                    patheffects.Stroke(linewidth=1.5, foreground='w'),
+                    patheffects.Normal()
+                ])
 
     def get_activity(self, timescale, timeframe=None, zth=3, saveAs="activity"):
         if hasattr(timescale,"__iter__"):
@@ -734,16 +650,105 @@ class Regions:
             self.df[saveAs] = activity
 
     def color_according_to(self,col,cmap="turbo"):
+        # check if column type is numeric
         if self.df[col].dtype.kind not in "biufc":
             raise ValueError(f"{col} elements not numeric.")
-        x = self.df[col].values.copy()
+        x = self.df[col].values.copy().astype("float")
         x -= np.percentile(x, 1)
         x /= np.percentile(x, 95)
         rgbs = np.array([plt.cm.get_cmap(cmap)(xx)[:3] for xx in x])
         rgbs = (256*rgbs).astype(int)
         rgbs = np.minimum(rgbs,255)
         self.df["color"] = ['#%02x%02x%02x' % tuple(rgb) for rgb in rgbs]
-        
+
+    def propose_merging_based_on_shared_edges(self, rois=None, debug=False,breakTies="peakValue"):
+        if self.df[breakTies].dtype.kind not in "biufc":
+            raise ValueError(f"{breakTies} elements need to be numeric.")
+        if rois is None:
+            rois = self.df.index
+        C = self.df
+        # if len(rois)>len(C.index)/2:
+        #     warnings.warn("You want to run on more than half of the rois. This will not end well. I'll restrict this to running on the half rois of the smallest size.")
+        #     rois = C.loc[rois,"size"].sort_values().index[:len(C)//2]
+        # outDF = []
+        G = nx.DiGraph()
+        for i in rois:
+            if debug:
+                print("roi:", i)
+            edges0 = set(C.loc[i, "edges"])
+            if len(C.loc[i, "neighbors"]) == 0:
+                continue
+            tmp = pd.DataFrame()
+            for j in C.loc[i, "neighbors"]:
+                if debug:
+                    print("neighbor:", j)
+                edges = C.loc[j, "edges"]
+                tmp.loc[j,"N_common_edges"] = len(edges0.intersection(edges))
+                tmp.loc[j,"size"] = C.loc[j,"size"]
+            tmp = tmp.sort_values(["N_common_edges", "size"], ascending = [False, False])
+            if debug:
+                print (tmp)
+            jchoose = tmp.index[0]
+            # outDF += [(i,jchoose)]
+            G.add_edge(i,jchoose,weight=tmp.loc[jchoose,'N_common_edges']/len(edges0))
+        a = nx.adj_matrix(G).toarray()
+        b = a.T * a
+        nodes = list(G.nodes)
+        redundantPairs = [[nodes[p] for p in pair] for pair in zip(*np.where(np.triu(b)))]
+        for pair in redundantPairs:
+            toDel = C.loc[pair,breakTies].sort_values(ascending = False).index
+            G.remove_edge(*toDel)
+        # outDF = pd.DataFrame(outDF,columns = ["from","to"])
+        return G
+
+    def propose_merging_based_on_close_peaks(self, rois=None, debug=False,breakTies="peakValue"):
+        if self.df[breakTies].dtype.kind not in "biufc":
+            raise ValueError(f"{breakTies} elements need to be numeric.")
+        if rois is None:
+            rois = self.df.index
+        C = self.df
+        if len(rois)>len(C.index)/2:
+            warnings.warn("You want to run on more than half of the rois. This will not end well. I'll restrict this to running on the half rois of the smallest size.")
+            rois = C.loc[rois,"size"].sort_values().index[:len(C)//2]
+        # outDF = []
+        G = nx.DiGraph()
+        for i in rois:
+            if debug:
+                print("roi:", i)
+            if len(C.loc[i, "neighbors"]) == 0:
+                continue
+            peak0 = np.array(C.loc[i, "peak"])
+            peaks = np.vstack(C.loc[C.loc[i, "neighbors"], "peak"])
+            dists = np.linalg.norm(peaks - peak, axis = 1)
+
+            tmp = pd.DataFrame()
+            for j in C.loc[i, "neighbors"]:
+                if debug:
+                    print("neighbor:", j)
+                peak = C.loc[j, "edges"]
+
+
+                peak = np.array(C.loc[i, "peak"])
+
+
+                tmp.loc[j,"N_common_edges"] = len(edges0.intersection(edges))
+                tmp.loc[j,"size"] = C.loc[j,"size"]
+            tmp = tmp.sort_values(["N_common_edges", "size"], ascending = [False, False])
+            if debug:
+                print (tmp)
+            jchoose = tmp.index[0]
+            # outDF += [(i,jchoose)]
+            G.add_edge(i,jchoose)
+        a = nx.adj_matrix(G).toarray()
+        b = a.T * a
+        nodes = list(G.nodes)
+        redundantPairs = [[nodes[p] for p in pair] for pair in zip(*np.where(np.triu(b)))]
+        for pair in redundantPairs:
+            toDel = C.loc[pair,breakTies].sort_values(ascending = False).index
+            G.remove_edge(*toDel)
+        # outDF = pd.DataFrame(outDF,columns = ["from","to"])
+        return G
+
     def change_frequency(self, fr=2):
         from .movies import movie as cmovie
         traces = np.vstack(self.df.trace)
@@ -772,7 +777,7 @@ class Regions:
                         neighborsMap[e1] += [e2]
         self.df["neighbors"] = [[self.peak2idx[pp] for pp in neighborsMap[p]] for p in self.df["peak"]]
         self.df["Nneighbors"] = self.df["neighbors"].apply(len)
-        
+
     def purge_lones(self,min_size=4, verbose=False):
         toDel = []
         for i in self.df.index:
@@ -781,7 +786,7 @@ class Regions:
         self.df = self.df.drop(index=toDel)
         if verbose:
             print (f"deleted {len(toDel)} rois. {len(self.df)} remain.")
-    
+
     def calcTraces(self, movie_=None, FrameRange=None):
         if movie_ is None:
             movie_ = self.movie
@@ -802,13 +807,13 @@ class Regions:
         time = np.arange(len(movie_))/movie_.fr
         self.time = time[i0:ie]
         self.Freq = movie_.fr
-    
+
     def reset_filtered(self):
         for col in self.df.columns:
             if "slower" in col or "faster" in col or "zScore" in col:
                 del self.df[col]
         self.showTime = {}
-        
+
     def detrend_traces(self,method="debleach", timescale=None):
 #         from .numeric import mydebleach
 #         traces = np.vstack(self.df.trace.values)
@@ -924,7 +929,7 @@ class Regions:
             ax.grid()
 
         self.TwoParFit = k,n
-    
+
     def slow_filter_traces(self,ironScale, n_processes=10, percentile = [10.], calcStd=False,
                            avg=True, verbose=False, write=True, indices=None, autorebin=True):
         from .numeric import lowPass
@@ -950,11 +955,11 @@ class Regions:
         if wIron%2==0:
             wIron += 1
         if avg:
-            def iterf(x_): 
+            def iterf(x_):
                 out = lowPass(x_, wIron, wIron, percentile)
                 return out
         else:
-            def iterf(x_): 
+            def iterf(x_):
                 out = lowPass(x_, wIron, perc=percentile)
                 return out
         if indices is None:
@@ -986,17 +991,17 @@ class Regions:
                 self.df[k] = list(tmp)
         else:
             return fast, slow, zScore
-            
-            
+
+
 #         def iterf(x_):
 #             mad2std = 1.4826
 #             out = mad2std*lowPass(np.abs(x_),wIron,wIron*2+1,50.)
 #             return out
 #         if calcStd:
 #             self.df["faster_%g_std"%ironScale] = multi_map(iterf,self.df["faster_%g"%ironScale].values,processes=n_processes)
-    
-    
-    
+
+
+
     def prep_filtering(self,
                        ironTimeScale,
                        Npoints=None,
@@ -1025,7 +1030,7 @@ class Regions:
             trend = C.trend.values
         else:
             raise ValueError("usecol can only be a 'trace' (or 'trace_*' or 'detrended'")
-            
+
         if Nrebin>1:
             freq = freq/Nrebin
             data = rebin(data, Nrebin, axis=1)
@@ -1049,7 +1054,7 @@ class Regions:
             "Nrebin":  Nrebin,
             "filter":  sf,
         }
-    
+
     def mean2std_funct(self, absmean, reg=3):
         absmean = np.maximum(absmean, reg)
         if hasattr(self, "TwoParFit"):
@@ -1060,7 +1065,7 @@ class Regions:
         else:
             var = absmean
         return var**.5
-    
+
     def fast_filter_traces(self,
                             ironTimeScale,
                             filt_cutoff=3,
@@ -1145,7 +1150,7 @@ class Regions:
             self.df["zScore_%g"%ironTimeScale] = list(z)
         else:
             return np.array(slower), np.array(faster), z
-    
+
 #     def fast_filter_traces(self,
 #                            ironTimeScale,
 #                            filt_cutoff=3,
@@ -1263,7 +1268,7 @@ class Regions:
         except:
             self.raster = {}
         self.raster[k] = zScores>z_th
-        
+
     def events2raster(self, ts, npoints = 1000, onlyRaster=True, z_th = 3):
         k = "%g"%ts
         try:
@@ -1295,7 +1300,7 @@ class Regions:
         })
             # fig.update_xaxes(showticklabels=False)
         return rr, fig
-        
+
     def detect_events(self, ts, z_th=3, Npoints=None, smooth=None, verbose=False, save=True, t=None, zScores=None, min_rel_hw=0.1, debug=False):
         from .numeric import runningAverage
         from scipy.signal import find_peaks, peak_widths
@@ -1352,7 +1357,7 @@ class Regions:
             self.events[k] = events
         else:
             return events
-        
+
     def show_scatter_events(self,ts,timeWindows=None,log_x=False):
         from plotly_express import scatter
         events = self.events[str(ts)].copy()
@@ -1390,7 +1395,7 @@ class Regions:
                       width=450,
                       height=450,
                      )
-#         fig.update_traces(hovertemplate='x: %{x} <br>y: %{y} <br>roi: %{roi}') # 
+#         fig.update_traces(hovertemplate='x: %{x} <br>y: %{y} <br>roi: %{roi}') #
         fig.update_layout({
         "plot_bgcolor":"white","margin":dict(l=10, r=10, t=20, b=40),"showlegend":False})
         fig.update_layout(
@@ -1401,7 +1406,7 @@ class Regions:
                 xanchor="right",
             )
         )
-        
+
         fig.update_xaxes(showline=True, linewidth=1, linecolor='black', mirror=True, ticks="outside", ticklen=2,
 #                          gridcolor="none"
                         )
@@ -1642,16 +1647,27 @@ class Regions:
         else:
             ax4.get_xaxis().set_visible(False)
 
-        plt.rcParams['font.size'] = original_font_size
         fig.show()
 
-    def plotTraces(regions, indices, axratios=[1,2], figsize=5, freqShow=2, col="detrended",Offset=5,separate=False, axs=None, protocol=True):
-        if col not in regions.df.columns:
+    def plotTraces(self, indices, axratios=[1, 2],
+                   figsize=5,
+                   freqShow=2,
+                   col="detrended",
+                   Offset=5,
+                   separate=False,
+                   axs=None,
+                   protocol=True,
+                   roiColor="black",
+                   roiAlpha = .6,
+                   traceColor = None
+                   ):
+        if col not in self.df.columns:
             if col=="detrended":
-                regions.detrend_traces()
+                self.detrend_traces()
             else:
                 raise ValueError(f"{col} not found in the dataframe.")
-        if axs is None:
+        createAxes = axs is None
+        if createAxes:
             xratios = np.array([.1,axratios[0],.1,axratios[1],.1])
             yratios = xratios[:3]
             xr = xratios/sum(xratios)
@@ -1662,55 +1678,51 @@ class Regions:
                 fig.add_axes([xr[0],yr[0],xr[1],yr[1]]),
                 fig.add_axes([xr[:3].sum(),yr[0],xr[3],yr[1]]),
             ]
-        regions.plotEdges(ax=axs[0],lw=.5,separate=separate)
-        regions.plotEdges(ax=axs[0],ix=indices, separate=True, fill=True, alpha=.5, image=False)
-        regions.plotPeaks(ax=axs[0],ix=indices, labels=True)
-        nr = int(np.round(regions.Freq/freqShow))
+        if hasattr(axs,"__iter__"):
+            roiAxes, traceAxes = axs[:2]
+            self.plotEdges(ax=roiAxes, lw=.5, separate=separate, color=roiColor)
+            self.plotEdges(ax=roiAxes, ix=indices, separate=True, fill=False, alpha=roiAlpha, image=False, lw=1.5)
+            self.plotPeaks(ax=roiAxes, ix=indices, labels=True)
+        else:
+            traceAxes = axs
+
+        nr = int(np.round(self.Freq / freqShow))
         if nr==0:
             nr=1
-        xs = np.vstack(regions.df.loc[indices,col].values)
+        xs = np.vstack(self.df.loc[indices, col].values)
         if nr>1:
-            t = rebin(regions.time, nr)
+            t = rebin(self.time, nr)
             xs = rebin(xs,nr,1)
         else:
-            t = regions.time
+            t = self.time
 
         for i in range(len(xs)):
             xs[i] = xs[i]-np.median(xs[i])
         offset = 0
-        if "color" in regions.df.columns:
-            colors = regions.df.loc[indices,"color"]
+        if traceColor is None:
+            if "color" in self.df.columns:
+                colors = self.df.loc[indices, "color"]
+            else:
+                colors = [MYCOLORS[ix%len(MYCOLORS)] for ix in indices]
         else:
-            colors = [MYCOLORS[ix%len(MYCOLORS)] for ix in indices]
+            colors = [traceColor]*len(indices)
         for x,ix,c in zip(xs, indices, colors):
-            axs[1].plot(t,x+offset,lw=.5,color=c)
-            axs[1].text(0,offset,str(ix)+" ",color=c,ha="right")
+            traceAxes.plot(t,x+offset,lw=.5,color=c)
+            traceAxes.text(0,offset,str(ix)+" ",color=c,ha="right")
             offset += xs.std()*Offset
-        axs[1].set_yticks([])
-        axs[1].set_xlabel("time [s]")
-        axs[0].set_yticks([])
-        axs[0].set_xticks([])
-        for sp in ["left","right","top"]: axs[1].spines[sp].set_visible(False)
-        if not protocol or not hasattr(regions,"protocol"):
+        if createAxes:
+            axs[1].set_yticks([])
+            axs[1].set_xlabel("time [s]")
+            axs[0].set_yticks([])
+            axs[0].set_xticks([])
+            for sp in ["left","right","top"]: axs[1].spines[sp].set_visible(False)
+        if not protocol or not hasattr(self, "protocol"):
             return None
-        yl = axs[1].get_ylim()
-        dy = yl[1]-yl[0]
-        offset = yl[0]/2 - dy/20
+        else:
+            from .utils import add_protocol
+            add_protocol(traceAxes, self.protocol)
 
-        for comp, df in regions.protocol.groupby("compound"):
-            for ii in df.index:
-                t0,t1 = df.loc[ii].iloc[-2:]
-                conc = df.loc[ii,"concentration"]
-                x,y = [t0,t1,t1,t0,t0],[-1,-1,-2,-2,-1]
-                y = np.array(y)
-                y = y*dy/20 + offset
-                plt.fill(x,y,color="grey",alpha =.3)
-                plt.text(t0,y[:-1].mean(), " "+conc,va="center", ha="left")
-                plt.plot(x,y,color="grey",)
 
-            plt.text(df.t_begin.min(),y[:-1].mean(),comp+" ",va="center", ha="right")
-            offset -= 1.3*dy/20
-            
     def plot_trace(regions, indices, axratios = [1,2.5], figsize=5, freqShow=2, cols=["trace"], Offset=10, separate=False,showProtocol=True, spacing=.1):
         for col in cols:
             if col not in regions.df.columns:

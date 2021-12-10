@@ -1,48 +1,87 @@
 from contextlib import contextmanager
 import numpy as np
 
+
+def mystyle_axes(ax, retain=None, xlim=None, ylim=None,bounded=None):
+    if retain is None:
+        retain = []
+    if bounded is None:
+        bounded = [True]*len(retain)
+    boundedDict = dict(zip(retain, bounded))
+    for sp in ax.spines:
+        ax.spines[sp].set_visible(sp in retain)
+    if xlim is None:
+        xlim = ax.get_xlim()
+    xt = ax.get_xticks()
+    if ylim is None:
+        ylim = ax.get_ylim()
+    yt = ax.get_yticks()
+    for sp in ["top", "bottom"]:
+        if len(xt) and sp in retain and boundedDict[sp]:
+            xbounds = xt[np.searchsorted(xt, xlim[0])], xt[np.searchsorted(xt, xlim[1] + 1e-10) - 1]
+            ax.spines[sp].set_bounds(xbounds)
+    for sp in ["left", "right"]:
+        if len(yt) and sp in retain and boundedDict[sp]:
+            ybounds = yt[np.searchsorted(yt, ylim[0])], yt[np.searchsorted(yt, ylim[1] + 1e-10) - 1]
+            ax.spines[sp].set_bounds(ybounds)
+    if "top" in retain:
+        ax.xaxis.set_ticks_position('top')
+        ax.xaxis.set_label_position('top')
+    if "right" in retain:
+        ax.yaxis.set_ticks_position('right')
+        ax.yaxis.set_label_position('right')
+    if "bottom" not in retain and "top" not in retain:
+        ax.set_xticks([])
+    if "right" not in retain and "left" not in retain:
+        ax.set_yticks([])
+
+
 @contextmanager
 def suppress_stdout():
     import os, sys
     with open(os.devnull, "w") as devnull:
         old_stdout = sys.stdout
         sys.stdout = devnull
-        try:  
+        try:
             yield
         finally:
             sys.stdout = old_stdout
-            
+
+
 @contextmanager
 def suppress_stderr():
     import os, sys
     with open(os.devnull, "w") as devnull:
         old_stderr = sys.stderr
         sys.stderr = devnull
-        try:  
+        try:
             yield
         finally:
             sys.stderr = old_stderr
-            
+
 
 def getCircularKernel(n, dtype="uint8"):
     from numpy import zeros
-    a = zeros((n,n), dtype)
+    a = zeros((n, n), dtype)
     for i in range(n):
         for j in range(n):
-            x = i-n//2
-            y = j-n//2
-            if x**2+y**2<=(n//2)**2:
-                a[i,j] = 1
+            x = i - n // 2
+            y = j - n // 2
+            if x ** 2 + y ** 2 <= (n // 2) ** 2:
+                a[i, j] = 1
     return a
 
+
 # find positions of elements in the list
-def pozicija(testlist,cond):
-    return [i for i,x in enumerate(testlist) if cond(x)]
+def pozicija(testlist, cond):
+    return [i for i, x in enumerate(testlist) if cond(x)]
+
 
 def polynom(c, x):
     from numpy import sum as npsum
-    out = [k*x**j for j,k in enumerate(c)]
-    return npsum(out, axis=0)
+    out = [k * x ** j for j, k in enumerate(c)]
+    return npsum(out, axis = 0)
+
 
 def is_number(x):
     try:
@@ -51,22 +90,25 @@ def is_number(x):
     except:
         return False
 
+
 def mode(l):
     from collections import Counter
     return Counter(l).most_common(1)[0][0]
 
+
 def td2str(x):
     try:
-        if isinstance(x,float):
+        if isinstance(x, float):
             ts = x
         else:
             ts = x.total_seconds()
         hours, remainder = divmod(ts, 3600)
         minutes, seconds = divmod(remainder, 60)
-        out = ('{}:{:02d}:{:02d}').format(int(hours), int(minutes), int(seconds)) 
+        out = ('{}:{:02d}:{:02d}').format(int(hours), int(minutes), int(seconds))
         return out.lstrip(":0")
     except:
         return "N/A"
+
 
 def td2secs(x):
     try:
@@ -76,12 +118,15 @@ def td2secs(x):
         from numpy import nan
         return nan
 
+
 def td_nanfloor(x, dt=1):
     from pandas import Timedelta
     try:
-        return x.floor(Timedelta(dt,unit="s"))
+        return x.floor(Timedelta(dt, unit = "s"))
     except:
         return x
+
+
 # def autocorr(sett, dtrange):
 #     from numpy import zeros, corrcoef
 #     ret = zeros(len(dtrange))
@@ -92,90 +137,78 @@ def td_nanfloor(x, dt=1):
 #             ret[k] = corrcoef(sett[:len(sett)-i],sett[i:])[0,1]
 #     return ret
 
-def add_protocol(ax, protocol, color="grey"):
-    yl = ax.get_ylim()
-    dy = yl[1]-yl[0]
-    offset = yl[0]/2 - dy/20
-    for comp, df in protocol.groupby("compound"):
-        for ii in df.index:
-            t0,t1 = df.loc[ii].iloc[-2:]
-            conc = df.loc[ii,"concentration"]
-            x,y = [t0,t1,t1,t0,t0],[-1,-1,-2,-2,-1]
-            y = np.array(y)
-            y = y*dy/20 + offset
-            ax.fill(x,y,color=color,alpha =.3)
-            ax.text(t0,y[:-1].mean(), " "+conc,va="center", ha="left")
-            ax.plot(x,y,color=color,)
-        ax.text(df.t_begin.min(),y[:-1].mean(),comp+" ",va="center", ha="right")
-        offset -= 1.3*dy/20
-
-def moving_average(a, n=3) :
+def moving_average(a, n=3):
     from numpy import cumsum
-    ret = cumsum(a, dtype=float)
+    ret = cumsum(a, dtype = float)
     ret[n:] = ret[n:] - ret[:-n]
     return ret[n - 1:] / n
 
-def moving_sum(a, n=3) :
+
+def moving_sum(a, n=3):
     from numpy import cumsum
-    ret = cumsum(a, dtype=float)
+    ret = cumsum(a, dtype = float)
     ret[n:] = ret[n:] - ret[:-n]
     return ret[n - 1:]
+
 
 def autocorr2d(sett, dxrange, dyrange):
     from numpy import zeros, corrcoef
     Nx, Ny = sett.shape
     ret = zeros((len(dxrange), len(dyrange)))
-    for kx,dx in enumerate(dxrange):
-        for ky,dy in enumerate(dyrange):
-            ret[kx,ky] = corrcoef(sett[  :Nx-dx,   :Ny-dy].flatten(),
-                                  sett[dx:     , dy:     ].flatten())[0,1]
+    for kx, dx in enumerate(dxrange):
+        for ky, dy in enumerate(dyrange):
+            ret[kx, ky] = corrcoef(sett[:Nx - dx, :Ny - dy].flatten(),
+                                   sett[dx:, dy:].flatten())[0, 1]
     return ret
 
-def autocorr(sett, dtrange, nsplits = 1):
+
+def autocorr(sett, dtrange, nsplits=1):
     from numpy import zeros, corrcoef, array, mean, std
     if nsplits == 1:
         ret = zeros(len(dtrange))
-        for k,i in enumerate(dtrange):
-            if i==0:
+        for k, i in enumerate(dtrange):
+            if i == 0:
                 ret[k] = 1.
             else:
-                ret[k] = corrcoef(sett[:len(sett)-i],sett[i:])[0,1]
+                ret[k] = corrcoef(sett[:len(sett) - i], sett[i:])[0, 1]
         return ret
     else:
-        out = []        
+        out = []
         for j in range(nsplits):
             ret = zeros(len(dtrange))
-            ss = sett[j*len(sett)//nsplits : (j+1)*len(sett)//nsplits]
-            for k,i in enumerate(dtrange):
-                if i==0:
+            ss = sett[j * len(sett) // nsplits: (j + 1) * len(sett) // nsplits]
+            for k, i in enumerate(dtrange):
+                if i == 0:
                     ret[k] = 1.
                 else:
-                    ret[k] = corrcoef(ss[:len(ss)-i],ss[i:])[0,1]
+                    ret[k] = corrcoef(ss[:len(ss) - i], ss[i:])[0, 1]
             out += [ret]
         out = array(out)
-        return ( mean(out,axis=0), std(out,axis=0) )
+        return (mean(out, axis = 0), std(out, axis = 0))
 
-def OU(theta,mu,sigma,tmax,x0,dt):
-    maxindex = int(float(tmax)/dt)
-    x=empty(maxindex)
-    x[0]=x0
-    w  = randn(maxindex)
-    a1 = 1.-theta*dt
-    a2 = mu*theta*dt
-    b  = sigma*dt**.5*w
-    for t in range(maxindex-1):
-        x[t+1] = a1*x[t] - a2 + b[t]
+
+def OU(theta, mu, sigma, tmax, x0, dt):
+    maxindex = int(float(tmax) / dt)
+    x = empty(maxindex)
+    x[0] = x0
+    w = randn(maxindex)
+    a1 = 1. - theta * dt
+    a2 = mu * theta * dt
+    b = sigma * dt ** .5 * w
+    for t in range(maxindex - 1):
+        x[t + 1] = a1 * x[t] - a2 + b[t]
     return x
 
 
 def order(testlist):
     import numpy as np
-    tmp = sorted([[i,el] for i,el in enumerate(testlist)], key=lambda xi: xi[1])
+    tmp = sorted([[i, el] for i, el in enumerate(testlist)], key = lambda xi: xi[1])
     return np.array([el[0] for el in tmp])
-    
+
+
 def tally(mylist):
     from collections import Counter
-    return sorted(Counter(mylist).most_common(),key=lambda duple: duple[0])
+    return sorted(Counter(mylist).most_common(), key = lambda duple: duple[0])
 
 
 # def multi_map(some_function, iterable, processes=1):
@@ -194,29 +227,31 @@ def tally(mylist):
 #     return out
 
 
-
-
-
 # if __name__=='__main__':
-extraColors = [ u'firebrick', u'darkolivegreen', u'indigo', u'indianred', u'darkseagreen', u'tomato', u'darkgoldenrod', u'lightblue', u'orangered', u'lime', u'darkslategrey', u'burlywood', u'dimgray', u'darkslategray', u'brown', u'dodgerblue', u'peru', u'chocolate', u'crimson', u'forestgreen', u'fuchsia', u'slateblue', u'olive']
+extraColors = [u'firebrick', u'darkolivegreen', u'indigo', u'indianred', u'darkseagreen', u'tomato', u'darkgoldenrod',
+               u'lightblue', u'orangered', u'lime', u'darkslategrey', u'burlywood', u'dimgray', u'darkslategray',
+               u'brown', u'dodgerblue', u'peru', u'chocolate', u'crimson', u'forestgreen', u'fuchsia', u'slateblue',
+               u'olive']
 
 
-def stochasticMaximize(fun,x0,steps = 10000, temp = 1., step = .1):
+def stochasticMaximize(fun, x0, steps=10000, temp=1., step=.1):
     global exponent, mcmc
     execfile('MCMCworker_RNApOnly_exclusions.py')
     from os.path import expanduser
     nPars = len(x0)
     exponent = fun
     import numpy as np
-    mcmc=MCMC(x0, Nsave=10*nPars, filename=expanduser('~/tmp/mcmc'), step = step, temp = temp, exclude=np.array([],dtype=int))
-    mcmc.cycle(steps,adjust=True)
-    outPars = np.loadtxt(mcmc.filename+".out", skiprows=steps//10//nPars*9//10)[:,1:-1].mean(axis=0)
+    mcmc = MCMC(x0, Nsave = 10 * nPars, filename = expanduser('~/tmp/mcmc'), step = step, temp = temp,
+                exclude = np.array([], dtype = int))
+    mcmc.cycle(steps, adjust = True)
+    outPars = np.loadtxt(mcmc.filename + ".out", skiprows = steps // 10 // nPars * 9 // 10)[:, 1:-1].mean(axis = 0)
     return outPars, fun(outPars)
 
 
 from collections import Mapping, Container
 from sys import getsizeof
- 
+
+
 def deep_getsizeof(o, ids):
     """Find the memory footprint of a Python object
  
@@ -235,17 +270,17 @@ def deep_getsizeof(o, ids):
     d = deep_getsizeof
     if id(o) in ids:
         return 0
- 
+
     r = getsizeof(o)
     ids.add(id(o))
- 
+
     if isinstance(o, str) or isinstance(0, unicode):
         return r
- 
+
     if isinstance(o, Mapping):
         return r + sum(d(k, ids) + d(v, ids) for k, v in o.iteritems())
- 
+
     if isinstance(o, Container):
         return r + sum(d(x, ids) for x in o)
- 
-    return r 
+
+    return r
