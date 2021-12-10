@@ -1534,12 +1534,14 @@ class Regions:
     def import_protocol(self,pathToProtocol):
         protocol = None
         try:
-            protocol = pd.read_csv(pathToProtocol, dtype=str)
-            protocol.dropna(how='all', inplace=True)
-            protocol["t_begin"] = pd.to_timedelta(["00:"+el if type(el)==str else "00:00:00" \
-                                                           for el in protocol["begin"]]).total_seconds()
-            protocol["t_end"] = pd.to_timedelta(["00:"+el if type(el)==str else (self.time[0]+len(self.time)/self.Freq)*1e9 \
-                                                         for el in protocol["end"]]).total_seconds()
+            from .protocol import Protocol
+            protocol = Protocol.from_file(pathToProtocol, t0 = self.time[0], tend = self.time[-1])
+            # protocol = pd.read_csv(pathToProtocol, dtype=str)
+            # protocol.dropna(how='all', inplace=True)
+            # protocol["t_begin"] = pd.to_timedelta(["00:"+el if type(el)==str else "00:00:00" \
+            #                                                for el in protocol["begin"]]).total_seconds()
+            # protocol["t_end"] = pd.to_timedelta(["00:"+el if type(el)==str else (self.time[0]+len(self.time)/self.Freq)*1e9 \
+            #                                              for el in protocol["end"]]).total_seconds()
             self.protocol = protocol
         except:
             warnings.warn(f"Could not import protocol from {pathToProtocol}.")

@@ -34,5 +34,6 @@ with warnings.catch_warnings():
     from .Recording import Recording, parse_leica
     from .utils import saveRois, get_filterSizes, saveMovie
     from .fitting import fit_spikes
+    from .protocol import Protocol
 
 __version__ = pkg_resources.get_distribution('islets').version
