@@ -14,6 +14,7 @@ def examine(self,
             mode="jupyter",
             name=None,
             lw=None,
+            fill=False
            ):
     if name is None:
         name = __name__
@@ -362,7 +363,7 @@ def examine(self,
             if mode in ["discard_sel","discard_unsel","plot"]:
                 seeIndices = [isee for isee in seeIndices if isee in self.df.index]
                 # out += [html.Br(),seeIndices.__repr__()]
-                fig = showRoisOnly(self, im=self.statImages[imagemode], showall=True, lw=lw, indices=seeIndices)
+                fig = showRoisOnly(self, im=self.statImages[imagemode], showall=True, lw=lw, indices=seeIndices,fill=fill)
         
             ##########
 #             if mode=="plot":

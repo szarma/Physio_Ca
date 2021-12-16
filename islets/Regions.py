@@ -586,7 +586,7 @@ class Regions:
                   lw=None,
                   alpha=1,
                   fill=False,
-                  scaleFontSize=12,
+                  scaleFontSize=8,
                   spline=True,
                   bound=True,
                   **kwargs
@@ -1548,14 +1548,14 @@ class Regions:
         return protocol
 
     # noinspection PyUnresolvedReferences
-    def examine(self, max_rois=10, imagemode=None, debug=False, startShow='',mode="jupyter",name=None,lw=None, test=False):
+    def examine(self, max_rois=10, imagemode=None, debug=False, startShow='',mode="jupyter",name=None,lw=None, test=False,fill=False):
         if test:
             from .examine_test import examine
         else:
             from .examine import examine
         if imagemode is None:
             imagemode = self.mode
-        return examine(self, max_rois=max_rois, imagemode=imagemode, debug=debug, startShow=startShow,mode=mode,name=name)
+        return examine(self, max_rois=max_rois, imagemode=imagemode, debug=debug, startShow=startShow,mode=mode,name=name, fill=fill)
 
     def examine_events(self, df, x, y, debug=False, **otherkwargs):
         from .examine_events import examine_events
