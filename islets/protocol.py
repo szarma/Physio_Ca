@@ -7,14 +7,16 @@ import warnings
 class Protocol(pd.DataFrame):
     @classmethod
     def from_file(cls, path, tend, t0=0):
-        num_alph = re.compile("\d\D")
-        protocol = pd.read_csv(path)
-        protocol["begin"][protocol["begin"].isna()] = "00:%02i" % t0
+        num_alph = re.compile("\d[a-zA-Z]")
+        protocol = pd.read_csv(path, na_values = [" "*j for j in range(1,10)])
+        beginNa = protocol.index[protocol["begin"].isna()]
+        protocol.loc[beginNa, "begin"] = "00:%02i" % t0
         protocol["t_begin"] = [pd.Timedelta("00:" + v).total_seconds() for v in protocol["begin"]]
         protocol["t_end"] = [pd.Timedelta("00:" + v).total_seconds() if isinstance(v, str) else np.nan for v in
                              protocol["end"]]
         if protocol["t_end"].isna().any():
-            protocol.loc[protocol["t_end"].isna().idxmax(), "t_end"] = max(tend, protocol["t_end"].max() + 1)
+            endNa = protocol.index[protocol["t_end"].isna()]
+            protocol.loc[endNa, "t_end"] = max(tend, protocol["t_end"].max() )
         cols = list(protocol.columns)
         for i in protocol.index:
             concentration = protocol.loc[i, "concentration"].replace(" ", "")
@@ -40,20 +42,27 @@ class Protocol(pd.DataFrame):
         protocol = cls(protocol)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            protocol.legs = protocol.get_legs()
+            try:
+                protocol.legs = protocol.get_legs()
+            except Exception as e:
+                warnings.warn(f"Could not get the legs: {e}")
         return protocol
 
-    def get_legs(self, parse_output=False):
+    def get_legs(self, parse_output=False, verbose=False):
         out = {}
         for t in self["t_begin"].sort_values():
             dft = self.query(f"t_begin<={t} and {t}<t_end").copy()
+            if verbose:
+                print (t, "\n", dft,"\n","="*5)
+
             if len(dft["compound"].unique()) != len(dft):
                 raise ValueError("Inconsistent treatments.")
             if parse_output:
-                v = {row["compound"]: (row["conc"], row["unit"]) for ir, row in dft.iterrows()}
+                v = {row["compound"].lower(): (row["conc"], row["unit"]) for ir, row in dft.iterrows()}
             else:
-                v = {row["compound"]: row["concentration"] for ir, row in dft.iterrows()}
-            out[t, dft["t_end"].min()] = v
+                v = {row["compound"].lower(): row["concentration"] for ir, row in dft.iterrows()}
+            if len(v):
+                out[t, dft["t_end"].min()] = v
         return out
 
     def get_scheme(self, symbolDict):
