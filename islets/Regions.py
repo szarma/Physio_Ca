@@ -57,7 +57,6 @@ def load_regions(path,
     except:
         print ("encountered error:", exc_info())
     if "interest" in regions.df.columns:
-        regions.df["activity"] = regions.df["interest"]
         del regions.df["interest"]
     return regions
 
@@ -497,6 +496,7 @@ class Regions:
                   scaleFontSize=12,
                   spline=True,
                   bound=True,
+                  lengths=None,
                   **kwargs
                   ):
         if ix is None:
@@ -573,10 +573,10 @@ class Regions:
                 ax.set_xlim(xlim)
             except:
                 pass
-
-        if scaleFontSize<=0: return None
-        if hasattr(self, "metadata") and "pxSize" in self.metadata:
-            lengths = [10,20,50,100,200,500]
+              
+        if image and scaleFontSize>=0 and hasattr(self, "metadata") and "pxSize" in self.metadata:
+            if lengths is None:
+                lengths = [10,20,50,100,200,500]
             il = np.searchsorted(lengths,self.metadata.pxSize*self.image.shape[1]/10)
             if il>=len(lengths):
                 il = len(lengths)-1
@@ -650,13 +650,16 @@ class Regions:
         else:
             self.df[saveAs] = activity
 
-    def color_according_to(self,col,cmap="turbo"):
+    def color_according_to(self,col,cmap="turbo", vmin = None, vmax = None):
         # check if column type is numeric
         if self.df[col].dtype.kind not in "biufc":
             raise ValueError(f"{col} elements not numeric.")
         x = self.df[col].values.copy().astype("float")
-        x -= np.percentile(x, 1)
-        x /= np.percentile(x, 95)
+        if vmin is None:
+            vmin = np.percentile(x, 1)
+        if vmax is None:
+            vmax = np.percentile(x, 95)
+        x = (x-vmin)/(vmax-vmin)
         rgbs = np.array([plt.cm.get_cmap(cmap)(xx)[:3] for xx in x])
         rgbs = (256*rgbs).astype(int)
         rgbs = np.minimum(rgbs,255)
@@ -1443,26 +1446,28 @@ class Regions:
     def import_protocol(self,pathToProtocol):
         protocol = None
         try:
-            protocol = pd.read_csv(pathToProtocol, dtype=str)
-            protocol.dropna(how='all', inplace=True)
-            protocol["t_begin"] = pd.to_timedelta(["00:"+el if type(el)==str else "00:00:00" \
-                                                           for el in protocol["begin"]]).total_seconds()
-            protocol["t_end"] = pd.to_timedelta(["00:"+el if type(el)==str else (self.time[0]+len(self.time)/self.Freq)*1e9 \
-                                                         for el in protocol["end"]]).total_seconds()
+            from .protocol import Protocol
+            protocol = Protocol.from_file(pathToProtocol, t0 = self.time[0], tend = self.time[-1])
+            # protocol = pd.read_csv(pathToProtocol, dtype=str)
+            # protocol.dropna(how='all', inplace=True)
+            # protocol["t_begin"] = pd.to_timedelta(["00:"+el if type(el)==str else "00:00:00" \
+            #                                                for el in protocol["begin"]]).total_seconds()
+            # protocol["t_end"] = pd.to_timedelta(["00:"+el if type(el)==str else (self.time[0]+len(self.time)/self.Freq)*1e9 \
+            #                                              for el in protocol["end"]]).total_seconds()
             self.protocol = protocol
         except:
             warnings.warn(f"Could not import protocol from {pathToProtocol}.")
         return protocol
 
     # noinspection PyUnresolvedReferences
-    def examine(self, max_rois=10, imagemode=None, debug=False, startShow='',mode="jupyter",name=None,lw=None, test=False):
+    def examine(self, max_rois=10, imagemode=None, debug=False, startShow='',mode="jupyter",name=None,lw=None, test=False,fill=False):
         if test:
             from .examine_test import examine
         else:
             from .examine import examine
         if imagemode is None:
             imagemode = self.mode
-        return examine(self, max_rois=max_rois, imagemode=imagemode, debug=debug, startShow=startShow,mode=mode,name=name)
+        return examine(self, max_rois=max_rois, imagemode=imagemode, debug=debug, startShow=startShow,mode=mode,name=name, fill=fill)
 
     def examine_events(self, df, x, y, debug=False, **otherkwargs):
         from .examine_events import examine_events

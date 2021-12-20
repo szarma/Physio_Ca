@@ -270,7 +270,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description = 'Process a recording: correct phase, correct for motion, segment and save.')
     parser.add_argument('recording', type = str,
-                        help = 'path to the recording, can be tif, lif, or nd2', metavar = "--recording")
+                        help = 'path to the recording, can be tif, lif, or nd2')
     parser.add_argument('--series', '-ser', type = str, default = None,
                         help = 'name of the series (relevant only for lif files)')
     parser.add_argument('--restrict', type = str, default = None,
@@ -319,6 +319,6 @@ if __name__ == "__main__":
     try:
         main(args)
     except Exception as e:
-        raise e
+        print (e)
     finally:
         sys.exit(0)

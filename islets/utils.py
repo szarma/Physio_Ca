@@ -520,7 +520,7 @@ def get_ccs(regions, timescales=None, verbose=False, time_ranges=None, skip_sequ
         output[tr] = ccs
     return output
 
-def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None):
+def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None,fill=False):
     import plotly.graph_objects as go
     from .Regions import MYCOLORS
     if indices is None:
@@ -549,7 +549,8 @@ def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None):
     if im!="none":
         imgpointer = createStaticImage(regions,
                                        showall=showall,
-                                       lw=lw
+                                       lw=lw,
+                                       fill=fill
                                       )
 
         f.add_layout_image(
@@ -608,7 +609,7 @@ def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None):
     
     
 
-def createStaticImage(regions,im=None,showall=True,returnPath=False,origin="lower",lw=None):
+def createStaticImage(regions,im=None,showall=True,returnPath=False,origin="lower",lw=None,fill=False,**imkwargs):
     if im is None:
         im = regions.statImages[regions.mode]
     if lw is None:
@@ -621,7 +622,8 @@ def createStaticImage(regions,im=None,showall=True,returnPath=False,origin="lowe
         # cmap = copy(plt.cm.Greys)
         # cmap.set_bad("lime")
     bkg_img_file = "/tmp/%i.png"%np.random.randint(int(1e10))
-    figsize=np.array(im.shape)[::-1]/30
+    figaspect = im.shape[0]/im.shape[1]
+    figsize=(8, 8*figaspect)
     fig = plt.figure(figsize=figsize)
     ax = fig.add_axes([0, 0, 1, 1])
     im[im==0] = np.nan
@@ -629,17 +631,19 @@ def createStaticImage(regions,im=None,showall=True,returnPath=False,origin="lowe
         im = np.clip(im, np.percentile(im,1), np.percentile(im,(1-20/im.size)*100))
     except:
         pass
-    ax.imshow(np.log(im+1),cmap=plt.cm.Greys, origin=origin)
+    if "cmap" not in imkwargs:
+        imkwargs["cmap"] = plt.cm.Greys
+    ax.imshow(np.log(im+1), origin=origin, **imkwargs)
     for sp in ax.spines: ax.spines[sp].set_visible(False)
     if showall:
         try:
-            regions.plotEdges(ax=ax,image=False,lw=figsize[0]*lw,separate=True,scaleFontSize=50)
+            regions.plotEdges(ax=ax,image=False,lw=figsize[0]*lw,separate=True,scaleFontSize=25,fill=fill)
         except:
             pass
     plt.xticks([])
     plt.yticks([])
     # plt.ylim(plt.ylim()[::-1])
-    plt.savefig(bkg_img_file,dpi=150)
+    plt.savefig(bkg_img_file,dpi=100)
     plt.close(fig)
     plt.switch_backend(currentBackend)
     if returnPath:

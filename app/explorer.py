@@ -37,9 +37,10 @@ def save_meta(n_clicks, txt, path, filetype):
             # with open(path, "w") as f:
             #     f.write(txt)
             proc = subprocess.Popen(
-                f'''sudo sh -c "echo -n '{txt}' > {path}"''',
+                f'''sudo sh -c "echo -n '{txt}' > '{path}'"''',
                 shell = True,
-                stdout = subprocess.PIPE
+                stdout = subprocess.PIPE,
+                text=True
             )
             outs, errs = proc.communicate()
             txt1 = open(path).read()
@@ -47,9 +48,10 @@ def save_meta(n_clicks, txt, path, filetype):
                 out = "File saved ✔"
             else:
                 out = "File not saved ✘"
-                output_list = [li for li in difflib.ndiff(txt, txt1) if li[0] != ' ']
-                # out += " | ".join(output_list)
-                out += "difference: > "+ repr(output_list) + " <"
+                # out += "\nOutput: "+str(outs)
+                # out += "\nError: "+str(errs)
+                # output_list = [li for li in difflib.ndiff(txt, txt1) if li[0] != ' ']
+                # out += "\ndifference: > "+ repr(output_list) + " <"
         return out
 
 def serve_examiner(username="srdjan", 
@@ -132,7 +134,7 @@ conditionalFormats += [
     for col in ["experiment"]
 ]
 
-users = sorted(["srdjan","johannes","sandra","marjan","nastja","ya-chi","dean","lidija","anita"])
+users = sorted(["srdjan","johannes","sandra","marjan","nastja","ya-chi","dean","lidija","anita","natalia"])
 app = dash.Dash(__name__,suppress_callback_exceptions=True)
 
 df = prepareDF(startFolder,constr,0)

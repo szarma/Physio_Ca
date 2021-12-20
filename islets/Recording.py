@@ -240,9 +240,7 @@ class Recording:
                     serrange = range(serrange[0], serrange[-1] + 1)
                     SeriesList = ["Series%03i" % i for i in serrange]
             except:
-                print(f"Cannot import {Series} from {self.path}. Probably a modified name.")
-                SeriesList = []
-                self.Series = {}
+                warn(f"Cannot import {Series} from {self.path}. Probably a modified name.")
                 return None
         try:
             self.Series
