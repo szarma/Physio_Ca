@@ -59,7 +59,6 @@ def load_regions(path,
     except:
         print ("encountered error:", exc_info())
     if "interest" in regions.df.columns:
-        regions.df["activity"] = regions.df["interest"]
         del regions.df["interest"]
     return regions
 
@@ -586,9 +585,10 @@ class Regions:
                   lw=None,
                   alpha=1,
                   fill=False,
-                  scaleFontSize=8,
+                  scaleFontSize=12,
                   spline=True,
                   bound=True,
+                  lengths=None,
                   **kwargs
                   ):
         if ix is None:
@@ -665,9 +665,9 @@ class Regions:
                 ax.set_xlim(xlim)
             except:
                 pass
-        if scaleFontSize<=0: return None
-        if hasattr(self, "metadata") and "pxSize" in self.metadata:
-            lengths = [10,20,50,100,200,500]
+        if image and scaleFontSize>=0 and hasattr(self, "metadata") and "pxSize" in self.metadata:
+            if lengths is None:
+                lengths = [10,20,50,100,200,500]
             il = np.searchsorted(lengths,self.metadata.pxSize*self.image.shape[1]/10)
             if il>=len(lengths):
                 il = len(lengths)-1
@@ -741,13 +741,16 @@ class Regions:
         else:
             self.df[saveAs] = activity
 
-    def color_according_to(self,col,cmap="turbo"):
+    def color_according_to(self,col,cmap="turbo", vmin = None, vmax = None):
         # check if column type is numeric
         if self.df[col].dtype.kind not in "biufc":
             raise ValueError(f"{col} elements not numeric.")
         x = self.df[col].values.copy().astype("float")
-        x -= np.percentile(x, 1)
-        x /= np.percentile(x, 95)
+        if vmin is None:
+            vmin = np.percentile(x, 1)
+        if vmax is None:
+            vmax = np.percentile(x, 95)
+        x = (x-vmin)/(vmax-vmin)
         rgbs = np.array([plt.cm.get_cmap(cmap)(xx)[:3] for xx in x])
         rgbs = (256*rgbs).astype(int)
         rgbs = np.minimum(rgbs,255)

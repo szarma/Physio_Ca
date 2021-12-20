@@ -54,7 +54,7 @@ def examine(self,
     roisImage = getFigure()#showRoisOnly(self,indices=self.df.index, im=self.statImages[imagemode], lw=lw)
     roisImage.update_layout({"dragmode":'lasso'},)
     if hasattr(self,"time"):
-        if not hasattr(self,"TwoParreit"):
+        if not hasattr(self,"TwoParFit"):
             self.infer_TwoParFit()
     SelectedRois = html.Div([
         html.Div([

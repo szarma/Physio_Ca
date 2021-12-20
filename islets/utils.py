@@ -609,7 +609,7 @@ def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None,fill=Fals
     
     
 
-def createStaticImage(regions,im=None,showall=True,returnPath=False,origin="lower",lw=None,fill=False):
+def createStaticImage(regions,im=None,showall=True,returnPath=False,origin="lower",lw=None,fill=False,**imkwargs):
     if im is None:
         im = regions.statImages[regions.mode]
     if lw is None:
@@ -631,7 +631,9 @@ def createStaticImage(regions,im=None,showall=True,returnPath=False,origin="lowe
         im = np.clip(im, np.percentile(im,1), np.percentile(im,(1-20/im.size)*100))
     except:
         pass
-    ax.imshow(np.log(im+1),cmap=plt.cm.Greys, origin=origin)
+    if "cmap" not in imkwargs:
+        imkwargs["cmap"] = plt.cm.Greys
+    ax.imshow(np.log(im+1), origin=origin, **imkwargs)
     for sp in ax.spines: ax.spines[sp].set_visible(False)
     if showall:
         try:
