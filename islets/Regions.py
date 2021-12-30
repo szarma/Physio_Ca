@@ -714,6 +714,25 @@ class Regions:
                     patheffects.Normal()
                 ])
 
+    def interpolate_over_breaks(self):
+        if not hasattr(self, "gaps"):
+            zeroTraces = np.all([tr == 0 for tr in self.df['trace']], 0)
+            gaps = np.where(np.abs(np.diff(zeroTraces)))[0].reshape((-1, 2)) + 1
+            gaps[:, 1] += 1
+            gaps = list(map(tuple, gaps))
+        else:
+            gaps = self.gaps
+        dix = int(2 * regions.Freq)
+        if "raw_trace" not in self.df.columns:
+            self.df["raw_trace"] = [tr.copy() for tr in self.df["trace"]]
+        for i in self.df.index:
+            tr = self.df.loc[i, "trace"]
+            for gap in gaps:
+                x0 = tr[gap[0] - dix:gap[0]].mean()
+                x1 = tr[gap[1]:gap[1] + dix].mean()
+                xr = np.arange(gap[0], gap[1] - 1)
+                tr[xr] = np.interp(xr, gap, [x0, x1])
+
     def get_activity(self, timescale, timeframe=None, zth=3, saveAs="activity"):
         if hasattr(timescale,"__iter__"):
             activity = np.zeros(len(self.df))
