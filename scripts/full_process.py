@@ -253,7 +253,7 @@ def main(args):
         regions.merge_closest(verbose = args.verbose)
         regions.sortInOrder()
         regions.metadata = metadata
-        regions.calcTraces(movie)
+        regions.calcTraces(m_correct)
         if "frame_range" in metadata and "Frequency" in metadata:
             regions.time += metadata.frame_range[0] / metadata.Frequency
         islets.utils.saveRois(regions, outputDir, filename = pklBase, add_date = False, formats = ["vienna"])
