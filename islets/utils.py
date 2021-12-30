@@ -651,7 +651,7 @@ def createStaticImage(regions,im=None,showall=True,returnPath=False,origin="lowe
     
     return PilImage.open(bkg_img_file)
 
-def motion_correct(movie, m_rshifted, freqMC=0.5, max_dev=(5, 5), plot_name="shifts.png", pinpoint_template = 0, Niter = 4, mode = "full", verbose = True):
+def motion_correct(movie, m_rshifted, freqMC=0.5, max_dev=(5, 5), plot_name="shifts.png", pinpoint_template = 0, Niter = 4, mode = "full", verbose = True, template = None):
     freq = movie.fr
     n_rebin = int(np.round(freq / freqMC))
     if n_rebin < 1:
@@ -693,9 +693,9 @@ def motion_correct(movie, m_rshifted, freqMC=0.5, max_dev=(5, 5), plot_name="shi
         plt.tight_layout();fig.savefig(plot_name)
 
     if mode in ["template-based", "full"]:
-
-        ichoose = int(pinpoint_template * len(reb_movie))
-        template = reb_movie[ichoose]
+        if template is None:
+            ichoose = int(pinpoint_template * len(reb_movie))
+            template = reb_movie[ichoose]
 
 
         for i_extract in range(Niter):
