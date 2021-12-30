@@ -1426,12 +1426,21 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
                     md["Time Range"] = "all"
                     md["Duration [s]"] = md["SizeT"]/md["Frequency"]
                 fs = get_filterSizes(md.pxSize)
-                if recType=="Nikon":
-                    movieFilename = os.path.join(saveDir, os.path.splitext(rec.Experiment)[0]+".mp4")
+                movies = [os.path.join(saveDir,fn) for fn in os.listdir(saveDir) if fn.endswith(".mp4")]
+                if len(movies):
+                    movies = sorted(movies, key = lambda xi: os.stat(xi).st_mtime)
+                    md["movie done"] = True
+                    movieFilename = movies[-1]
+                    md["path to movie"] = movieFilename
                 else:
-                    movieFilename = os.path.join(saveDir, rec.Experiment+"_"+series+".mp4")
-                md["path to movie"] = movieFilename
-                md["movie done"] = os.path.isfile(movieFilename)
+                    md["path to movie"] = "None"
+                    md["movie done"] = False
+#                 if recType=="Nikon":
+#                     movieFilename = os.path.join(saveDir, os.path.splitext(rec.Experiment)[0]+".mp4")
+#                 else:
+#                     movieFilename = os.path.join(saveDir, rec.Experiment+"_"+series+".mp4")
+                
+                
                 if md["movie done"]:
                     md["movie size [MB]"] = np.round(os.path.getsize(movieFilename)/10**6,1)
                 md["date"] = md["Start time"].date().__str__()
@@ -1448,7 +1457,7 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
                     pickleThere = os.path.isfile(pickleFile)
                     pklsDone[fsize] = pickleThere
                 md["pickles done"] = pklsDone
-                pathToProtocol = movieFilename.replace(".mp4","_protocol.txt")#.replace("_"+md["Time Range"]+"s","")
+                pathToProtocol = movieFilename.replace(".mp4","_protocol.txt").replace("_corrected","").replace("_original","")
                 md["path to protocol"] = pathToProtocol
                 md["protocol done"] = False
                 try:
