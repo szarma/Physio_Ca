@@ -716,15 +716,21 @@ class Regions:
 
     def interpolate_over_breaks(self):
         if not hasattr(self, "gaps"):
-            zeroTraces = np.all([tr == 0 for tr in self.df['trace']], 0)
+            rawTraceCol = 'raw_trace' if "raw_trace" in self.df.columns else "trace"
+            zeroTraces = np.all([tr == 0 for tr in self.df[rawTraceCol]], 0)
             gaps = np.where(np.abs(np.diff(zeroTraces)))[0].reshape((-1, 2)) + 1
             gaps[:, 1] += 1
             gaps = list(map(tuple, gaps))
+            self.gaps = gaps
         else:
             gaps = self.gaps
-        dix = int(2 * regions.Freq)
+        if len(gaps)==0:
+            warnings.warn("no gaps detected. If you no exactly where they are, you can enter them explicitly",
+                          UserWarning)
+            return None
         if "raw_trace" not in self.df.columns:
             self.df["raw_trace"] = [tr.copy() for tr in self.df["trace"]]
+        dix = int(2 * self.Freq)
         for i in self.df.index:
             tr = self.df.loc[i, "trace"]
             for gap in gaps:
