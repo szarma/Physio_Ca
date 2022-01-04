@@ -7,6 +7,35 @@ from scipy.stats import distributions as dst
 from matplotlib.lines import Line2D
 
 
+def get_tidy(Events, hwmin, hwmax , legKeys = None):
+    if legKeys is None:
+        legKeys = sorted([leg for leg in Events['leg'].unique() if isinstance(leg,str)])
+    rois = Events.roi.unique()
+    Nevents = pd.DataFrame(
+        index = rois,
+        columns = legKeys
+    )
+    for leg in legKeys:
+        Nevents[leg] = [len(Events.query(f"roi=={roi} and leg=='{leg}' and halfwidth>={hwmin} and halfwidth<{hwmax}")) for roi in rois]
+
+    activeRois = Nevents.index[(Nevents>1).all(1)]
+    tmp = []
+    for leg in legKeys:
+        ev = Events.query(f"leg=='{leg}'")
+        duration = ev["peakpoint"].max() - ev["peakpoint"].min()
+        for roi in activeRois:
+            ev = Events.query(f"roi=={roi} and leg=='{leg}' and halfwidth>={hwmin} and halfwidth<{hwmax}")
+            assert len(ev)==Nevents.loc[roi,leg]
+            tmp += [{
+                "leg": leg,
+                "roi": roi,
+                "nevents": len(ev),
+                "halfwidth": ev["halfwidth"].median(),# if len(ev)>3 else np.nan,
+                "height": ev["height"].median(), #if len(ev)>3 else np.nan,
+                "duration": duration
+            }]
+    return pd.DataFrame(tmp)
+
 def histogram_of_hw(Events, hwbinEdges, legDict, legColorDict, ax=None, orientation="bottom", hist_scale="left", control_line=False, n_sigma=False):
     if ax is None:
         plt.figure()
@@ -54,7 +83,6 @@ def histogram_of_hw(Events, hwbinEdges, legDict, legColorDict, ax=None, orientat
 
     legend = ax.legend(frameon = False)
 
-
 def boxplots_per_leg(roi_stats,legDict,legColorDict, pvalue=None, ax=None, **bx_kwargs):
     if ax is None:
         plt.figure()
@@ -95,10 +123,13 @@ def boxplots_per_leg(roi_stats,legDict,legColorDict, pvalue=None, ax=None, **bx_
     ax.set_xticks(range(len(legDict)))
     ax.set_xticklabels(list(legDict))
 
-def fancy_barchart(ax, df, c=(.4,) * 3, orientation="horizontal", plabel_offset=.1):
+def fancy_barchart(ax, df, c=(.4,) * 3, orientation="horizontal", plabel_offset=.1, value = "mean", error = None):
     c = df.get("color", c)
-    y = df["mean"].values
-    yerr = df["std"].values
+    y = df[value].values
+    if error is None:
+        yerr = np.zeros_like(y)
+    else:
+        yerr = df[error].values
     nticks = len(df.index)
     if orientation == "horizontal":
         ax.barh(range(nticks), y, color = c)
@@ -112,7 +143,8 @@ def fancy_barchart(ax, df, c=(.4,) * 3, orientation="horizontal", plabel_offset=
         ax.set_xticks([])
     else:
         raise ValueError("orientation can only be 'horizonal' or 'vertical'")
-
+    if error is None:
+        return None
     comparisons = [(i, j) for i in range(len(df.index)) for j in range(i + 1, len(df.index))]
     comparisons = sorted(comparisons, key = lambda ij: ((y + yerr)[list(ij)].max(), np.diff(ij)[0]))
 
@@ -215,7 +247,13 @@ def plot_events(Events, regions, timeUnits="s", plottype="scatter", only_legs=Fa
             x = x.copy() / 60
         if "bins" not in kwargs:
             kwargs.update({"vmin":0})
-        hx = ax.hexbin(x,y,yscale="log", mincnt = 1, gridsize=(1+int(duration/20), 50),**kwargs)
+        if "gridsize" not in kwargs:
+            kwargs.update({"gridsize":(1+int(duration/20), 50)})
+        if "mincnt" not in kwargs:
+            kwargs.update({"mincnt":1})
+            
+            
+        hx = ax.hexbin(x,y,yscale="log", **kwargs)
         cax = plt.colorbar(hx, cax=cax)
         cax.set_label("bin count")
         output[1] = output[1] + (cax,)
@@ -233,20 +271,28 @@ def plot_events(Events, regions, timeUnits="s", plottype="scatter", only_legs=Fa
     mystyle_axes(ax,["bottom","left"],bounded = [True,False])
     return output
 
-def get_events_per_min_per_nrois(Events, hwRegions):
-    nrois = len(Events.roi.unique())
+def get_events_per_min_per_nrois(Events, hwRegions, minEvents, reduceRois, Nbootstrap = 20):
+    ### active rois ar`e those that have at least 10 events
+    activeRois = [roi for roi, evroi in Events.groupby("roi") if len(evroi) > minEvents]
+    nrois = len(activeRois)//reduceRois
     ev_pm_par = []  # number of events per min per active roi
     for leg,ev in Events.groupby("leg"):
         duration = ev["peakpoint"].max() - ev["peakpoint"].min()
         for hwr in hwRegions:
             hwb = hwRegions[hwr]
-            ev = Events.query(f"leg=='{leg}' and halfwidth>{hwb[0]} and halfwidth<{hwb[1]}")
+            tmp = []
+            for j in range(Nbootstrap):
+                acts = np.random.choice(activeRois, nrois, replace=False)
+                ## take only events that belong to active rois
+                evs = Events[Events.roi.isin(acts)]
+                evs = evs.query(f"leg=='{leg}' and halfwidth>={hwb[0]} and halfwidth<{hwb[1]}")
+                tmp += [len(evs)]
 
             ev_pm_par += [{
                 "hw_region": hwr,
                 "leg": leg,
-                "mean": len(ev) / duration / nrois * 60,
-                "std": len(ev) ** .5 / duration / nrois * 60,
+                "epmpr": np.mean(tmp) / duration / nrois * 60,
+                "epmpr_std": np.std(tmp) / duration / nrois * 60,
             }]
     ev_pm_par = pd.DataFrame(ev_pm_par)
     return ev_pm_par
