@@ -1,39 +1,4 @@
 from contextlib import contextmanager
-import numpy as np
-
-
-def mystyle_axes(ax, retain=None, xlim=None, ylim=None,bounded=None):
-    if retain is None:
-        retain = []
-    if bounded is None:
-        bounded = [True]*len(retain)
-    boundedDict = dict(zip(retain, bounded))
-    for sp in ax.spines:
-        ax.spines[sp].set_visible(sp in retain)
-    if xlim is None:
-        xlim = ax.get_xlim()
-    xt = ax.get_xticks()
-    if ylim is None:
-        ylim = ax.get_ylim()
-    yt = ax.get_yticks()
-    for sp in ["top", "bottom"]:
-        if len(xt) and sp in retain and boundedDict[sp]:
-            xbounds = xt[np.searchsorted(xt, xlim[0])], xt[np.searchsorted(xt, xlim[1] + 1e-10) - 1]
-            ax.spines[sp].set_bounds(xbounds)
-    for sp in ["left", "right"]:
-        if len(yt) and sp in retain and boundedDict[sp]:
-            ybounds = yt[np.searchsorted(yt, ylim[0])], yt[np.searchsorted(yt, ylim[1] + 1e-10) - 1]
-            ax.spines[sp].set_bounds(ybounds)
-    if "top" in retain:
-        ax.xaxis.set_ticks_position('top')
-        ax.xaxis.set_label_position('top')
-    if "right" in retain:
-        ax.yaxis.set_ticks_position('right')
-        ax.yaxis.set_label_position('right')
-    if "bottom" not in retain and "top" not in retain:
-        ax.set_xticks([])
-    if "right" not in retain and "left" not in retain:
-        ax.set_yticks([])
 
 
 @contextmanager
