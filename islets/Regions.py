@@ -680,7 +680,7 @@ class Regions:
                 txt += self.metadata["pxUnit"]
             ax.text((x0+x1)/2, y1+.3*(y1-y0), txt, va="center", ha="center", size=scaleFontSize)
 
-    def plotPeaks(self, ix=None, ax=None, image=False, ms=3, labels=False,color=None, imkw_args={},absMarker=True, marker=".", location="peak",**kwargs):
+    def plotPeaks(self, ix=None, ax=None, image=False, ms=3, labels=False,color=None, imkw_args={},absMarker=True, marker=".", location="peak",labelEdgeDict=None,**kwargs):
         if ax is None:
             ax = plt.subplot(111)
         if image:
@@ -1782,7 +1782,8 @@ class Regions:
                    protocol=True,
                    roiColor="black",
                    roiAlpha = .6,
-                   traceColor = None
+                   traceColor = None,
+                   labels = True
                    ):
         if col not in self.df.columns:
             if col=="detrended":
@@ -1805,7 +1806,7 @@ class Regions:
             roiAxes, traceAxes = axs[:2]
             self.plotEdges(ax=roiAxes, lw=.5, separate=separate, color=roiColor)
             self.plotEdges(ax=roiAxes, ix=indices, separate=True, fill=False, alpha=roiAlpha, image=False, lw=1.5)
-            self.plotPeaks(ax=roiAxes, ix=indices, labels=True)
+            self.plotPeaks(ax=roiAxes, ix=indices, labels=labels)
         else:
             traceAxes = axs
 
@@ -1831,7 +1832,8 @@ class Regions:
             colors = [traceColor]*len(indices)
         for x,ix,c in zip(xs, indices, colors):
             traceAxes.plot(t,x+offset,lw=.5,color=c)
-            traceAxes.text(0,offset,str(ix)+" ",color=c,ha="right")
+            if labels:
+                traceAxes.text(0,offset,str(ix)+" ",color=c,ha="right")
             offset += xs.std()*Offset
         if createAxes:
             axs[1].set_yticks([])
