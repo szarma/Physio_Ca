@@ -109,7 +109,7 @@ class Recording:
                 self.allSeries = self.metadata.Name.values
                 
     def __del__(self):
-        if hasattr(self, "tempdir"):
+        if hasattr(self, "tempdir") and not self.tempdir is None:
             from os import system
             system(f"rm -rf {self.tempdir}")
         
