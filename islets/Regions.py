@@ -709,10 +709,11 @@ class Regions:
             if labels:
                 from matplotlib import patheffects
                 tx = ax.text(*p[::-1],s=" "+str(i),color=c, ha="center",va="center",**kwargs)
-                tx.set_path_effects([
-                    patheffects.Stroke(linewidth=1.5, foreground='w'),
-                    patheffects.Normal()
-                ])
+                if labelEdgeDict is not None:
+                    tx.set_path_effects([
+                        patheffects.Stroke(**labelEdgeDict),
+                        patheffects.Normal()
+                    ])
 
     def interpolate_over_breaks(self):
         if not hasattr(self, "gaps"):
