@@ -170,7 +170,8 @@ def get_series_dir(pathToExp, series):
     if not os.path.isdir(folder):
         return []
     
-    relevantsubdirs = [sd for sd in os.listdir(folder) if series == sd or series == "_".join(sd.split("_")[:-1])]
+    #relevantsubdirs = [sd for sd in os.listdir(folder) if series == sd or series == "_".join(sd.split("_")[:-1])]
+    relevantsubdirs = [sd for sd in os.listdir(folder) if series in sd]
     return relevantsubdirs
 
 def get_filterSizes(px, physSize=5.5):
@@ -1435,10 +1436,6 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
                 else:
                     md["path to movie"] = "None"
                     md["movie done"] = False
-#                 if recType=="Nikon":
-#                     movieFilename = os.path.join(saveDir, os.path.splitext(rec.Experiment)[0]+".mp4")
-#                 else:
-#                     movieFilename = os.path.join(saveDir, rec.Experiment+"_"+series+".mp4")
                 
                 
                 if md["movie done"]:
@@ -1457,7 +1454,10 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
                     pickleThere = os.path.isfile(pickleFile)
                     pklsDone[fsize] = pickleThere
                 md["pickles done"] = pklsDone
-                pathToProtocol = movieFilename.replace(".mp4","_protocol.txt").replace("_corrected","").replace("_original","")
+                if md["movie done"]:
+                    pathToProtocol = movieFilename.replace(".mp4","_protocol.txt").replace("_corrected","").replace("_original","")
+                else:
+                    pathToProtocol = os.path.join(saveDir, "%s_%s_protocol.txt"%(md["experiment"],md["series"]))
                 md["path to protocol"] = pathToProtocol
                 md["protocol done"] = False
                 try:

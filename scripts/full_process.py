@@ -133,7 +133,7 @@ def create_movie(recording, frequency, restrict, series, input_type, channel, ve
 
         movie = islets.cmovie(images, fr = fr)
         movie.filename = images.filename
-
+    del rec
     return movie, metadata
 
 
