@@ -1,14 +1,10 @@
 # -*- coding: utf-8 -*-
-import difflib
-import subprocess
-
 import dash
 from dash import html, dcc, dash_table
 from dash.dash_table.Format import Format, Scheme  # , Sign, Symbol
 from dash.dependencies import Input, Output, State
 from dash import no_update
 import json
-import os
 from sys import exc_info
 from islets.general_functions import td2str
 from islets.utils import import_data
