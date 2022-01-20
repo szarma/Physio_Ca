@@ -169,9 +169,8 @@ def get_series_dir(pathToExp, series):
     folder = pathToExp+f"_analysis/"
     if not os.path.isdir(folder):
         return []
-    
     #relevantsubdirs = [sd for sd in os.listdir(folder) if series == sd or series == "_".join(sd.split("_")[:-1])]
-    relevantsubdirs = [sd for sd in os.listdir(folder) if series in sd]
+    relevantsubdirs = [sd for sd in os.listdir(folder) if series in sd and os.path.isdir(os.path.join(folder,sd))]
     return relevantsubdirs
 
 def get_filterSizes(px, physSize=5.5):
@@ -1337,10 +1336,6 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
                 path = os.path.join(cur,f)
                 recordings += [path]
     recordings = sorted(recordings)
-
-    from .utils import get_series_dir, get_filterSizes
-    import numpy as np
-    import pandas as pd
 
     status = []
     ilifs = 0
