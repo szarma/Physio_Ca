@@ -33,12 +33,11 @@ def beautify_protocol(protocol):
 
 def ruler(fig, margin=.5):
     from matplotlib.ticker import MultipleLocator
-    from .general_functions import mystyle_axes
     figwidth = fig.get_figwidth()
     figheight = fig.get_figheight()
     dax = fig.add_axes([0, 0, 1, 1],
                        zorder=-2,
-                       # facecolor=(.98,)*3#"whitesmoke"
+                       facecolor=(.98,)*3#"whitesmoke"
                        )
     dax.axvline(margin, color="salmon", lw=.5, )
     dax.axvline(figwidth - margin, color="salmon", lw=.5, )
@@ -321,7 +320,6 @@ def emphasize_region(ax, x, y, extend=(0, 0), **line_kwargs):
 
 def plot_events(Events, regions, timeUnits="s", plottype="scatter", only_legs=False, protocol=None, legColorDict=None,
                 axheight=2, offset=2, **kwargs):
-    from .general_functions import mystyle_axes
     from .utils import add_protocol
 
     if protocol is None:
