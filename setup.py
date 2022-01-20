@@ -16,5 +16,5 @@ setup(
     packages=find_packages(),
     long_description=long_description,
     install_requires=requirements,
-    authors='Srdjan Sarikas, Johannes Pfabe'
+    author='Srdjan Sarikas & Johannes Pfabe'
 )
