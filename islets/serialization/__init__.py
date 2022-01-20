@@ -35,6 +35,9 @@ def get_serializer(file_path: Union[str, Path], file_format: str = 'infer') -> I
 
     serializer: IDataSerializer
 
+    if type(file_path) == 'str':
+        file_path = Path(file_path)
+
     if file_format == 'infer':
         for key, value in __supported_file_types__.items():
             if file_path.suffix in value:

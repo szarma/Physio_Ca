@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Union
-from ..Regions import Regions
+from .. import Regions
 
 
 class IDataSerializer(ABC):
