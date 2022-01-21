@@ -2,25 +2,14 @@ import pandas as pd
 import re
 import numpy as np
 import warnings
-
+num_alph = re.compile("\d[a-zA-Z]")
 
 class Protocol(pd.DataFrame):
-    @classmethod
-    def from_file(cls, path, tend, t0=0):
-        num_alph = re.compile("\d[a-zA-Z]")
-        protocol = pd.read_csv(path, na_values = [" "*j for j in range(1,10)])
-        beginNa = protocol.index[protocol["begin"].isna()]
-        protocol.loc[beginNa, "begin"] = "00:%02i" % t0
-        protocol["t_begin"] = [pd.Timedelta("00:" + v).total_seconds() for v in protocol["begin"]]
-        protocol["t_end"] = [pd.Timedelta("00:" + v).total_seconds() if isinstance(v, str) else np.nan for v in
-                             protocol["end"]]
-        if protocol["t_end"].isna().any():
-            endNa = protocol.index[protocol["t_end"].isna()]
-            protocol.loc[endNa, "t_end"] = max(tend, protocol["t_end"].max() )
-        cols = list(protocol.columns)
-        for i in protocol.index:
-            concentration = protocol.loc[i, "concentration"].replace(" ", "")
-            protocol.loc[i, "concentration"] = concentration
+    def add_conc_and_unit_columns(self):
+        cols = list(self.columns)
+        for i in self.index:
+            concentration = self.loc[i, "concentration"].replace(" ", "")
+            self.loc[i, "concentration"] = concentration
             matches = num_alph.findall(concentration)
             if len(matches) > 1:
                 raise ImportError("at least one concentration does not have the appropriate form (quantity, unit)")
@@ -36,16 +25,38 @@ class Protocol(pd.DataFrame):
                 isplit = num_alph.search(concentration).start() + 1
                 conc = concentration[:isplit]
                 unit = concentration[isplit:]
-            protocol.loc[i, "conc"] = conc
-            protocol.loc[i, "unit"] = unit
-        protocol = protocol[cols[:2] + ["conc", "unit"] + cols[2:]]
-        protocol = cls(protocol)
+            self.loc[i, "conc"] = conc
+            self.loc[i, "unit"] = unit
+        self = self[cols[:2] + ["conc", "unit"] + cols[2:]]
+
+    @classmethod
+    def from_df(cls, df):
+        protocol = cls(df)
+        for c in ["conc","unit"]:
+            if c in df.columns:
+                del df[c]
+        protocol.add_conc_and_unit_columns()
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             try:
                 protocol.legs = protocol.get_legs()
             except Exception as e:
                 warnings.warn(f"Could not get the legs: {e}")
+        return protocol
+
+    @classmethod
+    def from_file(cls, path, tend, t0=0):
+        df = pd.read_csv(path, na_values = [" "*j for j in range(1,10)])
+        beginNa = df.index[df["begin"].isna()]
+        df.loc[beginNa, "begin"] = "00:%02i" % t0
+        df["t_begin"] = [pd.Timedelta("00:" + v).total_seconds() for v in df["begin"]]
+        df["t_end"] = [pd.Timedelta("00:" + v).total_seconds() if isinstance(v, str) else np.nan for v in
+                             df["end"]]
+        if df["t_end"].isna().any():
+            endNa = df.index[df["t_end"].isna()]
+            df.loc[endNa, "t_end"] = max(tend, df["t_end"].max() )
+        protocol = cls.from_df(df)
+        protocol.path_to_file = path
         return protocol
 
     def get_legs(self, parse_output=False, verbose=False):
@@ -82,3 +93,59 @@ class Protocol(pd.DataFrame):
                 letter += symbolDict[symbol_key]
             prtl += [letter]
         return "-".join(prtl)
+    
+    def copy(self):
+        protocol = super(Protocol, self).copy()
+        protocol = self.from_df(protocol)
+        return protocol
+        
+    def plot_protocol( self, ax, color=(.95,)*3, hspace = 0.2, only_number = True, linenkwargs={}, label = "close", fontsize=10):
+        if only_number:
+            col = "conc"
+        else:
+            col = "concentration"
+
+        fig = ax.get_figure()
+        compounds = list(self["compound"].unique())
+        # put glucose first
+        for ic,comp in enumerate(compounds):
+            if "glc" in comp.lower() or "glu" in comp.lower() or comp=="" :
+                compounds.pop(ic)
+                compounds = [comp] + compounds
+                break
+        nComp = len(compounds)
+        figheight = fig.get_figheight()
+        figheight = figheight*72
+        axHeight = nComp*fontsize*(1+2*hspace)/figheight
+        pos = ax.get_position()
+        axp = fig.add_axes([pos.x0, pos.y0+pos.height*1.02, pos.width, axHeight], label="protocol")
+        axp.set_ylim(0, nComp)
+        fig.canvas.draw()
+        for ic,comp in enumerate(compounds):
+            df = self.query(f"compound=='{comp}'")
+            for ii in df.index:
+                t0,t1 = df.loc[ii,["t_begin","t_end"]]
+                conc = df.loc[ii,col]
+                x = [t0,t1,t1,t0,t0]
+                y = np.array([1,1,0,0,1])*(1-hspace)+ic+hspace/2
+                c = df.loc[ii].get("color",color)
+                if "edgecolor" not in linenkwargs:
+                    linenkwargs["edgecolor"] = "black"
+
+                if "linewidth" not in linenkwargs:
+                    linenkwargs["linewidth"] = 1
+
+                ln = axp.fill(x,y,color=c,**linenkwargs)[0]
+                ln.set_clip_on(False)
+                ftc = df.loc[ii].get("fontcolor","black")
+                yt = ic+.5 - fontsize/figheight#y[:-1].mean()
+                axp.text(t0,yt, " "+str(conc),va="center", ha="left", color=ftc, size = fontsize)
+                #ax.plot(x,y,color="black",lw=1)
+            if label == "close":
+                axp.text(df.t_begin.min(),yt,comp+" ",va="center", ha="right", fontsize = fontsize)
+            if label == "left":
+                axp.text(self.t_begin.min(),yt,comp+" ",va="center", ha="right", fontsize = fontsize)
+        axp.set_clip_on(False)
+        #ax.set_yticks([])
+        #mystyle_axes(ax)
+        return axp

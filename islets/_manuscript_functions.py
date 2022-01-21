@@ -7,6 +7,119 @@ from scipy.stats import distributions as dst
 from matplotlib.lines import Line2D
 import warnings
 
+from IPython.display import display, HTML
+import statsmodels.api as sm
+#
+def fitLine(x, y, alpha=0.05, newx=[], plotFlag=False, show0=False, summary=False, ax=None, prediction=True):
+    ''' Fit a curve to the data using a least squares 1st order polynomial fit 
+    mostly copied from: central.scipy.org/item/50/1/line-fit-with-confidence-intervals
+    '''
+    from scipy.stats import t
+    # Summary data
+    n = len(x)			   # number of samples     
+    
+    Sxx = np.sum(x**2) - np.sum(x)**2/n
+    Sxy = np.sum(x*y) - np.sum(x)*np.sum(y)/n    
+    mean_x = np.mean(x)
+    mean_y = np.mean(y)
+    
+    # Linefit
+    b = Sxy/Sxx
+    a = mean_y - b*mean_x
+    
+    # Residuals
+    fit = lambda xx: a + b*xx    
+    residuals = y - fit(x)
+    
+    var_res = np.sum(residuals**2)/(n-2)
+    sd_res = np.sqrt(var_res)
+    
+    # Confidence intervals
+    se_b = sd_res/np.sqrt(Sxx)
+    se_a = sd_res*np.sqrt(np.sum(x**2)/(n*Sxx))
+    
+    df = n-2                            # degrees of freedom
+    tval = t.isf(alpha/2., df) 	# appropriate t value
+    
+    ci_a = a + tval*se_a*np.array([-1,1])
+    ci_b = b + tval*se_b*np.array([-1,1])
+
+    # create series of new test x-values to predict for
+    npts = 100
+    if show0:
+        px = np.linspace(   0.    ,np.max(x),num=npts)
+    else:
+        px = np.linspace(np.min(x),np.max(x),num=npts)
+    
+    se_fit     = lambda x: sd_res * np.sqrt(  1./n + (x-mean_x)**2/Sxx)
+    se_predict = lambda x: sd_res * np.sqrt(1+1./n + (x-mean_x)**2/Sxx)
+
+    if summary:    
+        print ('Fitting y = a + b*x')
+        print ('a={0:5.4f}+/-{1:5.4f}, b={2:5.4f}+/-{3:5.4f}'.format(a,tval*se_a,b,tval*se_b))
+        print ('Confidence intervals: ci_a=({0:5.4f} - {1:5.4f}), ci_b=({2:5.4f} - {3:5.4f})'.format(ci_a[0], ci_a[1], ci_b[0], ci_b[1]))
+        print ('Residuals: variance = {0:5.4f}, standard deviation = {1:5.4f}'.format(var_res, sd_res))
+        print ('alpha = {0:.3f}, tval = {1:5.4f}, df={2:d}'.format(alpha, tval, df))
+    
+    # Return info
+    ri = {'residuals': residuals, 
+        'var_res': var_res,
+        'sd_res': sd_res,
+        'alpha': alpha,
+        'tval': tval,
+        'df': df,
+        'se_fit': se_fit,
+         }
+    
+    if plotFlag:
+        # Plot the data
+        if ax is None:
+            plt.figure()
+            ax = plt.subplot(111)
+        
+        ax.plot(px, fit(px),'k', label='Regression line')
+        ax.plot(x,y,'r.', label='Sample observations')
+        
+        x.sort()
+        limit = (1-alpha)*100
+        ax.plot(px, fit(px)+tval*se_fit(px), 'r--', label='Confidence limit ({0:.1f}%)'.format(limit))
+        ax.plot(px, fit(px)-tval*se_fit(px), 'r--')
+        if prediction:
+            ax.plot(px, fit(px)+tval*se_predict(px), 'c--', label='Prediction limit ({0:.1f}%)'.format(limit))
+            ax.plot(px, fit(px)-tval*se_predict(px), 'c--')
+
+        ax.set_xlabel('X values')
+        ax.set_ylabel('Y values')
+        #ax.set_xlim(0,plt.xlim()[1]*1.1)
+        ax.set_title('Linear regression and confidence limits')
+        
+        # configure legend
+        leg = ax.legend(loc=0)
+        # leg = plt.gca().get_legend()
+        ltext = leg.get_texts()
+        plt.setp(ltext, fontsize=10)
+
+    output = {
+        "func": "y = a + b*x",
+        "params": (a,b),
+        "confidence interval": (ci_a, ci_b),
+        "t value": tval,
+        "standard error": (se_a, se_b),
+        "details": ri,
+    }
+    if newx != []:
+        try:
+            len(newx)
+        except AttributeError:
+            newx = np.array([newx])
+    
+        print ('Example: x = {0}+/-{1} =&gt; se_fit = {2:5.4f}, se_predict = {3:6.5f}'\
+        .format(newx[0], tval*se_predict(newx[0]), se_fit(newx[0]), se_predict(newx[0])))
+        
+        newy = (fit(newx), fit(newx)-se_predict(newx), fit(newx)+se_predict(newx))
+        output ["newy"] = newy
+    return output
+
 protocolColorScheme = {
     ("glucose", "6mM"): (0.98,) * 3,
     ("glucose", "8mM"): (0.8,) * 3,
@@ -59,13 +172,38 @@ def silent_fit(model):
         result = model.fit()
         return result, w
 
-
-def get_summary(model, legs, ref_leg=None):
+def get_hw_effect(events, ref_leg = None, legs = None, control_for_roi = True, minEvents = 10, ):
+    events = events.copy()
+    if legs is None:
+        legs = events["leg"].dropna().unique()
     if ref_leg is None:
-        ref_leg = legs[0]
-        legs = legs[1:]
+        ref_leg = events[~events["leg"].isna()].iloc[0]['leg']
+    events["log10_hw"] = np.log10(events["halfwidth"])
+    if control_for_roi:
+        chooseRois = [roi for roi, ev in events.groupby("roi") if
+                      all([len(ev.query(f"leg=='{leg}'")) >= minEvents for leg in legs])]
+        print (f"There are {len(chooseRois)} rois, which have at least {minEvents} events in all legs.")
+        events = events[events.roi.isin(chooseRois)]
+        events.dropna(inplace=True)
+        model = sm.MixedLM.from_formula(f"log10_hw ~ C(leg, Treatment('{ref_leg}')) + 1", data = events, groups = "roi")
+    else:
+        model = sm.OLS.from_formula(f"log10_hw ~ C(leg, Treatment('{ref_leg}')) + 1", data = events)
     result, warns = silent_fit(model)
-    html_summary = "<table>"
+    legs = [leg for leg in legs if leg!=ref_leg]
+    # summary = get_summary(model, legs, ref_leg)
+    html_summary = \
+         """<style type="text/css">
+            /* Fix details summary arrow
+               not shown in Firefox
+               due to bootstrap
+               display: block;
+             */
+            summary {
+                display: list-item;
+            }
+            </style>"""
+    html_summary += f"<div>reference leg: {ref_leg}</div>"
+    html_summary += "<table>"
     for leg in legs:
         coef = result.params[f"C(leg, Treatment('{ref_leg}'))[T.{leg}]"]
         pv = result.pvalues[f"C(leg, Treatment('{ref_leg}'))[T.{leg}]"]
@@ -75,9 +213,41 @@ def get_summary(model, legs, ref_leg=None):
     #         html_summary += "<br>"
     html_summary += "</table>"
     if len(warns):
-        html_summary += f"~ {len(warns)} warning(s) encountered when fitting you might want to check full output ~"
+        html_summary += f"<span style='font-size:70%'>~ {len(warns)} warning(s) encountered when fitting you might want to check full output ~</span>"
     summary = result.summary()
-    return f"{html_summary}<details><summary>full output</summary>{summary._repr_html_()}</details>"
+    html_summary = f"{html_summary}<details><summary style='color:navy'>full output</summary>{summary._repr_html_()}</details>"
+    display(HTML(html_summary))
+    return result
+
+# def get_summary(model, legs, ref_leg=None):
+#     if ref_leg is None:
+#         ref_leg = legs[0]
+#         legs = legs[1:]
+#     result, warns = silent_fit(model)
+#     html_summary = \
+#          """<style type="text/css">
+#             /* Fix details summary arrow
+#                not shown in Firefox
+#                due to bootstrap
+#                display: block;
+#              */
+#             summary {
+#                 display: list-item;
+#             }
+#             </style>"""
+#     html_summary += "<table>"
+#     for leg in legs:
+#         coef = result.params[f"C(leg, Treatment('{ref_leg}'))[T.{leg}]"]
+#         pv = result.pvalues[f"C(leg, Treatment('{ref_leg}'))[T.{leg}]"]
+#         effect_in_pc = (10 ** coef - 1) * 100
+#         html_summary += f"""<tr><td style="text-align:left">Obtained effect for leg '<span style='font-family:monospace'>{leg}</span>':</td><td>%+.2g%%,</td><td>with the p-value of %.2g</td></tr>""" % (
+#         effect_in_pc, pv)
+#     #         html_summary += "<br>"
+#     html_summary += "</table>"
+#     if len(warns):
+#         html_summary += f"~ {len(warns)} warning(s) encountered when fitting you might want to check full output ~"
+#     summary = result.summary()
+#     return f"{html_summary}<details><summary>full output</summary>{summary._repr_html_()}</details>"
 
 
 def get_tidy(Events, hwmin, hwmax, legKeys=None):
@@ -318,10 +488,17 @@ def emphasize_region(ax, x, y, extend=(0, 0), **line_kwargs):
     ax.add_line(ln)
 
 
-def plot_events(Events, regions, timeUnits="s", plottype="scatter", only_legs=False, protocol=None, legColorDict=None,
-                axheight=2, offset=2, **kwargs):
-    from .utils import add_protocol
-
+def plot_events(Events,
+                regions,
+                timeUnits="s",
+                plottype="hexbin",
+                only_legs=False,
+                protocol=None,
+                legColorDict=None,
+                axheight=2,
+                offset=2,
+                ySpineOffset=100,
+                **kwargs):
     if protocol is None:
         protocol = regions.protocol.copy()
 
@@ -332,15 +509,18 @@ def plot_events(Events, regions, timeUnits="s", plottype="scatter", only_legs=Fa
         Events = Events[~Events.leg.isna()].copy()
 
     ### creation and formatting of figure
-    axwidth = duration / 500
+    axwidth = (duration+ySpineOffset) / 500
 
     figwidth, figheight = axwidth + 2 * offset, axheight + 2 * offset
     fig = plt.figure(figsize=(figwidth, figheight))
     ax = fig.add_axes([offset / figwidth, offset / figheight, axwidth / figwidth, axheight / figheight])
-    axp = fig.add_axes([offset / figwidth, (axheight + 1.1 * offset) / figheight, axwidth / figwidth,
-                        offset / 10 / figheight * len(protocol.compound.unique())])
-    axp.get_shared_x_axes().join(ax, axp)
-    mystyle_axes(axp)
+    # axp = fig.add_axes([offset / figwidth, (axheight + 1.1 * offset) / figheight, axwidth / figwidth,
+    #                     offset / 10 / figheight * len(protocol.compound.unique())])
+    # axp.get_shared_x_axes().join(ax, axp)
+    # mystyle_axes(axp)
+    # from .utils import add_protocol
+    # add_protocol(axp, protocol)
+    axp = protocol.plot_protocol(ax, only_number = False)
     output = [fig, (ax, axp)]
     if timeUnits[0] == "m":
         # duration = duration/60
@@ -350,7 +530,7 @@ def plot_events(Events, regions, timeUnits="s", plottype="scatter", only_legs=Fa
     elif timeUnits[0] == "s":
         ax.set_xlabel("time [s]")
     ax.set_ylabel(r"$\tau_{1/2}$, halfwidth [s]")
-    add_protocol(axp, protocol)
+    protocol.plot_protocol(ax)
     ## plotting
     if plottype == "hexbin":
         cax = fig.add_axes(
@@ -364,6 +544,8 @@ def plot_events(Events, regions, timeUnits="s", plottype="scatter", only_legs=Fa
             kwargs.update({"gridsize": (1 + int(duration / 20), 50)})
         if "mincnt" not in kwargs:
             kwargs.update({"mincnt": 1})
+        if "cmap" not in kwargs:
+            kwargs.update({"cmap": "hot"})
 
         hx = ax.hexbin(x, y, yscale="log", **kwargs)
         cax = plt.colorbar(hx, cax=cax)
@@ -379,8 +561,10 @@ def plot_events(Events, regions, timeUnits="s", plottype="scatter", only_legs=Fa
             ax.plot(x, y, ".", c="lightgrey" if leg is None else legColorDict[leg], **kwargs)
     else:
         raise ValueError("plottype can only be 'scatter' or 'hexbin")
-
+    ax.set_xlim (regions.time[0]-ySpineOffset, regions.time[-1])
+    axp.set_xlim(regions.time[0]-ySpineOffset, regions.time[-1])
     mystyle_axes(ax, ["bottom", "left"], bounded=[True, False])
+    mystyle_axes(axp)
     return output
 
 
