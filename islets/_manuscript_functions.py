@@ -569,9 +569,12 @@ def plot_events(Events,
 
 
 def get_events_per_min_per_nrois(Events, hwRegions, minEvents, reduceRois, Nbootstrap=20):
-    ### active rois ar`e those that have at least 10 events
+    ### active rois are those that have at least 10 events
     activeRois = [roi for roi, evroi in Events.groupby("roi") if len(evroi) > minEvents]
+    pc = len(activeRois)/len(Events['roi'].unique())*100
+    print (f"There are {len(activeRois)} rois with more than {minEvents} events ({pc:.0f}%).")
     nrois = len(activeRois) // reduceRois
+    print (f"Out of them, {nrois} are sampled {Nbootstrap} times to estimate mean and std of the firing rate.")
     ev_pm_par = []  # number of events per min per active roi
     for leg, ev in Events.groupby("leg"):
         duration = ev["peakpoint"].max() - ev["peakpoint"].min()

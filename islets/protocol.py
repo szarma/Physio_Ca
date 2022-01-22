@@ -94,8 +94,8 @@ class Protocol(pd.DataFrame):
             prtl += [letter]
         return "-".join(prtl)
     
-    def copy(self):
-        protocol = super(Protocol, self).copy()
+    def copy(self, deep=True):
+        protocol = super(Protocol, self).copy(deep=deep)
         protocol = self.from_df(protocol)
         return protocol
         

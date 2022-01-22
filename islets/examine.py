@@ -1,10 +1,12 @@
 import json
-from sys import exc_info
+import traceback
 import numpy as np
 from .numeric import rebin
 from .utils import getFigure
 from .utils import saveRois
 
+def trcbk():
+    return repr(traceback.format_tb())
 
 def examine(self, 
             max_rois=10, 
@@ -240,7 +242,7 @@ def examine(self,
                 else:
                     output += ["Oops, you first need to associate a movie to the regions."]
         except:
-            output+=[str(exc_info())]
+            output+=[trcbk()]
         return output
         
     @app.callback(
@@ -264,7 +266,7 @@ def examine(self,
                             self.df.loc[i,"tag"] += "|"*int(tagExists)+tag
                 return f"Successfully applied tags for {len(selected)} rois."
         except:
-            return str(exc_info())
+            return trcbk()
         
         
         
@@ -279,7 +281,7 @@ def examine(self,
                 folder, fname = split(self.pathToRois)
                 return saveRois(self,folder,fname.replace("_rois.pkl",""),formats=["vienna"])
         except:
-            return str(exc_info())
+            return trcbk()
             
     @app.callback(
         Output("selected-rois", "value"),
@@ -409,7 +411,7 @@ def examine(self,
                 pass
 
         except:
-            out += [html.Br(),"  "+str(exc_info())]
+            out += [html.Br(),"  "+trcbk()]
             
         
         return out, outcurns, fig
@@ -571,7 +573,7 @@ def examine(self,
 
                 return fg
             except:
-                out += str(exc_info()).replace(",","<br>")
+                out += trcbk().replace(",","<br>")
                 fg = getFigure(300,300)
                 fg.add_trace(go.Scatter(
                         x = [0],
