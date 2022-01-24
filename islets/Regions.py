@@ -1562,49 +1562,50 @@ class Regions:
         ax2 = fig.add_subplot(spec[0, 1])
         ax3 = fig.add_subplot(spec[1, 0])
         ax4 = fig.add_subplot(spec[1, 1])
+        self.plotTraces(rois,axs=[ax1,ax2])
 
-        self.plotEdges(ax=ax1, lw=.5)
-        self.plotEdges(ax=ax1, ix=rois, separate=True, fill=True, alpha=.5, image=False)
-        self.plotPeaks(ax=ax1, ix=rois, labels=True)
-        ax1.get_xaxis().set_visible(False)
-        ax1.get_yaxis().set_visible(False)
-
+        # self.plotEdges(ax=ax1, lw=.5)
+        # self.plotEdges(ax=ax1, ix=rois, separate=True, fill=True, alpha=.5, image=False)
+        # self.plotPeaks(ax=ax1, ix=rois, labels=True)
+        # ax1.get_xaxis().set_visible(False)
+        # ax1.get_yaxis().set_visible(False)
+        #
         num_rebin = 10
         time = rebin(self.time, num_rebin)
-        ax2.set_xlim(time[0], time[-1])
-        if offset is None:
-            offset = determine_offset(num_rebin)
-        off = 0
-        for roi in rois:
-            y = rebin(self.df.loc[roi, 'detrended'], num_rebin) + off
-            c = plc.qualitative.Plotly[roi % len(plc.qualitative.Plotly)]
-            ax2.plot(time, y, c=c)
-            ax2.text(x=0, y=y.mean(),
-                     s=str(roi),
-                     c=c,
-                     horizontalalignment='right')
-            off += offset
-
-        ymin, ymax = ax2.get_ylim()
-        new_ymin = ymin - (ymax - ymin) / 18 * self.protocol['compound'].nunique()
-        vl = self.protocol['t_begin'].append(self.protocol['t_end']).unique()
-        ax2.vlines(vl, new_ymin, ymax, color='black', zorder=1000)
-        ax2.hlines(ymin, 0, self.time[-1], color='black', zorder=1000)
-        ax2.set_ylim(new_ymin, ymax)
-
-        off = ymin
-        off_diff = (ymin - new_ymin) / self.protocol['compound'].nunique()
-        for comp, df in self.protocol.groupby('compound'):
-            for ii in df.index:
-                t0, t1 = df.loc[ii].iloc[-2:]
-                conc = df.loc[ii, 'concentration']
-                x, y = [t0, t1, t1, t0, t0], [off - off_diff, off - off_diff, off, off, off - off_diff]
-                ax2.fill(x, y, color='grey', alpha=.3)
-                ax2.text(t0, np.mean(y[:-1]), ' ' + conc, va='center', ha='left')
-                ax2.plot(x, y, color='grey')
-            ax2.text(df['t_begin'].min(), np.mean([off - off_diff, off - off_diff, off, off]), comp + ' ',
-                     va='center', ha='right')
-            off -= off_diff
+        # ax2.set_xlim(time[0], time[-1])
+        # if offset is None:
+        #     offset = determine_offset(num_rebin)
+        # off = 0
+        # for roi in rois:
+        #     y = rebin(self.df.loc[roi, 'detrended'], num_rebin) + off
+        #     c = plc.qualitative.Plotly[roi % len(plc.qualitative.Plotly)]
+        #     ax2.plot(time, y, c=c)
+        #     ax2.text(x=0, y=y.mean(),
+        #              s=str(roi),
+        #              c=c,
+        #              horizontalalignment='right')
+        #     off += offset
+        #
+        # ymin, ymax = ax2.get_ylim()
+        # new_ymin = ymin - (ymax - ymin) / 18 * self.protocol['compound'].nunique()
+        # vl = self.protocol['t_begin'].append(self.protocol['t_end']).unique()
+        # ax2.vlines(vl, new_ymin, ymax, color='black', zorder=1000)
+        # ax2.hlines(ymin, 0, self.time[-1], color='black', zorder=1000)
+        # ax2.set_ylim(new_ymin, ymax)
+        #
+        # off = ymin
+        # off_diff = (ymin - new_ymin) / self.protocol['compound'].nunique()
+        # for comp, df in self.protocol.groupby('compound'):
+        #     for ii in df.index:
+        #         t0, t1 = df.loc[ii].iloc[-2:]
+        #         conc = df.loc[ii, 'concentration']
+        #         x, y = [t0, t1, t1, t0, t0], [off - off_diff, off - off_diff, off, off, off - off_diff]
+        #         ax2.fill(x, y, color='grey', alpha=.3)
+        #         ax2.text(t0, np.mean(y[:-1]), ' ' + conc, va='center', ha='left')
+        #         ax2.plot(x, y, color='grey')
+        #     ax2.text(df['t_begin'].min(), np.mean([off - off_diff, off - off_diff, off, off]), comp + ' ',
+        #              va='center', ha='right')
+        #     off -= off_diff
         ax2.get_yaxis().set_visible(False)
         ax2.set_xlabel('time [s]')
 
