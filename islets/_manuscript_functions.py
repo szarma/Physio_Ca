@@ -596,3 +596,123 @@ def get_events_per_min_per_nrois(Events, hwRegions, minEvents, reduceRois, Nboot
             }]
     ev_pm_par = pd.DataFrame(ev_pm_par)
     return ev_pm_par
+
+from typing import Dict, List, Optional, Tuple, Iterable
+def big_plot(regions: islets.Regions,
+             Events: pd.DataFrame,
+             rois: Optional[Iterable] = None,
+             plot_sum: bool = False,
+             frame=False,
+             labels = False,
+             legColors = None,
+             cdf = False,
+             ):
+    figwidth, figheight = 8.27 * 1.5, 11.69 / 2 * 1.5
+    fig, axs = plt.subplots(3, 2, figsize = (figwidth, figheight), gridspec_kw = {"width_ratios": [1, 3]}, )
+    if frame:
+        ax = fig.add_axes([0, 0, 1, 1], zorder = -1, facecolor = "none")
+        ax.plot([0, 0, 1, 1, 0], [0, 1, 1, 0, 0], "k-")
+        ax.set_xlim(-.001, 1.001)
+        ax.set_ylim(-.001, 1.001)
+        mystyle_axes(ax)
+    # plt.subplots_adjust(left = .5/figwidth, right=1-.5/figwidth, bottom = .5/figheight, top = 1-.5/figheight)
+    # mf.ruler(fig)
+    if rois is None:
+        ccs = islets.utils.get_ccs(regions,
+                                   timescales = np.array([10]),
+                                   col = "faster",
+                                   skip_sequential_filtering = "faster_10" in regions.df.columns
+                                   )
+        ccs = pd.DataFrame(ccs["all"]).T
+        ccs.set_index(regions.df.index, inplace = True)
+        ranks = ccs.rank(ascending = False)
+        mostranked = ranks.sum(1).sort_values().index[:3]
+        rois = mostranked
+    regions.plotTraces(rois, axs = axs[0], protocol = False, labels = labels)
+    #     axs[0,1].set_xlim()
+    axs[0, 1].set_xlabel("time [s]")
+    mystyle_axes(axs[0, 1], retain = ["top"], bounded = [False])
+    ax = axs.flat[0]
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+    ax = axs.flat[3]
+    hxb = ax.hexbin(Events["peakpoint"], Events["halfwidth"], yscale = "log", cmap = "hot", gridsize = (300, 100),
+                    mincnt = 1)
+    ax.set_ylabel("halfwidth [s]")
+    if not plot_sum:
+        ax.set_xlabel("time [s]")
+    pos = ax.get_position()
+    cax = fig.add_axes([pos.x0 + pos.width, pos.y0 + .1 * pos.height, pos.width / 40, pos.height * .8])
+    plt.colorbar(hxb, cax = cax, label = "bin counts")
+    if "leg" in Events.columns:
+        legs = sorted(Events.dropna()["leg"].unique())
+        if legColors is None:
+            legColors = dict(zip(legs,["C%i"%(j%10) for j in range(len(legs))]))
+        for leg,ev in Events.groupby("leg"):
+            ys = ev['halfwidth'].min()*.95, ev['halfwidth'].max()*1.05
+            xs = ev['peakpoint'].min()*.95, ev['peakpoint'].max()*1.05
+            emphasize_region(ax,xs,ys,color=legColors[leg])
+
+    ax.set_xlim(axs.flat[1].get_xlim())
+    mystyle_axes(ax, retain = ["left","bottom"][:2-int(plot_sum)], bounded = [False,False])
+    axp = regions.protocol.plot_protocol(ax = ax)
+    mystyle_axes(axp)
+    axp.set_xlim(axs.flat[1].get_xlim())
+    tmin = regions.time[0]
+    for t in set(regions.protocol.dropna()[["t_begin", "t_end"]].values.flatten()):
+        if t<=tmin+5: continue
+        for ax in axs[:,1]:
+            ax.axvline(t,lw=.5, color=(.5,)*3, ls="dotted")
+    epmpr = get_events_per_min_per_nrois(Events,{"all":(Events["halfwidth"].min(), Events["halfwidth"].max())},minEvents=10,reduceRois=2)
+    pos = axs[1,0].get_position()
+    axev = fig.add_axes([pos.x0, pos.y0, pos.width*.4,pos.height])
+    axev.set_ylabel("events / min / active roi")
+    axbx = fig.add_axes([pos.x0+pos.width*.6, pos.y0, pos.width*.4,pos.height])
+    for i,row in epmpr.iterrows():
+        axev.bar([i],[row['epmpr']],color = legColors[row["leg"]])
+        axev.errorbar([i],[row['epmpr']],[row['epmpr_std']], color = legColors[row["leg"]])
+        axev.text(i+.5,0,row["leg"]+" ",rotation=45,va="top",ha="right")
+        axbx.text(i+.5,0,row["leg"]+" ",rotation=45,va="top",ha="right")
+    for il,leg in enumerate(legs):
+        ev = Events.query(f"leg=='{leg}'")
+        bxs = axbx.boxplot(ev["halfwidth"], positions = [il], showfliers=False, widths = .7, notch = True)
+        for el in bxs:
+            for ln in bxs[el]:
+                ln.set_color(legColors[leg])
+    hwmin, hwmax = axbx.get_ylim()
+    dhw = hwmax - hwmin
+    hwmin -= dhw/5
+    hwmin = max(0,hwmin)
+    axbx.set_ylim(hwmin, hwmax)
+    mystyle_axes(axev, ["left"])
+    mystyle_axes(axbx, ["right"],bounded=[False])
+    axs[1,0].remove()
+
+    pos = axs[2, 0].get_position()
+    axs[2, 0].remove()
+    if cdf:
+        axcdf = fig.add_axes([pos.x0, pos.y0, pos.width, pos.height*.8])
+        for leg, ev in Events.groupby("leg"):
+            x = ev["halfwidth"].values.copy()
+            x.sort()
+            axcdf.plot(x, np.linspace(0,1,len(x)), color=legColors[leg])
+        axcdf.set_xscale("log")
+        axcdf.set_xlabel("halfwidth [s]")
+        axcdf.set_ylabel("CDF")
+        mystyle_axes(axcdf, ["left","bottom"], bounded = [True, False])
+    ax = axs.flat[-1]
+    if plot_sum:
+        nrebin = int(regions.Freq/1)
+        t = regions.time
+        y = np.sum([regions.df.loc[i,"trace"]*regions.df.loc[i,"size"] for i in regions.df.index],0)#/regions.df["size"].sum()
+
+        if nrebin>1:
+            t = islets.numeric.rebin(t,nrebin)
+            y = islets.numeric.rebin(y,nrebin)
+            ax.plot(t,y,color="k")
+        ax.set_xlim(axs.flat[1].get_xlim())
+        mystyle_axes(ax, retain = ["bottom"], bounded = [False])
+        ax.set_xlabel("time [s]")
+    else:
+        ax.remove()
