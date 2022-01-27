@@ -493,7 +493,7 @@ class Regions:
                   lw=None,
                   alpha=1,
                   fill=False,
-                  scaleFontSize=12,
+                  scaleFontSize=9,
                   spline=True,
                   bound=True,
                   lengths=None,
