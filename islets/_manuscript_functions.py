@@ -553,6 +553,8 @@ def plot_events(Events,
         output[1] = output[1] + (cax,)
 
     elif plottype == "scatter":
+        if "markersize" not in kwargs and "ms" not in kwargs:
+            kwargs.update({"markersize": 2})
         ax.set_yscale("log")
         for leg, ev in list(Events.groupby("leg")) + [(None, Events[Events.leg.isna()])]:
             x, y = ev["peakpoint"].values.copy(), ev["halfwidth"]
