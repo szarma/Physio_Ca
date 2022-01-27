@@ -257,6 +257,9 @@ def main(args):
         if "frame_range" in metadata and "Frequency" in metadata:
             regions.time += metadata.frame_range[0] / metadata.Frequency
         islets.utils.saveRois(regions, outputDir, filename = pklBase, add_date = False, formats = ["vienna"])
+    ## Write the protocol template
+    with open(baseName+"_protocol.txt","w") as f:
+        f.write("compound,concentration,begin,end\n,,,")
 
     ## Cleanup and notification
     bioformats.javabridge.kill_vm()
