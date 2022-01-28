@@ -36,17 +36,25 @@ class Protocol(pd.DataFrame):
             if c in df.columns:
                 del df[c]
         protocol.add_conc_and_unit_columns()
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            try:
-                protocol.legs = protocol.get_legs()
-            except Exception as e:
-                warnings.warn(f"Could not get the legs: {e}")
+        protocol.legs = protocol.get_legs()
+#         with warnings.catch_warnings():
+#             warnings.simplefilter("ignore")
+#             try:
+#                 protocol.legs = protocol.get_legs()
+#             except Exception as e:
+#                 warnings.warn(f"Could not get the legs: {e}")
         return protocol
 
     @classmethod
     def from_file(cls, path, tend, t0=0):
+        lines = open(path).readlines()
+        for il,line in enumerate(lines):
+            n_commas = line.count(",")
+            if n_commas!=3:
+                raise ValueError(f"Line {il} of {path} has {n_commas}, but each line must have exactly 3.")
         df = pd.read_csv(path, na_values = [" "*j for j in range(1,10)])
+        if len(df)==0:
+            raise pd.errors.EmptyDataError
         beginNa = df.index[df["begin"].isna()]
         df.loc[beginNa, "begin"] = "00:%02i" % t0
         df["t_begin"] = [pd.Timedelta("00:" + v).total_seconds() for v in df["begin"]]
@@ -67,13 +75,16 @@ class Protocol(pd.DataFrame):
                 print (t, "\n", dft,"\n","="*5)
 
             if len(dft["compound"].unique()) != len(dft):
-                raise ValueError("Inconsistent treatments.")
+                raise ValueError("Inconsistent treatments. Legs that should not overlap, do overlap in time. Edit the file and try again.")
             if parse_output:
                 v = {row["compound"].lower(): (row["conc"], row["unit"]) for ir, row in dft.iterrows()}
             else:
                 v = {row["compound"].lower(): row["concentration"] for ir, row in dft.iterrows()}
             if len(v):
                 out[t, dft["t_end"].min()] = v
+            for k in out:
+                if "glucose" not in out[k]:
+                    out[k]["glucose"] = ("0","")
         return out
 
     def get_scheme(self, symbolDict):
