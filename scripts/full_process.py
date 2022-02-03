@@ -258,7 +258,7 @@ def main(args):
             regions.time += metadata.frame_range[0] / metadata.Frequency
         islets.utils.saveRois(regions, outputDir, filename = pklBase, add_date = False, formats = ["vienna"])
     ## Write the protocol template
-    with open(baseName+"_protocol.txt","w") as f:
+    with open(baseName+"protocol.txt","w") as f:
         f.write("compound,concentration,begin,end\n,,,")
 
     ## Cleanup and notification
