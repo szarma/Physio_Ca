@@ -69,7 +69,9 @@ class Protocol(pd.DataFrame):
 
     def get_legs(self, parse_output=False, verbose=False):
         out = {}
-        for t in self["t_begin"].sort_values():
+        timepoints = set(self[["t_begin", "t_end"]].values.flatten())
+        timepoints = sorted(timepoints)
+        for t in timepoints:
             dft = self.query(f"t_begin<={t} and {t}<t_end").copy()
             if verbose:
                 print (t, "\n", dft,"\n","="*5)
