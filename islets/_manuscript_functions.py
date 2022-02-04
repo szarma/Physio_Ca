@@ -698,7 +698,7 @@ def big_plot(regions: islets.Regions,
             legColors = dict(zip(legs,["C%i"%(j%10) for j in range(len(legs))]))
         for leg,ev in Events.groupby("leg"):
             ys = ev['halfwidth'].min()*.95, ev['halfwidth'].max()*1.05
-            xs = ev['peakpoint'].min()*.95, ev['peakpoint'].max()*1.05
+            xs = ev['peakpoint'].min(), ev['peakpoint'].max()
             emphasize_region(ax,xs,ys,color=legColors[leg])
 
     ax.set_xlim(axs.flat[1].get_xlim())
