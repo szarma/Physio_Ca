@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+import sys
+debug = sys.argv[0]=="explorer1.py"
+if debug:
+    print ("debug mode")
 import subprocess
 import traceback
 import dash

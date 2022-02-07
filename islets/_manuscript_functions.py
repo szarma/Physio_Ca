@@ -9,116 +9,117 @@ import warnings
 
 from IPython.display import display, HTML
 import statsmodels.api as sm
+
+
 #
-def fitLine(x, y, alpha=0.05, newx=[], plotFlag=False, show0=False, summary=False, ax=None, prediction=True):
-    ''' Fit a curve to the data using a least squares 1st order polynomial fit 
+def fitLine(x, y, alpha=0.05, newx=None, plotFlag=False, show0=False, summary=False, ax=None, prediction=True):
+    """ Fit a curve to the data using a least squares 1st order polynomial fit
     mostly copied from: central.scipy.org/item/50/1/line-fit-with-confidence-intervals
-    '''
+    """
     from scipy.stats import t
     # Summary data
-    n = len(x)			   # number of samples     
-    
-    Sxx = np.sum(x**2) - np.sum(x)**2/n
-    Sxy = np.sum(x*y) - np.sum(x)*np.sum(y)/n    
+    n = len(x)  # number of samples
+
+    Sxx = np.sum(x ** 2) - np.sum(x) ** 2 / n
+    Sxy = np.sum(x * y) - np.sum(x) * np.sum(y) / n
     mean_x = np.mean(x)
     mean_y = np.mean(y)
-    
+
     # Linefit
-    b = Sxy/Sxx
-    a = mean_y - b*mean_x
-    
+    b = Sxy / Sxx
+    a = mean_y - b * mean_x
+
     # Residuals
-    fit = lambda xx: a + b*xx    
+    fit = lambda xx: a + b * xx
     residuals = y - fit(x)
-    
-    var_res = np.sum(residuals**2)/(n-2)
+
+    var_res = np.sum(residuals ** 2) / (n - 2)
     sd_res = np.sqrt(var_res)
-    
+
     # Confidence intervals
-    se_b = sd_res/np.sqrt(Sxx)
-    se_a = sd_res*np.sqrt(np.sum(x**2)/(n*Sxx))
-    
-    df = n-2                            # degrees of freedom
-    tval = t.isf(alpha/2., df) 	# appropriate t value
-    
-    ci_a = a + tval*se_a*np.array([-1,1])
-    ci_b = b + tval*se_b*np.array([-1,1])
+    se_b = sd_res / np.sqrt(Sxx)
+    se_a = sd_res * np.sqrt(np.sum(x ** 2) / (n * Sxx))
+
+    df = n - 2  # degrees of freedom
+    tval = t.isf(alpha / 2., df)  # appropriate t value
+
+    ci_a = a + tval * se_a * np.array([-1, 1])
+    ci_b = b + tval * se_b * np.array([-1, 1])
 
     # create series of new test x-values to predict for
     npts = 100
     if show0:
-        px = np.linspace(   0.    ,np.max(x),num=npts)
+        px = np.linspace(0., np.max(x), num = npts)
     else:
-        px = np.linspace(np.min(x),np.max(x),num=npts)
-    
-    se_fit     = lambda x: sd_res * np.sqrt(  1./n + (x-mean_x)**2/Sxx)
-    se_predict = lambda x: sd_res * np.sqrt(1+1./n + (x-mean_x)**2/Sxx)
+        px = np.linspace(np.min(x), np.max(x), num = npts)
 
-    if summary:    
-        print ('Fitting y = a + b*x')
-        print ('a={0:5.4f}+/-{1:5.4f}, b={2:5.4f}+/-{3:5.4f}'.format(a,tval*se_a,b,tval*se_b))
-        print ('Confidence intervals: ci_a=({0:5.4f} - {1:5.4f}), ci_b=({2:5.4f} - {3:5.4f})'.format(ci_a[0], ci_a[1], ci_b[0], ci_b[1]))
-        print ('Residuals: variance = {0:5.4f}, standard deviation = {1:5.4f}'.format(var_res, sd_res))
-        print ('alpha = {0:.3f}, tval = {1:5.4f}, df={2:d}'.format(alpha, tval, df))
-    
+    se_fit = lambda xi: sd_res * np.sqrt(1. / n + (xi - mean_x) ** 2 / Sxx)
+    se_predict = lambda xi: sd_res * np.sqrt(1 + 1. / n + (xi - mean_x) ** 2 / Sxx)
+
+    if summary:
+        print('Fitting y = a + b*x')
+        print('a={0:5.4f}+/-{1:5.4f}, b={2:5.4f}+/-{3:5.4f}'.format(a, tval * se_a, b, tval * se_b))
+        print('Confidence intervals: ci_a=({0:5.4f} - {1:5.4f}), ci_b=({2:5.4f} - {3:5.4f})'.format(ci_a[0], ci_a[1],
+                                                                                                    ci_b[0], ci_b[1]))
+        print('Residuals: variance = {0:5.4f}, standard deviation = {1:5.4f}'.format(var_res, sd_res))
+        print('alpha = {0:.3f}, tval = {1:5.4f}, df={2:d}'.format(alpha, tval, df))
+
     # Return info
-    ri = {'residuals': residuals, 
-        'var_res': var_res,
-        'sd_res': sd_res,
-        'alpha': alpha,
-        'tval': tval,
-        'df': df,
-        'se_fit': se_fit,
-         }
-    
+    ri = {'residuals': residuals,
+          'var_res': var_res,
+          'sd_res': sd_res,
+          'alpha': alpha,
+          'tval': tval,
+          'df': df,
+          'se_fit': se_fit,
+          }
+
     if plotFlag:
         # Plot the data
         if ax is None:
             plt.figure()
             ax = plt.subplot(111)
-        
-        ax.plot(px, fit(px),'k', label='Regression line')
-        ax.plot(x,y,'r.', label='Sample observations')
-        
+
+        ax.plot(px, fit(px), 'k', label = 'Regression line')
+        ax.plot(x, y, 'r.', label = 'Sample observations')
+
         x.sort()
-        limit = (1-alpha)*100
-        ax.plot(px, fit(px)+tval*se_fit(px), 'r--', label='Confidence limit ({0:.1f}%)'.format(limit))
-        ax.plot(px, fit(px)-tval*se_fit(px), 'r--')
+        limit = (1 - alpha) * 100
+        ax.plot(px, fit(px) + tval * se_fit(px), 'r--', label = 'Confidence limit ({0:.1f}%)'.format(limit))
+        ax.plot(px, fit(px) - tval * se_fit(px), 'r--')
         if prediction:
-            ax.plot(px, fit(px)+tval*se_predict(px), 'c--', label='Prediction limit ({0:.1f}%)'.format(limit))
-            ax.plot(px, fit(px)-tval*se_predict(px), 'c--')
+            ax.plot(px, fit(px) + tval * se_predict(px), 'c--', label = 'Prediction limit ({0:.1f}%)'.format(limit))
+            ax.plot(px, fit(px) - tval * se_predict(px), 'c--')
 
         ax.set_xlabel('X values')
         ax.set_ylabel('Y values')
-        #ax.set_xlim(0,plt.xlim()[1]*1.1)
+        # ax.set_xlim(0,plt.xlim()[1]*1.1)
         ax.set_title('Linear regression and confidence limits')
-        
+
         # configure legend
-        leg = ax.legend(loc=0)
+        leg = ax.legend(loc = 0)
         # leg = plt.gca().get_legend()
         ltext = leg.get_texts()
-        plt.setp(ltext, fontsize=10)
+        plt.setp(ltext, fontsize = 10)
 
     output = {
         "func": "y = a + b*x",
-        "params": (a,b),
+        "params": (a, b),
         "confidence interval": (ci_a, ci_b),
         "t value": tval,
         "standard error": (se_a, se_b),
         "details": ri,
     }
-    if newx != []:
-        try:
-            len(newx)
-        except AttributeError:
-            newx = np.array([newx])
-    
-        print ('Example: x = {0}+/-{1} =&gt; se_fit = {2:5.4f}, se_predict = {3:6.5f}'\
-        .format(newx[0], tval*se_predict(newx[0]), se_fit(newx[0]), se_predict(newx[0])))
-        
-        newy = (fit(newx), fit(newx)-se_predict(newx), fit(newx)+se_predict(newx))
-        output ["newy"] = newy
+    if newx is not None and len(newx):
+        newx = np.array(newx)
+
+        print('Example: x = {0}+/-{1} =&gt; se_fit = {2:5.4f}, se_predict = {3:6.5f}'
+              .format(newx[0], tval * se_predict(newx[0]), se_fit(newx[0]), se_predict(newx[0])))
+
+        newy = (fit(newx), fit(newx) - se_predict(newx), fit(newx) + se_predict(newx))
+        output["newy"] = newy
     return output
+
 
 protocolColorScheme = {
     ("glucose", "6mM"): (0.98,) * 3,
@@ -127,6 +128,7 @@ protocolColorScheme = {
     ("Ca", "0.4mM"): plt.cm.Oranges(.1),
     ("Ca", "0mM"): plt.cm.Oranges(.3),
 }
+
 
 def beautify_protocol(protocol):
     colors = []
@@ -149,42 +151,44 @@ def ruler(fig, margin=.5):
     figwidth = fig.get_figwidth()
     figheight = fig.get_figheight()
     dax = fig.add_axes([0, 0, 1, 1],
-                       zorder=-2,
-                       facecolor=(.98,)*3#"whitesmoke"
+                       zorder = -2,
+                       facecolor = (.98,) * 3  # "whitesmoke"
                        )
-    dax.axvline(margin, color="salmon", lw=.5, )
-    dax.axvline(figwidth - margin, color="salmon", lw=.5, )
-    dax.axhline(margin, color="salmon", lw=.5, )
-    dax.axhline(figheight - margin, color="salmon", lw=.5, )
+    dax.axvline(margin, color = "salmon", lw = .5, )
+    dax.axvline(figwidth - margin, color = "salmon", lw = .5, )
+    dax.axhline(margin, color = "salmon", lw = .5, )
+    dax.axhline(figheight - margin, color = "salmon", lw = .5, )
     dax.set_xlim(0, figwidth)
     dax.set_ylim(0, figheight)
     dax.set_xticks(np.arange(0, figwidth + 1e-10))
     dax.set_yticks(np.arange(0, figheight + 1e-10))
-    mystyle_axes(dax, retain=["top", "left"], bounded=[False] * 2)
+    mystyle_axes(dax, retain = ["top", "left"], bounded = [False] * 2)
     dax.xaxis.set_minor_locator(MultipleLocator(.2))
     dax.yaxis.set_minor_locator(MultipleLocator(.2))
-    dax.grid(color=(.9,) * 3, which="major")
-    dax.grid(color=(.94,) * 3, which="minor")
+    dax.grid(color = (.9,) * 3, which = "major")
+    dax.grid(color = (.94,) * 3, which = "minor")
 
 
 def silent_fit(model):
-    with warnings.catch_warnings(record=True) as w:
+    with warnings.catch_warnings(record = True) as w:
         result = model.fit()
         return result, w
 
-def get_rate_effect(events, ref_leg = None, legs = None,):
+
+def get_rate_effect(events, ref_leg=None, legs=None, ):
     events = events.copy()
     if legs is None:
         legs = events["leg"].dropna().unique()
     if ref_leg is None:
         ref_leg = events[~events["leg"].isna()].iloc[0]['leg']
     events["log10_epmpr"] = np.log10(events["epmpr"])
-    model = sm.MixedLM.from_formula(f"log10_epmpr ~ C(leg, Treatment('{ref_leg}')) + 1", data = events, groups="experiment")
+    model = sm.MixedLM.from_formula(f"log10_epmpr ~ C(leg, Treatment('{ref_leg}')) + 1", data = events,
+                                    groups = "experiment")
     result, warns = silent_fit(model)
-    legs = [leg for leg in legs if leg!=ref_leg]
+    legs = [leg for leg in legs if leg != ref_leg]
     # summary = get_summary(model, legs, ref_leg)
     html_summary = \
-         """<style type="text/css">
+        """<style type="text/css">
             /* Fix details summary arrow
                not shown in Firefox
                due to bootstrap
@@ -201,7 +205,7 @@ def get_rate_effect(events, ref_leg = None, legs = None,):
         pv = result.pvalues[f"C(leg, Treatment('{ref_leg}'))[T.{leg}]"]
         effect_in_pc = (10 ** coef - 1) * 100
         html_summary += f"""<tr><td style="text-align:left">Obtained effect for leg '<span style='font-family:monospace'>{leg}</span>':</td><td>%+.2g%%,</td><td>with the p-value of %.2g</td></tr>""" % (
-        effect_in_pc, pv)
+            effect_in_pc, pv)
     #         html_summary += "<br>"
     html_summary += "</table>"
     if len(warns):
@@ -211,7 +215,8 @@ def get_rate_effect(events, ref_leg = None, legs = None,):
     display(HTML(html_summary))
     return result
 
-def get_hw_effect(events, ref_leg = None, legs = None, control_for_roi = True, minEvents = 10, groups = "roi"):
+
+def get_hw_effect(events, ref_leg=None, legs=None, control_for_roi=True, minEvents=10, groups="roi"):
     events = events.copy()
     if legs is None:
         legs = events["leg"].dropna().unique()
@@ -219,25 +224,25 @@ def get_hw_effect(events, ref_leg = None, legs = None, control_for_roi = True, m
         ref_leg = events[~events["leg"].isna()].iloc[0]['leg']
     events["log10_hw"] = np.log10(events["halfwidth"])
     if control_for_roi:
-        events.dropna(inplace=True)
+        events.dropna(inplace = True)
         chooseRois = [roi for roi, ev in events.groupby("roi") if
                       all([len(ev.query(f"leg=='{leg}'")) >= minEvents for leg in legs])]
-        print (f"There are {len(chooseRois)} rois, which have at least {minEvents} events in all legs.")
+        print(f"There are {len(chooseRois)} rois, which have at least {minEvents} events in all legs.")
         events = events[events.roi.isin(chooseRois)]
         model = sm.MixedLM.from_formula(
             f"log10_hw ~ C(leg, Treatment('{ref_leg}')) + 1",
             data = events,
             groups = groups,
             vc_formula = None if groups == "roi" else {"roi": "0 + C(roi)"},
-            
+
         )
     else:
         model = sm.OLS.from_formula(f"log10_hw ~ C(leg, Treatment('{ref_leg}')) + 1", data = events)
     result, warns = silent_fit(model)
-    legs = [leg for leg in legs if leg!=ref_leg]
+    legs = [leg for leg in legs if leg != ref_leg]
     # summary = get_summary(model, legs, ref_leg)
     html_summary = \
-         """<style type="text/css">
+        """<style type="text/css">
             /* Fix details summary arrow
                not shown in Firefox
                due to bootstrap
@@ -254,7 +259,7 @@ def get_hw_effect(events, ref_leg = None, legs = None, control_for_roi = True, m
         pv = result.pvalues[f"C(leg, Treatment('{ref_leg}'))[T.{leg}]"]
         effect_in_pc = (10 ** coef - 1) * 100
         html_summary += f"""<tr><td style="text-align:left">Obtained effect for leg '<span style='font-family:monospace'>{leg}</span>':</td><td>%+.2g%%,</td><td>with the p-value of %.2g</td></tr>""" % (
-        effect_in_pc, pv)
+            effect_in_pc, pv)
     #         html_summary += "<br>"
     html_summary += "</table>"
     if len(warns):
@@ -263,6 +268,7 @@ def get_hw_effect(events, ref_leg = None, legs = None, control_for_roi = True, m
     html_summary = f"{html_summary}<details><summary style='color:navy'>full output</summary>{summary._repr_html_()}</details>"
     display(HTML(html_summary))
     return result
+
 
 # def get_summary(model, legs, ref_leg=None):
 #     if ref_leg is None:
@@ -300,8 +306,8 @@ def get_tidy(Events, hwmin, hwmax, legKeys=None):
         legKeys = sorted([leg for leg in Events['leg'].unique() if isinstance(leg, str)])
     rois = Events.roi.unique()
     Nevents = pd.DataFrame(
-        index=rois,
-        columns=legKeys
+        index = rois,
+        columns = legKeys
     )
     for leg in legKeys:
         Nevents[leg] = [len(Events.query(f"roi=={roi} and leg=='{leg}' and halfwidth>={hwmin} and halfwidth<{hwmax}"))
@@ -342,15 +348,15 @@ def histogram_of_hw(Events, hwbinEdges, legDict, legColorDict, ax=None, orientat
         if orientation in ["bottom", "top"]:
             ax.plot(
                 np.repeat(hwbinEdges, 2),
-                [0] + list(np.repeat(hmin, 2)) + [0], "-", c=legColorDict[leg],
-                label=leg)
+                [0] + list(np.repeat(hmin, 2)) + [0], "-", c = legColorDict[leg],
+                label = leg)
             if n_sigma:
                 ax.fill_between(
                     np.repeat(hwbinEdges, 2),
                     [0] + list(np.repeat(hmin + n_sigma * hmin_err, 2)) + [0],
                     [0] + list(np.repeat(hmin - n_sigma * hmin_err, 2)) + [0],
-                    color=legColorDict[leg],
-                    alpha=.1,
+                    color = legColorDict[leg],
+                    alpha = .1,
                 )
 
             ax.set_xscale("log")
@@ -361,10 +367,10 @@ def histogram_of_hw(Events, hwbinEdges, legDict, legColorDict, ax=None, orientat
             if control_line:
                 x = np.sqrt(hwbinEdges[:-1] * hwbinEdges[1:])
                 ax.step(x, 60 * dst.norm.sf(Events.z_max.min()) / x,  # *np.diff(hwbinEdges),
-                        c=legColorDict[leg], ls="--", where="mid")
+                        c = legColorDict[leg], ls = "--", where = "mid")
         else:
-            ax.plot([0] + list(np.repeat(hmin, 2)) + [0], np.repeat(hwbinEdges, 2), "-", c=legColorDict[leg],
-                    label=leg)
+            ax.plot([0] + list(np.repeat(hmin, 2)) + [0], np.repeat(hwbinEdges, 2), "-", c = legColorDict[leg],
+                    label = leg)
             ax.set_yscale("log")
             if hist_scale == "right":
                 ax.set_xlim(h.max() * 1.05, 0)
@@ -372,7 +378,7 @@ def histogram_of_hw(Events, hwbinEdges, legDict, legColorDict, ax=None, orientat
             ax.set_xlabel("events/min")
     # mystyle_axes(ax, retain = [orientation, hist_scale], bounded = [False, True])
 
-    legend = ax.legend(frameon=False)
+    legend = ax.legend(frameon = False)
 
 
 def boxplots_per_leg(roi_stats, legDict, legColorDict, pvalue=None, ax=None, **bx_kwargs):
@@ -381,14 +387,14 @@ def boxplots_per_leg(roi_stats, legDict, legColorDict, pvalue=None, ax=None, **b
         ax = plt.subplot(111)
     for ileg, leg in enumerate(legDict):
         box_kwargs = dict(
-            notch=True,
-            showfliers=False,
-            widths=.4,
-            whis=(5, 95)
+            notch = True,
+            showfliers = False,
+            widths = .4,
+            whis = (5, 95)
         )
         if bx_kwargs is not None:
             box_kwargs.update(bx_kwargs)
-        bxs = ax.boxplot(roi_stats[leg], positions=[ileg], **box_kwargs)
+        bxs = ax.boxplot(roi_stats[leg], positions = [ileg], **box_kwargs)
         for el in bxs:
             for ln in bxs[el]:
                 ln.set_color(legColorDict[leg])
@@ -405,13 +411,13 @@ def boxplots_per_leg(roi_stats, legDict, legColorDict, pvalue=None, ax=None, **b
             # p = dst.norm.sf(mu/sem)
             ypos = pvalue[kp].get("ypos", np.percentile(roi_stats[[ki, kj]], 99.7))
             alternative = pvalue[kp].get("alternative", "two-sided")
-            p = ttest_1samp(x, popmean=0, alternative=alternative).pvalue
-            ax.plot([i, j], [ypos] * 2, color="k")
+            p = ttest_1samp(x, popmean = 0, alternative = alternative).pvalue
+            ax.plot([i, j], [ypos] * 2, color = "k")
             if p < .005:
                 plabel = r"   $p < 10^{%i}$" % int(np.log10(p))
             else:
                 plabel = r"   $p = %.1g$" % p
-            ax.text((i + j) / 2, ypos, plabel, ha="center", va="bottom")
+            ax.text((i + j) / 2, ypos, plabel, ha = "center", va = "bottom")
     ax.set_xticks(range(len(legDict)))
     ax.set_xticklabels(list(legDict))
 
@@ -425,21 +431,21 @@ def fancy_barchart(ax, df, c=(.4,) * 3, orientation="horizontal", plabel_offset=
         yerr = df[error].values
     nticks = len(df.index)
     if orientation == "horizontal":
-        ax.barh(range(nticks), y, color=c)
-        ax.errorbar(y, range(nticks), xerr=yerr, ls='none', c=c)
+        ax.barh(range(nticks), y, color = c)
+        ax.errorbar(y, range(nticks), xerr = yerr, ls = 'none', c = c)
         ax.set_yticks([])
         for jt, tk in enumerate(df.index):
-            ax.text(0, jt, tk + " ", ha="right", va="center")
+            ax.text(0, jt, tk + " ", ha = "right", va = "center")
     elif orientation == "vertical":
-        ax.bar(range(nticks), y, color=c)
-        ax.errorbar(range(nticks), y, yerr=yerr, ls='none', c=c)
+        ax.bar(range(nticks), y, color = c)
+        ax.errorbar(range(nticks), y, yerr = yerr, ls = 'none', c = c)
         ax.set_xticks([])
     else:
         raise ValueError("orientation can only be 'horizonal' or 'vertical'")
     if error is None:
         return None
     comparisons = [(i, j) for i in range(len(df.index)) for j in range(i + 1, len(df.index))]
-    comparisons = sorted(comparisons, key=lambda ij: ((y + yerr)[list(ij)].max(), np.diff(ij)[0]))
+    comparisons = sorted(comparisons, key = lambda ij: ((y + yerr)[list(ij)].max(), np.diff(ij)[0]))
 
     offset = max(y + 2 * yerr) * plabel_offset
     xpos0 = 0
@@ -454,7 +460,7 @@ def fancy_barchart(ax, df, c=(.4,) * 3, orientation="horizontal", plabel_offset=
             xpos += offset
         # print(i, j, xpos)
         xpos0 = xpos
-        ln = Line2D([xpos - offset / 5, xpos, xpos, xpos - offset / 5], [i, i, j, j], c="k", lw=.7)
+        ln = Line2D([xpos - offset / 5, xpos, xpos, xpos - offset / 5], [i, i, j, j], c = "k", lw = .7)
         ln.set_clip_on(False)
         ax.add_line(ln)
         if p < .01:
@@ -473,14 +479,15 @@ def fancy_barchart(ax, df, c=(.4,) * 3, orientation="horizontal", plabel_offset=
         if orientation == "horizontal":
             ax.text(xpos, (i + j) / 2, plabel,
                     # rotation="90",
-                    va="center"
+                    va = "center"
                     )
 
-def mystyle_axes(ax, retain=None, xlim=None, ylim=None,bounded=None):
+
+def mystyle_axes(ax, retain=None, xlim=None, ylim=None, bounded=None):
     if retain is None:
         retain = []
     if bounded is None:
-        bounded = [True]*len(retain)
+        bounded = [True] * len(retain)
     boundedDict = dict(zip(retain, bounded))
     for sp in ax.spines:
         ax.spines[sp].set_visible(sp in retain)
@@ -508,6 +515,7 @@ def mystyle_axes(ax, retain=None, xlim=None, ylim=None,bounded=None):
         ax.set_xticks([])
     if "right" not in retain and "left" not in retain:
         ax.set_yticks([])
+
 
 def emphasize_region(ax, x, y, extend=(0, 0), **line_kwargs):
     xb, xe = x
@@ -554,10 +562,10 @@ def plot_events(Events,
         Events = Events[~Events.leg.isna()].copy()
 
     ### creation and formatting of figure
-    axwidth = (duration+ySpineOffset) / 500
+    axwidth = (duration + ySpineOffset) / 500
 
     figwidth, figheight = axwidth + 2 * offset, axheight + 2 * offset
-    fig = plt.figure(figsize=(figwidth, figheight))
+    fig = plt.figure(figsize = (figwidth, figheight))
     ax = fig.add_axes([offset / figwidth, offset / figheight, axwidth / figwidth, axheight / figheight])
     # axp = fig.add_axes([offset / figwidth, (axheight + 1.1 * offset) / figheight, axwidth / figwidth,
     #                     offset / 10 / figheight * len(protocol.compound.unique())])
@@ -592,8 +600,8 @@ def plot_events(Events,
         if "cmap" not in kwargs:
             kwargs.update({"cmap": "hot"})
 
-        hx = ax.hexbin(x, y, yscale="log", **kwargs)
-        cax = plt.colorbar(hx, cax=cax)
+        hx = ax.hexbin(x, y, yscale = "log", **kwargs)
+        cax = plt.colorbar(hx, cax = cax)
         cax.set_label("bin count")
         output[1] = output[1] + (cax,)
 
@@ -605,12 +613,12 @@ def plot_events(Events,
             x, y = ev["peakpoint"].values.copy(), ev["halfwidth"]
             if timeUnits == "min":
                 x = x / 60
-            ax.plot(x, y, ".", c="lightgrey" if leg is None else legColorDict[leg], **kwargs)
+            ax.plot(x, y, ".", c = "lightgrey" if leg is None else legColorDict[leg], **kwargs)
     else:
         raise ValueError("plottype can only be 'scatter' or 'hexbin")
-    ax.set_xlim (regions.time[0]-ySpineOffset, regions.time[-1])
-    axp.set_xlim(regions.time[0]-ySpineOffset, regions.time[-1])
-    mystyle_axes(ax, ["bottom", "left"], bounded=[True, False])
+    ax.set_xlim(regions.time[0] - ySpineOffset, regions.time[-1])
+    axp.set_xlim(regions.time[0] - ySpineOffset, regions.time[-1])
+    mystyle_axes(ax, ["bottom", "left"], bounded = [True, False])
     mystyle_axes(axp)
     return output
 
@@ -618,10 +626,10 @@ def plot_events(Events,
 def get_events_per_min_per_nrois(Events, hwRegions, minEvents, reduceRois, Nbootstrap=20):
     ### active rois are those that have at least 10 events
     activeRois = [roi for roi, evroi in Events.groupby("roi") if len(evroi) > minEvents]
-    pc = len(activeRois)/len(Events['roi'].unique())*100
-    print (f"There are {len(activeRois)} rois with more than {minEvents} events ({pc:.0f}%).")
+    pc = len(activeRois) / len(Events['roi'].unique()) * 100
+    print(f"There are {len(activeRois)} rois with more than {minEvents} events ({pc:.0f}%).")
     nrois = len(activeRois) // reduceRois
-    print (f"Out of them, {nrois} are sampled {Nbootstrap} times to estimate mean and std of the firing rate.")
+    print(f"Out of them, {nrois} are sampled {Nbootstrap} times to estimate mean and std of the firing rate.")
     ev_pm_par = []  # number of events per min per active roi
     for leg, ev in Events.groupby("leg"):
         duration = ev["peakpoint"].max() - ev["peakpoint"].min()
@@ -629,7 +637,7 @@ def get_events_per_min_per_nrois(Events, hwRegions, minEvents, reduceRois, Nboot
             hwb = hwRegions[hwr]
             tmp = []
             for j in range(Nbootstrap):
-                acts = np.random.choice(activeRois, nrois, replace=False)
+                acts = np.random.choice(activeRois, nrois, replace = False)
                 ## take only events that belong to active rois
                 evs = Events[Events.roi.isin(acts)]
                 evs = evs.query(f"leg=='{leg}' and halfwidth>={hwb[0]} and halfwidth<{hwb[1]}")
@@ -644,15 +652,18 @@ def get_events_per_min_per_nrois(Events, hwRegions, minEvents, reduceRois, Nboot
     ev_pm_par = pd.DataFrame(ev_pm_par)
     return ev_pm_par
 
+
 from typing import Dict, List, Optional, Tuple, Iterable
+
+
 def big_plot(regions: islets.Regions,
              Events: pd.DataFrame,
              rois: Optional[Iterable] = None,
              plot_sum: bool = False,
              frame=False,
-             labels = False,
-             legColors = None,
-             cdf = False,
+             labels=False,
+             legColors=None,
+             cdf=False,
              ):
     figwidth, figheight = 8.27 * 1.5, 11.69 / 2 * 1.5
     fig, axs = plt.subplots(3, 2, figsize = (figwidth, figheight), gridspec_kw = {"width_ratios": [1, 3]}, )
@@ -695,69 +706,79 @@ def big_plot(regions: islets.Regions,
     if "leg" in Events.columns:
         legs = sorted(Events.dropna()["leg"].unique())
         if legColors is None:
-            legColors = dict(zip(legs,["C%i"%(j%10) for j in range(len(legs))]))
-        for leg,ev in Events.groupby("leg"):
-            ys = ev['halfwidth'].min()*.95, ev['halfwidth'].max()*1.05
+            legColors = dict(zip(legs, ["C%i" % (j % 10) for j in range(len(legs))]))
+        for leg, ev in Events.groupby("leg"):
+            ys = ev['halfwidth'].min() * .95, ev['halfwidth'].max() * 1.05
             xs = ev['peakpoint'].min(), ev['peakpoint'].max()
-            emphasize_region(ax,xs,ys,color=legColors[leg])
+            emphasize_region(ax, xs, ys, color = legColors[leg])
 
     ax.set_xlim(axs.flat[1].get_xlim())
-    mystyle_axes(ax, retain = ["left","bottom"][:2-int(plot_sum)], bounded = [False,False])
+    mystyle_axes(ax, retain = ["left", "bottom"][:2 - int(plot_sum)], bounded = [False, False])
     axp = regions.protocol.plot_protocol(ax = ax)
     mystyle_axes(axp)
     axp.set_xlim(axs.flat[1].get_xlim())
+
+    axtraces = axs[0, 1]
+    pos_traces = axtraces.get_position()
+    pos_axp = axp.get_position()
+    posy0tr = pos_axp.y0 + pos_axp.height + .01
+    dy = pos_traces.y0 - posy0tr
+    axtraces.set_position([pos_traces.x0, pos_traces.y0 - dy, pos_traces.width, pos_traces.height + dy])
+
     tmin = regions.time[0]
     for t in set(regions.protocol.dropna()[["t_begin", "t_end"]].values.flatten()):
-        if t<=tmin+5: continue
-        for ax in axs[:,1]:
-            ax.axvline(t,lw=.5, color=(.5,)*3, ls="dotted")
-    epmpr = get_events_per_min_per_nrois(Events,{"all":(Events["halfwidth"].min(), Events["halfwidth"].max())},minEvents=10,reduceRois=2)
-    pos = axs[1,0].get_position()
-    axev = fig.add_axes([pos.x0, pos.y0, pos.width*.4,pos.height])
+        if t <= tmin + 5: continue
+        for ax in axs[:, 1]:
+            ax.axvline(t, lw = .5, color = (.5,) * 3, ls = "dotted")
+    epmpr = get_events_per_min_per_nrois(Events, {"all": (Events["halfwidth"].min(), Events["halfwidth"].max())},
+                                         minEvents = 10, reduceRois = 2)
+    pos = axs[1, 0].get_position()
+    axev = fig.add_axes([pos.x0, pos.y0, pos.width * .4, pos.height])
     axev.set_ylabel("events / min / active roi")
-    axbx = fig.add_axes([pos.x0+pos.width*.6, pos.y0, pos.width*.4,pos.height])
-    for i,row in epmpr.iterrows():
-        axev.bar([i],[row['epmpr']],color = legColors[row["leg"]])
-        axev.errorbar([i],[row['epmpr']],[row['epmpr_std']], color = legColors[row["leg"]])
-        axev.text(i+.5,0,row["leg"]+" ",rotation=45,va="top",ha="right")
-        axbx.text(i+.5,0,row["leg"]+" ",rotation=45,va="top",ha="right")
-    for il,leg in enumerate(legs):
+    axbx = fig.add_axes([pos.x0 + pos.width * .6, pos.y0, pos.width * .4, pos.height])
+    for i, row in epmpr.iterrows():
+        axev.bar([i], [row['epmpr']], color = legColors[row["leg"]])
+        axev.errorbar([i], [row['epmpr']], [row['epmpr_std']], color = legColors[row["leg"]])
+        axev.text(i + .5, 0, row["leg"] + " ", rotation = 45, va = "top", ha = "right")
+        axbx.text(i + .5, 0, row["leg"] + " ", rotation = 45, va = "top", ha = "right")
+    for il, leg in enumerate(legs):
         ev = Events.query(f"leg=='{leg}'")
-        bxs = axbx.boxplot(ev["halfwidth"], positions = [il], showfliers=False, widths = .7, notch = True)
+        bxs = axbx.boxplot(ev["halfwidth"], positions = [il], showfliers = False, widths = .7, notch = True)
         for el in bxs:
             for ln in bxs[el]:
                 ln.set_color(legColors[leg])
     hwmin, hwmax = axbx.get_ylim()
     dhw = hwmax - hwmin
-    hwmin -= dhw/5
-    hwmin = max(0,hwmin)
+    hwmin -= dhw / 5
+    hwmin = max(0, hwmin)
     axbx.set_ylim(hwmin, hwmax)
     mystyle_axes(axev, ["left"])
-    mystyle_axes(axbx, ["right"],bounded=[False])
-    axs[1,0].remove()
+    mystyle_axes(axbx, ["right"], bounded = [False])
+    axs[1, 0].remove()
 
     pos = axs[2, 0].get_position()
     axs[2, 0].remove()
     if cdf:
-        axcdf = fig.add_axes([pos.x0, pos.y0, pos.width, pos.height*.8])
+        axcdf = fig.add_axes([pos.x0, pos.y0, pos.width, pos.height * .8])
         for leg, ev in Events.groupby("leg"):
             x = ev["halfwidth"].values.copy()
             x.sort()
-            axcdf.plot(x, np.linspace(0,1,len(x)), color=legColors[leg])
+            axcdf.plot(x, np.linspace(0, 1, len(x)), color = legColors[leg])
         axcdf.set_xscale("log")
         axcdf.set_xlabel("halfwidth [s]")
         axcdf.set_ylabel("CDF")
-        mystyle_axes(axcdf, ["left","bottom"], bounded = [True, False])
+        mystyle_axes(axcdf, ["left", "bottom"], bounded = [True, False])
     ax = axs.flat[-1]
     if plot_sum:
-        nrebin = int(regions.Freq/1)
+        nrebin = int(regions.Freq / 1)
         t = regions.time
-        y = np.sum([regions.df.loc[i,"trace"]*regions.df.loc[i,"size"] for i in regions.df.index],0)#/regions.df["size"].sum()
+        y = np.sum([regions.df.loc[i, "trace"] * regions.df.loc[i, "size"] for i in regions.df.index],
+                   0)  # /regions.df["size"].sum()
 
-        if nrebin>1:
-            t = islets.numeric.rebin(t,nrebin)
-            y = islets.numeric.rebin(y,nrebin)
-            ax.plot(t,y,color="k")
+        if nrebin > 1:
+            t = islets.numeric.rebin(t, nrebin)
+            y = islets.numeric.rebin(y, nrebin)
+            ax.plot(t, y, color = "k")
         ax.set_xlim(axs.flat[1].get_xlim())
         mystyle_axes(ax, retain = ["bottom"], bounded = [False])
         ax.set_xlabel("time [s]")
