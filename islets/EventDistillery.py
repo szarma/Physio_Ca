@@ -150,6 +150,7 @@ def draw_event(row, ax, **kwargs):
 def distill_events_per_roi(roiEvents,
                            regions,
                            plot=False,
+                           opt_col = "z_max",
                            halfwidth_toll=.2,
                            discardCloseToEdge=True,
                            freqShow=5,
@@ -267,7 +268,7 @@ def distill_events_per_roi(roiEvents,
                 row.color = colorDict[status]
                 draw_event(row, axs[0])
             continue
-        row = pd.Series(roiEvents.loc[list(ixs)].sort_values("z_max").iloc[-1])
+        row = pd.Series(roiEvents.loc[list(ixs)].sort_values(opt_col).iloc[-1])
         if not take_best:
             for col in ["t0","tend","z_max","color","coltrans"]:
                 if col in row.index:
