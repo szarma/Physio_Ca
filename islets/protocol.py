@@ -36,13 +36,9 @@ class Protocol(pd.DataFrame):
             if c in df.columns:
                 del df[c]
         protocol.add_conc_and_unit_columns()
-        protocol.legs = protocol.get_legs()
-#         with warnings.catch_warnings():
-#             warnings.simplefilter("ignore")
-#             try:
-#                 protocol.legs = protocol.get_legs()
-#             except Exception as e:
-#                 warnings.warn(f"Could not get the legs: {e}")
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category = UserWarning)
+            protocol.legs = protocol.get_legs()
         return protocol
 
     @classmethod
