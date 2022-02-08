@@ -1341,6 +1341,7 @@ class Regions:
                 self.fast_filter_traces(ts,Npoints=Npoints)
             zScores = np.vstack(self.df["zScore_%g"%ts])
             allFast = np.vstack(self.df["faster_%g"%ts])
+            allSlow = np.vstack(self.df["slower_%g"%ts])
         if t is None:
             try:
                 t = self.showTime["%g"%ts]
@@ -1358,21 +1359,28 @@ class Regions:
         if debug:
             self.df["zScore_%g"%ts] = list(zScores)
         events = []
-        for i,z,f in zip(self.df.index,zScores,allFast):
+        for i,z,f,s in zip(self.df.index,zScores,allFast,allSlow):
             pp = find_peaks(z,
                             width=(ts/dt*min_rel_hw,ts/dt),
                             height=z_th
                               )
             w,h,x0,xe = peak_widths(z, pp[0], rel_height=.5)
             w = w*dt
-            x0 = x0*dt + t[0]
-            xe = xe*dt + t[0]
+            t0 = x0*dt + t[0]
+            # x0, xe = peak_widths(z, pp[0], rel_height=.9,)[-2:]
+            x0 = (x0).astype(int)
+            xe = (xe+2).astype(int)
+            auc = [np.sum(f[xx0:xxe]/s[xx0:xxe])*dt for xx0,xxe in zip(x0,xe)]
+
             df = pd.DataFrame({
                 "z_max": z[pp[0]],
                 "halfwidth": w,
-                "t0": x0,
+                "t0": t0,
                 "peakpoint": pp[0]*dt+t[0],
-                "height": f[pp[0]],
+                "height": f[pp[0]]/s[pp[0]],
+                "auc": auc,
+                "time":  [ t[xx0:xxe] for xx0, xxe in zip(x0, xe)],
+                "trace": [ f[xx0:xxe] + s[xx0:xxe] for xx0,xxe in zip(x0,xe)]
             })
             df["roi"] = i
             events += [df]
