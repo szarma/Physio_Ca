@@ -240,7 +240,15 @@ def examine_events(self, spikeDF, x, y,
                         showlegend=False,
                         name=None,
                     ))
-                    
+
+            if "time" in row and "trace" in row:
+                fig.add_trace(go.Scatter(
+                    x = row.time,
+                    y = row.trace,
+                    mode = "lines",
+                    line = dict(width = 1),
+                    name = "trace smoothed"
+                ))
             index = int(row.name)
             for dummy in [None]:
                 if fitDF is None: break
