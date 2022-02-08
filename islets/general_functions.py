@@ -1,5 +1,10 @@
 from contextlib import contextmanager
 
+def notify(audiofilename = None):
+    from IPython.display import Audio,display
+    if audiofilename is None:
+        audiofilename  = "/usr/share/sounds/Oxygen-Sys-Log-In-Short.ogg"
+    display(Audio(audiofilename, autoplay=True))
 
 @contextmanager
 def suppress_stdout():
