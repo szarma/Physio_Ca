@@ -1048,7 +1048,7 @@ class Regions:
             if np.abs(freq/self.movie.fr-1)>1e-2:
                 print (f"movie frame rate ({self.movie.fr}) and inferred frame ({freq}) rate are different!")
         N_dt = ironTimeScale/minDt
-        Nrebin = max(1,int(np.round(N_dt/Npoints)))
+        Nrebin = max(1,int(np.floor(N_dt/Npoints)))
         if verbose:
             print (f"Nrebin = {Nrebin}")
         C = self.df
