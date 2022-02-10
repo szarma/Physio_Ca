@@ -1383,20 +1383,15 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
             for ser in subdirs:
                 if verbose>=2:
                     print ("ser=",ser)
+                if recType=="Nikon":
+                    series = "all"
+                rec.import_series(series, onlyMeta=True)
+                if series not in rec.Series:
+                    continue
                 md = pd.Series()
                 md["path to exp"] = pathToRecording
                 md["experiment"] = os.path.split(pathToRecording)[-1]
                 md["series"] = series
-                if recType=="Nikon":
-                    series = "all"
-#                     rec.import_series("all", onlyMeta=True)
-#                 else:
-#                 try:
-                rec.import_series(series, onlyMeta=True)
-#                 except:
-#                     print (f"could not import {series} from {rec.path}", exc_info())
-#                     status += [md]
-#                     continue
 
                 saveDir = os.path.join(analysisFolder, ser)
                 if len(rec.Series)==0: continue
