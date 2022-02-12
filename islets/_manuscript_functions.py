@@ -10,7 +10,43 @@ import warnings
 from IPython.display import display, HTML
 import statsmodels.api as sm
 
+myGrey = (.3,)*3
 
+
+def showLineScan(linescan, axs, pixel_limits, Tind = 1, slice_ = None, offset = 1):
+    data = linescan.data[slice_]
+    x = islets.numeric.rebin(data,100,1, func=np.sum)
+    for j in range(x.shape[0]):
+        x[j] -= np.percentile(x[j],10)
+    ax = axs[0]
+    distance = 10
+    physicalSize = linescan.metadata["pxSize"]*data.shape[0]
+    txtOffset = physicalSize-1.5*distance
+    tmax = linescan.time[-1]
+    ax.imshow(x, cmap="turbo", vmin = 0, vmax = x.max(), aspect="auto", extent = (0,tmax, 0, physicalSize), origin = "lower")
+
+    ax.plot([tmax*.05]*2,[txtOffset,txtOffset+distance],"lightgrey")
+    ax.text(tmax*.05,txtOffset+distance/2," "+str(distance)+"µm", va="center", color="w")
+    # ax.imshow(x, cmap="Greys", vmin = 0, vmax = x.max(), aspect="auto")
+    ax.plot([tmax*.05, tmax*.03+Tind],[.03*physicalSize]*2,"lightgrey")
+    ax.text(tmax*.05+Tind/2,.03*physicalSize,str(Tind)+"s\n", ha="center", va="center", color="w", fontsize=7)
+    ax1 = axs[1]
+    off = 0
+    for px0,px1 in pixel_limits:
+        emphasize_region(ax,ax.get_xlim(), [px0*physicalSize/x.shape[0],px1*physicalSize/x.shape[0]], color="lightgrey", extend = (-.01,0),lw=1)
+        ax1.plot(np.linspace(0,tmax,x.shape[1]), x[px0:px1].mean(0) + off, lw=.5, color=myGrey)
+        ar = ax.arrow(tmax*1.05, np.mean([px0, px1])*physicalSize/x.shape[0], tmax*.2, 0, color=myGrey, lw=1, clip_on=False, head_width = tmax, head_length = .2)
+        ar.set_clip_on(False)
+        ax.set_xlim(0,tmax)
+        off += offset
+    
+    mystyle_axes(ax)
+    mystyle_axes(ax1)
+#     ln = Line2D([tmax*1.05, tmax*1.3],[np.mean([px0, px1])*physicalSize/x.shape[0],]*2, color=myGrey, lw=1)
+#     ln.set_clip_on(False)
+#     ax.add_line(ln)
+    #place_indicator(ax1,Tind,position=(tmax-1.5*Tind,1))
+    return x
 #
 def fitLine(x, y, alpha=0.05, newx=None, plotFlag=False, show0=False, summary=False, ax=None, prediction=True):
     """ Fit a curve to the data using a least squares 1st order polynomial fit
@@ -146,7 +182,7 @@ def beautify_protocol(protocol):
     return protocol
 
 
-def ruler(fig, margin=.5):
+def ruler(fig, margin=.5, grid=True):
     from matplotlib.ticker import MultipleLocator
     figwidth = fig.get_figwidth()
     figheight = fig.get_figheight()
@@ -165,8 +201,9 @@ def ruler(fig, margin=.5):
     mystyle_axes(dax, retain = ["top", "left"], bounded = [False] * 2)
     dax.xaxis.set_minor_locator(MultipleLocator(.2))
     dax.yaxis.set_minor_locator(MultipleLocator(.2))
-    dax.grid(color = (.9,) * 3, which = "major")
-    dax.grid(color = (.94,) * 3, which = "minor")
+    if grid:
+        dax.grid(color = (.9,) * 3, which = "major")
+        dax.grid(color = (.94,) * 3, which = "minor")
 
 
 def silent_fit(model):
@@ -784,3 +821,54 @@ def big_plot(regions: islets.Regions,
         ax.set_xlabel("time [s]")
     else:
         ax.remove()
+
+
+def place_indicator(ax, duration, position=(0, 1), unit="s", linekwargs={}, fontkwargs={}, text_vert_offset=-.12):
+    axx = ax.get_figure().add_axes(ax.get_position(), facecolor = "none")
+    axx.set_xlim(ax.get_xlim())
+    if position[0] == "left":
+        x = axx.get_xlim()[0]
+    elif position[0] == "right":
+        x = axx.get_xlim()[1] - duration
+    else:
+        x = position[0]
+
+    # if position[1]=="top":
+    #    y = axx.get_ylim()[1]
+    # else:
+    #    y = axx.get_ylim()[0]
+    y = position[1]
+    if "lw" not in linekwargs:
+        linekwargs["lw"] = 3
+    if "color" not in linekwargs:
+        linekwargs["color"] = "black"
+    #     print ([x,x+duration],[y]*2,**linekwargs)
+    axx.plot([x, x + duration], [y] * 2, **linekwargs)
+    if unit == "s":
+        txt = "%gs"%duration
+    if unit == "min":
+        txt = " %gmin"%(duration / 60)
+    fontkwargs.update({"ha": "center"})
+    axx.text(x + duration / 2, y + text_vert_offset, txt, **fontkwargs)
+    axx.set_ylim(-.1, 1.1)
+    mystyle_axes(axx)
+
+def show_line_across_axes(list_of_coordinates_with_axes, fig, **linekwargs):
+    xy = []
+    for x,y,ax in list_of_coordinates_with_axes:
+        xy += [
+            fig.transFigure.inverted().transform(
+                ax.transData.transform((x,y))
+            )
+        ]
+    x,y = np.array(xy).T
+    fig.add_artist(Line2D(x,y,**linekwargs))
+
+def plot_closeup_traces(ax, regions, rois, closeup, **tracekwargs):
+    regions.plotTraces(rois,axs=ax,labels=False,protocol=False, **tracekwargs)
+    for l in ax.lines:
+        x,y = l.get_data()
+        fltr = (x>closeup[0]) & (x<closeup[1])
+        l.set_data((x[fltr], y[fltr]))
+    ax.set_xlim(closeup)
+    ax.relim()
