@@ -297,7 +297,7 @@ def percFilter(x_,perc,filterSize):
     out = np.zeros_like(x_)
     x_ = np.concatenate((x_[:delta][::-1], x_, x_[-delta:][::-1]))
     for i in prange(len(out)):
-        out[i] = np.nanpercentile(x_[i:i+filterSize],perc,axis=0)
+        out[i] = np.nanpercentile(x_[i:i+filterSize],perc)
     return out
 
 # @jit 
