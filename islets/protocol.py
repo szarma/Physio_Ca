@@ -108,7 +108,7 @@ class Protocol(pd.DataFrame):
         protocol = self.from_df(protocol)
         return protocol
         
-    def plot_protocol( self, ax, color=(.95,)*3, hspace = 0.2, only_number = True, linenkwargs={}, label = "close", fontsize=10):
+    def plot_protocol( self, ax, color=(.95,)*3, hspace = 0.2, only_number = True, linenkwargs={}, label = "close", fontsize=10, offset=.05):
         if only_number:
             col = "conc"
         else:
@@ -127,7 +127,7 @@ class Protocol(pd.DataFrame):
         figheight = figheight*72
         axHeight = nComp*fontsize*(1+2*hspace)/figheight
         pos = ax.get_position()
-        axp = fig.add_axes([pos.x0, pos.y0+pos.height*1.02, pos.width, axHeight], label="protocol")
+        axp = fig.add_axes([pos.x0, pos.y0+pos.height*(1+offset), pos.width, axHeight], label="protocol")
         axp.set_ylim(0, nComp)
         fig.canvas.draw()
         for ic,comp in enumerate(compounds):
