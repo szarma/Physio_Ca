@@ -41,6 +41,7 @@ class LineScan:
         save=False,
         Npoints = 1000,
         verbose=False,
+            axs = None
         ):
         if tmax is None:
             tmax = self.time[-1]
@@ -49,15 +50,17 @@ class LineScan:
         Tind = times[np.searchsorted(times, tmax*.2)-1]
         txtOffset = physicalSize-1.2*distance
         nr = len(timeScales)
-        fig, axs = plt.subplots(nr,1,
-                                figsize=(4,3*nr),
-                                sharey=True, 
-                                sharex=True
-                               )
-        fig.patch.set_facecolor('k')
-        plt.subplots_adjust(wspace=.02, hspace=.02)
+        if axs is None:
+            fig, axs = plt.subplots(nr,1,
+                                    figsize=(4,3*nr),
+                                    sharey=True,
+                                    sharex=True,
+                                    squeeze = False
+                                   )
+            axs = axs.flatten()
+            fig.patch.set_facecolor('k')
+            plt.subplots_adjust(wspace=.02, hspace=.02)
         nRebin = int(np.round(len(self.time)/Npoints))
-#         print (nRebin)
         if nRebin>1:
             if verbose: print ("rebinning by", nRebin)
             newdata = rebin(self.data, nRebin, axis=1)
@@ -98,10 +101,8 @@ class LineScan:
             fig.tight_layout()
             fig.savefig(save, dpi=150, facecolor='k')
             plt.close(fig)
-        else:
-            fig.show()
 
-    def detrend(self, fast=True, n=None, processes=1, func=None, points=100):
+    def detrend(self, fast=True, n=None, processes=1, func=None, points=None):
         from .numeric import fit_bleaching
         from .utils import multi_map
         if n is None:
@@ -111,11 +112,14 @@ class LineScan:
             trend = np.mean(self.data[:n],1)
         else:
             global iterf
+            if points is None:
+                points = 100
             def iterf(xi):
                 return fit_bleaching(xi, func=func, points=points)
             trend = multi_map(iterf, self.data[:n], processes = processes)
             if processes==1:
                 trend = list(trend)
+        self.trend = np.array(trend)
         for i in range(n):
             self.detrended[i] = self.data[i] - trend[i]
     
