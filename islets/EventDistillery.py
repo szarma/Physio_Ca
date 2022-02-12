@@ -277,6 +277,7 @@ def distill_events_per_roi(roiEvents,
                         row[col] = row[col][0]
                     #row[col] = np.mean(roiEvents.loc[list(ixs), col],axis=0)
         row.halfwidth = row.tend-row.t0
+        row["clique_size"] = len(ixs)
         for ix in ixs:
             if ix != row.name:
                 roiEvents.loc[ix,"status"]="merged"
