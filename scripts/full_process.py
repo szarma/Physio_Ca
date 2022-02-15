@@ -133,7 +133,7 @@ def create_movie(recording, frequency, restrict, series, input_type, channel, ve
 
         movie = islets.cmovie(images, fr = fr)
         movie.filename = images.filename
-    del rec
+        del rec
     return movie, metadata
 
 
@@ -209,35 +209,37 @@ def main(args):
         filtSizes = args.spatial_filter.split(",")
         filtSizes = [eval(el.replace("+", ",")) if "+" in el else (int(el),) for el in filtSizes]
         cell_half_width_in_px = min(sum(filtSizes, (np.inf,)))
+    if not args.skip_motion_correction:
+        ####### Correcting ####################
+        max_dev_rig = cell_half_width_in_px // 2 + 1
+        if input_type == "tif":
+            m_correct = islets.cmovie(
+                tifffile.memmap(
+                    tifFilename_corrected,
+                    shape = movie.shape,
+                    dtype = "float32",
+                    photometric = "minisblack"
+                ),
+                fr = movie.fr
+            )
+        else:
+            m_correct = movie
 
-    ####### Correcting ####################
-    max_dev_rig = cell_half_width_in_px // 2 + 1
-    if input_type == "tif":
-        m_correct = islets.cmovie(
-            tifffile.memmap(
-                tifFilename_corrected,
-                shape = movie.shape,
-                dtype = "float32",
-                photometric = "minisblack"
-            ),
-            fr = movie.fr
-        )
+        # if args.debug: raise InterruptedError()
+
+        # correct phase
+        phase_shifts = islets.utils.correct_phase(movie, m_correct, max_dev = max_dev_rig, plot_name = baseName + "phase_shifts.png")
+        np.savetxt(baseName+"phase_shifts.txt", phase_shifts, fmt = "%.4f", delimiter = ",")
+
+        # correct for motion
+        motion_shifts = islets.utils.motion_correct(movie, m_correct, max_dev = (max_dev_rig, max_dev_rig),
+                                    plot_name = baseName + "motion_shifts.png", verbose = args.verbose, mode = "full")
+        np.savetxt(baseName+"motion_shifts.txt", motion_shifts, fmt = "%.4f", delimiter = ",")
+
+        ####### Write corrected movie #######
+        islets.utils.saveMovie(m_correct, filename = mp4Filename_corrected)
     else:
         m_correct = movie
-
-    # if args.debug: raise InterruptedError()
-
-    # correct phase
-    phase_shifts = islets.utils.correct_phase(movie, m_correct, max_dev = max_dev_rig, plot_name = baseName + "phase_shifts.png")
-    np.savetxt(baseName+"phase_shifts.txt", phase_shifts, fmt = "%.4f", delimiter = ",")
-
-    # correct for motion
-    motion_shifts = islets.utils.motion_correct(movie, m_correct, max_dev = (max_dev_rig, max_dev_rig),
-                                plot_name = baseName + "motion_shifts.png", verbose = args.verbose, mode = "full")
-    np.savetxt(baseName+"motion_shifts.txt", motion_shifts, fmt = "%.4f", delimiter = ",")
-
-    ####### Write corrected movie #######
-    islets.utils.saveMovie(m_correct, filename = mp4Filename_corrected)
 
     ###### Start processing ######
     statistics = islets.utils.getStatImages(m_correct)
@@ -313,14 +315,16 @@ if __name__ == "__main__":
                         help = 'List of users to notify with the slack notifications')
     parser.add_argument('--debug', action = "store_true", dest = "debug",
                         help = 'toggle debug mode')
+    parser.add_argument('--skip_motion_correction', "-skipmc", action = "store_true",
+                        help = 'toggle motion correction off')
 
     args = parser.parse_args()
 
     if args.debug:
         args.verbose = True
         for k in args.__dict__.keys():
-            print("%20s" % k, args.__dict__[k])
-
+            print("%30s" % k, args.__dict__[k])
+        sys.exit()
     try:
         main(args)
     except Exception as e:
