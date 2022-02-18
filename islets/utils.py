@@ -1486,3 +1486,6 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
     if "protocol" not in status.columns:
         status["protocol"] = [""]*len(status)
     return status
+
+def get_trace(row):
+    return tuple([np.array(row[k].replace("\n"," ").strip(" []").split(), dtype="float") for k in ["time","trace"]])
