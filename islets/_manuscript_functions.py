@@ -199,7 +199,7 @@ def ruler(fig, margin=.5, grid=True):
     dax.set_ylim(0, figheight)
     dax.set_xticks(np.arange(0, figwidth + 1e-10))
     dax.set_yticks(np.arange(0, figheight + 1e-10))
-    mystyle_axes(dax, retain = ["top", "left"], bounded = [False] * 2)
+    mystyle_axes(dax, retain = [,"bottom","right","top", "left"], bounded = [False] * 4)
     dax.xaxis.set_minor_locator(MultipleLocator(.2))
     dax.yaxis.set_minor_locator(MultipleLocator(.2))
     if grid:
