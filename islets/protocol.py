@@ -155,6 +155,7 @@ class Protocol(pd.DataFrame):
             if label == "left":
                 axp.text(self.t_begin.min(),yt,comp+" ",va="bottom", ha="right", fontsize = fontsize)
         axp.set_clip_on(False)
+        axp.set_xlim(ax.get_xlim())
         #ax.set_yticks([])
         #mystyle_axes(ax)
         return axp
