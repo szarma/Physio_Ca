@@ -1732,11 +1732,14 @@ class Regions:
         if nr==0:
             nr=1
         xs = np.vstack(self.df.loc[indices, col].values)
-        if nr>1:
-            t = rebin(self.time, nr)
-            xs = rebin(xs,nr,1)
+        if len(self.df[col].iloc[0])==len(self.time):
+            if nr>1:
+                t = rebin(self.time, nr)
+                xs = rebin(xs,nr,1)
+            else:
+                t = self.time
         else:
-            t = self.time
+            t = self.showTime[col.split("_")[-1]]
 
         for i in range(len(xs)):
             xs[i] = xs[i]-np.median(xs[i])
