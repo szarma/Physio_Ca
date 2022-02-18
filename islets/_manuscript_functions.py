@@ -10,8 +10,9 @@ import warnings
 from IPython.display import display, HTML
 import statsmodels.api as sm
 
-myGrey = (.3,)*3
-
+myGrey = (.2,)*3
+default_fontsize = 7
+figlabeldict = dict(fontsize=8,fontweight="bold")
 
 def showLineScan(linescan, axs, pixel_limits, Tind = 1, slice_ = None, offset = 1):
     data = linescan.data[slice_]
@@ -554,7 +555,7 @@ def mystyle_axes(ax, retain=None, xlim=None, ylim=None, bounded=None):
         ax.set_yticks([])
 
 
-def emphasize_region(ax, x, y, extend=(0, 0), **line_kwargs):
+def emphasize_region(ax, x, y, extend=(0, 0), clip_on = False, **line_kwargs):
     xb, xe = x
     yb, ye = y
     assert xe > xb
@@ -569,13 +570,20 @@ def emphasize_region(ax, x, y, extend=(0, 0), **line_kwargs):
     dy = extend[1] * dy
     ye = ye + dy
     yb = yb - dy
-    ln = Line2D(
-        [xb, xe, xe, xb, xb],
-        [yb, yb, ye, ye, yb],
-        **line_kwargs
-    )
-    ln.set_clip_on(False)
-    ax.add_line(ln)
+    if clip_on:
+        ax.plot(
+            [xb, xe, xe, xb, xb],
+            [yb, yb, ye, ye, yb],
+            **line_kwargs
+        )
+    else:
+        ln = Line2D(
+            [xb, xe, xe, xb, xb],
+            [yb, yb, ye, ye, yb],
+            **line_kwargs
+        )
+        ln.set_clip_on(False)
+        ax.add_line(ln)
 
 
 def plot_events(Events,
@@ -610,8 +618,6 @@ def plot_events(Events,
     # mystyle_axes(axp)
     # from .utils import add_protocol
     # add_protocol(axp, protocol)
-    axp = protocol.plot_protocol(ax, only_number = False)
-    output = [fig, (ax, axp)]
     if timeUnits[0] == "m":
         # duration = duration/60
         ax.set_xlabel("time [min]")
@@ -620,7 +626,8 @@ def plot_events(Events,
     elif timeUnits[0] == "s":
         ax.set_xlabel("time [s]")
     ax.set_ylabel(r"$\tau_{1/2}$, halfwidth [s]")
-    protocol.plot_protocol(ax)
+    axp = protocol.plot_protocol(ax, only_number = False)
+    output = [fig, (ax, axp)]
     ## plotting
     if plottype == "hexbin":
         cax = fig.add_axes(
