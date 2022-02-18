@@ -147,13 +147,13 @@ class Protocol(pd.DataFrame):
                 ln = axp.fill(x,y,color=c,**linenkwargs)[0]
                 ln.set_clip_on(False)
                 ftc = df.loc[ii].get("fontcolor","black")
-                yt = ic+.5 - fontsize/figheight#y[:-1].mean()
-                axp.text(t0,yt, " "+str(conc),va="center", ha="left", color=ftc, size = fontsize)
+                yt = ic+.1#+.5 - fontsize/figheight#y[:-1].mean()
+                axp.text(t0,yt, " "+str(conc),va="bottom", ha="left", color=ftc, size = fontsize)
                 #ax.plot(x,y,color="black",lw=1)
             if label == "close":
-                axp.text(df.t_begin.min(),yt,comp+" ",va="center", ha="right", fontsize = fontsize)
+                axp.text(df.t_begin.min(),yt,comp+" ",va="bottom", ha="right", fontsize = fontsize)
             if label == "left":
-                axp.text(self.t_begin.min(),yt,comp+" ",va="center", ha="right", fontsize = fontsize)
+                axp.text(self.t_begin.min(),yt,comp+" ",va="bottom", ha="right", fontsize = fontsize)
         axp.set_clip_on(False)
         #ax.set_yticks([])
         #mystyle_axes(ax)
