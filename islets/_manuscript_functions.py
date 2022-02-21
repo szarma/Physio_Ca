@@ -879,3 +879,56 @@ def plot_closeup_traces(ax, regions, rois, closeup, **tracekwargs):
         l.set_data((x[fltr], y[fltr]))
     ax.set_xlim(closeup)
     ax.relim()
+
+def plot_rois_colored_acc_quantity(regions, axs, discr_qty, cmap = "turbo", vmin = None, vmax = None, hist_kwargs = None, rel_height = .1, rel_pos = 1.05):
+    axrois, axcolor = axs
+    if vmin is None:
+        vmin = np.nanpercentile(regions.df[discr_qty],1)
+    if vmax is None:
+        vmax = np.nanpercentile(regions.df[discr_qty],95)
+    if hist_kwargs is None:
+        hist_kwargs = {"bins":50, "color":myGrey}
+    regions.color_according_to(discr_qty, cmap=cmap, vmin = vmin, vmax = vmax)
+    regions.plotEdges(ax=axrois, scaleFontSize=7, separate=True, fill=True, alpha =.6)
+    regions.plotEdges(ax=axrois, separate=True, fill=False, image=False)
+    axrois.set_xticks([])
+    axrois.set_yticks([])
+    h = axcolor.hist(regions.df[discr_qty],**hist_kwargs)[0]
+    axc_pos = axcolor.get_position()
+    fig = axrois.get_figure()
+    axc1 = fig.add_axes([axc_pos.x0, axc_pos.y0+axc_pos.height*rel_pos, axc_pos.width, axc_pos.height*rel_height])
+    min_, max_ = axcolor.get_xlim()
+    axrange = max_ - min_
+    min_ -= axrange*.3
+    max_ += axrange*.3
+    x = np.linspace(min_, max_, 200)
+    x = (x-vmin)/(vmax-vmin)
+    axc1.imshow(plt.cm.get_cmap(cmap)([x]), aspect="auto", extent = (min_, max_, 0, 1))
+    axc1.set_xlim(axcolor.get_xlim())
+    axc1.set_yticks([])
+    axc1.set_xticks([])
+    return axc1, h
+
+
+def check_roi_heterogeneity(Events, regions, quantity = "halfwidth", min_events = 10, transform = None,
+                            boxplot_kwargs = dict(flierprops = dict(markersize = 1))
+                            ):
+    fig, axs = plt.subplots(2, 2, figsize = (20, 8), gridspec_kw={"width_ratios":[1,4]})
+    if transform is None: transform = lambda xi: xi
+    X = [transform(dfr[quantity].values) for roi, dfr in Events.groupby("roi") if len(dfr) > min_events]
+    X = sorted(X, key = np.median)
+    bx = axs[0,1].boxplot(X, positions = np.arange(len(X)), **boxplot_kwargs)
+    axs[1,1].plot(list(map(len, X)))
+    axs[1,1].set_xlim(axs[0,1].get_xlim())
+    hetvar = "heterogeneity_var"
+    x = []
+    for roi in regions.df.index:
+        ev = Events.query(f"roi=={roi}")
+        if len(ev)>min_events:
+            x += [np.median(transform(ev[quantity]))]
+        else:
+            x += [np.nan]
+    regions.df[hetvar] = x
+    plot_rois_colored_acc_quantity(regions, axs[::-1,0], hetvar, )
+
+    return (fig, axs, bx)
