@@ -651,84 +651,85 @@ def createStaticImage(regions,im=None,showall=True,returnPath=False,origin="lowe
     
     return PilImage.open(bkg_img_file)
 
-def motion_correct(movie, m_rshifted, freqMC=0.5, max_dev=(5, 5), plot_name="shifts.png", pinpoint_template = 0, Niter = 4, mode = "full", verbose = True, template = None):
+def motion_correct(movie, m_rshifted, freqMC=0.5, max_dev=(5, 5), plot_name="shifts.png", pinpoint_template = 0, Niter = 4, mode = "full", verbose = True, template = None, shifts = None):
     freq = movie.fr
-    n_rebin = int(np.round(freq / freqMC))
-    if n_rebin < 1:
-        n_rebin = 1
-    if verbose: (f"The original frequency is {freq}.")
-    if n_rebin > 1:
-        if verbose: print(f"The movie will be rebinned in time by {n_rebin} for shifts extraction.")
-    reb_movie = movie.resize(1, 1, 1. / n_rebin).astype("float32")
-    reb_movie = reb_movie.gaussian_blur_2D(max_dev[0] * 2 + 1, max_dev[1] * 2 + 1, -1, -1)
+    if shifts is None:
+        n_rebin = int(np.round(freq / freqMC))
+        if n_rebin < 1:
+            n_rebin = 1
+        if verbose: (f"The original frequency is {freq}.")
+        if n_rebin > 1:
+            if verbose: print(f"The movie will be rebinned in time by {n_rebin} for shifts extraction.")
+        reb_movie = movie.resize(1, 1, 1. / n_rebin).astype("float32")
+        reb_movie = reb_movie.gaussian_blur_2D(max_dev[0] * 2 + 1, max_dev[1] * 2 + 1, -1, -1)
 
-    if verbose: print(f'Extracting shifts started. The output will be saved in {plot_name} file.')
-    #     fig, axs = plt.subplots(2, 1, figsize=(8, 8), sharex=True, sharey=True, dpi=150)
-    fig, axs = plt.subplots(1, 1, figsize = (8, 3.5), sharex = True, sharey = True, dpi = 150)
-    axs = [axs, axs]
-    #     axs[0].set_title("shifts (in pixels)")
-    axs[0].set_title("vertical: sold, horizontal: dashed")
-    axs[0].set_ylabel("shifts (in pixels)")
-    #     axs[0].set_ylabel("vertical")
-    #     axs[1].set_ylabel("horizontal")
-    axs[1].set_xlabel("time [s]")
-    max_shift_vert, max_shift_hor = max_dev
+        if verbose: print(f'Extracting shifts started. The output will be saved in {plot_name} file.')
+        #     fig, axs = plt.subplots(2, 1, figsize=(8, 8), sharex=True, sharey=True, dpi=150)
+        fig, axs = plt.subplots(1, 1, figsize = (8, 3.5), sharex = True, sharey = True, dpi = 150)
+        axs = [axs, axs]
+        #     axs[0].set_title("shifts (in pixels)")
+        axs[0].set_title("vertical: sold, horizontal: dashed")
+        axs[0].set_ylabel("shifts (in pixels)")
+        #     axs[0].set_ylabel("vertical")
+        #     axs[1].set_ylabel("horizontal")
+        axs[1].set_xlabel("time [s]")
+        max_shift_vert, max_shift_hor = max_dev
 
-    shifts = np.zeros(shape = (len(reb_movie), 2), dtype = "float32")
-    if mode in ["pairwise","full"]:
-        dshifts = [[0, 0]]
-        for iframe in range(reb_movie.shape[0]-1):
-            mtmp = reb_movie[iframe:iframe + 2]
-            dshifts += [mtmp.extract_shifts(max_shift_vert//2+1, max_shift_hor//2+1, template = mtmp[0])[0][1]]
-        shifts += np.cumsum(np.array(dshifts), axis = 0)
+        shifts = np.zeros(shape = (len(reb_movie), 2), dtype = "float32")
+        if mode in ["pairwise","full"]:
+            dshifts = [[0, 0]]
+            for iframe in range(reb_movie.shape[0]-1):
+                mtmp = reb_movie[iframe:iframe + 2]
+                dshifts += [mtmp.extract_shifts(max_shift_vert//2+1, max_shift_hor//2+1, template = mtmp[0])[0][1]]
+            shifts += np.cumsum(np.array(dshifts), axis = 0)
 
-        shifts[:, 0] -= np.median(shifts[:, 0])
-        shifts[:, 1] -= np.median(shifts[:, 1])
+            shifts[:, 0] -= np.median(shifts[:, 0])
+            shifts[:, 1] -= np.median(shifts[:, 1])
 
-        reb_movie = reb_movie.apply_shifts(shifts)
+            reb_movie = reb_movie.apply_shifts(shifts)
 
-        c = axs[0].plot([])[0].get_color()
-        axs[0].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 0], label = "pairwise inference", c = c)
-        axs[1].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 1], "--", c = c)
-        plt.tight_layout();fig.savefig(plot_name)
-
-    if mode in ["template-based", "full"]:
-        if template is None:
-            ichoose = int(pinpoint_template * len(reb_movie))
-            template = reb_movie[ichoose]
-
-
-        for i_extract in range(Niter):
-            dshifts = reb_movie.extract_shifts(
-                max_shift_w = max_shift_hor,
-                max_shift_h = max_shift_vert,
-                template = template
-            )[0]
-            shifts += np.array(dshifts)
-            reb_movie.apply_shifts(dshifts)
-            maxshifts = np.abs(dshifts).max(axis = 0)
-            if verbose:
-                print("maximal shifts are ", maxshifts)
-            # print ("all dshifts ", dshifts)
             c = axs[0].plot([])[0].get_color()
-            axs[0].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 0], label = i_extract, c = c)
+            axs[0].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 0], label = "pairwise inference", c = c)
             axs[1].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 1], "--", c = c)
             plt.tight_layout();fig.savefig(plot_name)
-            i_extract += 1
-            if (maxshifts[0] < max_dev[0]) and (maxshifts[1] < max_dev[1]):
-                break
 
-    axs[0].legend()
-    maxyl = np.abs([ax.get_ylim() for ax in axs]).max()
-    for ax in axs:
-        ax.set_ylim(-maxyl, maxyl)
-    plt.tight_layout();fig.savefig(plot_name)
-    if verbose: print(f'Extracting shifts finished.')
+        if mode in ["template-based", "full"]:
+            if template is None:
+                ichoose = int(pinpoint_template * len(reb_movie))
+                template = reb_movie[ichoose]
 
-    #### if rebinned, then need to expand shift to fit the whole movie
-    if n_rebin > 1:
-        from . import cmovie
-        shifts = cmovie(shifts.reshape((1,) + shifts.shape)).resize(n_rebin, 1, 1)[0]
+
+            for i_extract in range(Niter):
+                dshifts = reb_movie.extract_shifts(
+                    max_shift_w = max_shift_hor,
+                    max_shift_h = max_shift_vert,
+                    template = template
+                )[0]
+                shifts += np.array(dshifts)
+                reb_movie.apply_shifts(dshifts)
+                maxshifts = np.abs(dshifts).max(axis = 0)
+                if verbose:
+                    print("maximal shifts are ", maxshifts)
+                # print ("all dshifts ", dshifts)
+                c = axs[0].plot([])[0].get_color()
+                axs[0].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 0], label = i_extract, c = c)
+                axs[1].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 1], "--", c = c)
+                plt.tight_layout();fig.savefig(plot_name)
+                i_extract += 1
+                if (maxshifts[0] < max_dev[0]) and (maxshifts[1] < max_dev[1]):
+                    break
+
+        axs[0].legend()
+        maxyl = np.abs([ax.get_ylim() for ax in axs]).max()
+        for ax in axs:
+            ax.set_ylim(-maxyl, maxyl)
+        plt.tight_layout();fig.savefig(plot_name)
+        if verbose: print(f'Extracting shifts finished.')
+
+        #### if rebinned, then need to expand shift to fit the whole movie
+        if n_rebin > 1:
+            from . import cmovie
+            shifts = cmovie(shifts.reshape((1,) + shifts.shape)).resize(n_rebin, 1, 1)[0]
     # pad the remaining frames if exist:
     npad = len(movie) - len(shifts)
     if npad > 0:
@@ -755,49 +756,50 @@ def motion_correct(movie, m_rshifted, freqMC=0.5, max_dev=(5, 5), plot_name="shi
     return shifts
 
 
-def correct_phase(movie, m_phasecor, freqMC=.5, max_dev=5, plot_name="phase_shift.png", verbose = False):
-    from . import cmovie
-    freq = movie.fr
-    n_rebin = int(np.round(freq / freqMC))
-    if n_rebin < 1:
-        n_rebin = 1
-    if verbose: print(f"The original frequency is {freq}.")
-    if n_rebin > 1:
-        if verbose: print(f"The movie will be rebinned in time by {n_rebin} for shifts extraction.")
-    reb_movie = movie.resize(1, 1, 1. / n_rebin).astype("float32")
-
-    fig, ax = plt.subplots(1, 1, figsize = (8, 3.5))
-    ax.set_title("shifts for odd lines")
-    ax.set_ylabel("shifts (in pixels)")
-    ax.set_xlabel("time [s]")
-
-
-    # first pass on the pairs of neighboring frames:
-
-    dshifts = []
-    for iframe in range(reb_movie.shape[0]):
-        evenFrame = reb_movie[iframe,::2]
-        evenFrame = (evenFrame[1:]+evenFrame[:-1])/2
-        oddFrame = reb_movie[iframe,1::2][:-1]
-        tmpshift = cmovie.extract_shifts(oddFrame.reshape((1,)+oddFrame.shape), max_dev, 0, template=evenFrame)[0][0]
-        dshifts += [tmpshift]
-    shifts = np.array(dshifts).astype("float32")
-
-    ax.plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:,1], label = "pairwise inference", c = "darkgrey")
-    # ax.plot(np.arange(len(shifts)) / reb_movie.fr, np.array(dshifts), label = "pairwise inference", c = "darkgrey")
-    shifts[:,0] = 0
-
-    if verbose: print(f'Extracting shifts finished.')
-    plt.tight_layout()
-    fig.savefig(plot_name)
-
-    if n_rebin > 1:
+def correct_phase(movie, m_phasecor, freqMC=.5, max_dev=5, plot_name="phase_shift.png", verbose = False, shifts = None):
+    if shifts is None:
         from . import cmovie
-        shifts = cmovie(shifts.reshape((1,) + shifts.shape)).resize(n_rebin, 1, 1)[0]
-    # pad the remaining frames if exist:
-    npad = len(movie) - len(shifts)
-    if npad > 0:
-        shifts = np.vstack([shifts, [shifts[-1]] * npad])
+        freq = movie.fr
+        n_rebin = int(np.round(freq / freqMC))
+        if n_rebin < 1:
+            n_rebin = 1
+        if verbose: print(f"The original frequency is {freq}.")
+        if n_rebin > 1:
+            if verbose: print(f"The movie will be rebinned in time by {n_rebin} for shifts extraction.")
+        reb_movie = movie.resize(1, 1, 1. / n_rebin).astype("float32")
+
+        fig, ax = plt.subplots(1, 1, figsize = (8, 3.5))
+        ax.set_title("shifts for odd lines")
+        ax.set_ylabel("shifts (in pixels)")
+        ax.set_xlabel("time [s]")
+
+
+        # first pass on the pairs of neighboring frames:
+
+        dshifts = []
+        for iframe in range(reb_movie.shape[0]):
+            evenFrame = reb_movie[iframe,::2]
+            evenFrame = (evenFrame[1:]+evenFrame[:-1])/2
+            oddFrame = reb_movie[iframe,1::2][:-1]
+            tmpshift = cmovie.extract_shifts(oddFrame.reshape((1,)+oddFrame.shape), max_dev, 0, template=evenFrame)[0][0]
+            dshifts += [tmpshift]
+        shifts = np.array(dshifts).astype("float32")
+
+        ax.plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:,1], label = "pairwise inference", c = "darkgrey")
+        # ax.plot(np.arange(len(shifts)) / reb_movie.fr, np.array(dshifts), label = "pairwise inference", c = "darkgrey")
+        shifts[:,0] = 0
+
+        if verbose: print(f'Extracting shifts finished.')
+        plt.tight_layout()
+        fig.savefig(plot_name)
+
+        if n_rebin > 1:
+            from . import cmovie
+            shifts = cmovie(shifts.reshape((1,) + shifts.shape)).resize(n_rebin, 1, 1)[0]
+        # pad the remaining frames if exist:
+        npad = len(movie) - len(shifts)
+        if npad > 0:
+            shifts = np.vstack([shifts, [shifts[-1]] * npad])
 
     # prepare for saving
     chunkSize = 3e9 # gigabytes
@@ -816,90 +818,6 @@ def correct_phase(movie, m_phasecor, freqMC=.5, max_dev=5, plot_name="phase_shif
         m_phasecor[sl,1::2] = tmpm.astype(m_phasecor.dtype)
     if verbose: print("Done.")
     return shifts
-
-def gentle_motion_correct(movie, m_rshifted, freqMC=1, max_dev=(5,5), plot_name="shifts.png", template=None,pinpoint_template=0,Niter=4):
-    from .numeric import rebin
-    assert movie.shape == m_rshifted.shape
-    freq = movie.fr
-    n_rebin = int(np.round(freq / freqMC))
-    if n_rebin < 1:
-        n_rebin = 1
-    print (f"The original frequency is {freq}.")
-    if n_rebin>1:
-        print (f"The movie will be rebinned in time by {n_rebin} for shifts extraction.")
-    reb_movie = movie.resize(1,1,1./n_rebin).astype("float32")
-    reb_movie.gaussian_blur_2D(max_dev[0]*2+1, max_dev[1]*2+1, -1,-1)
-    # reb_movie = rebin(movie, n_rebin, dtype='float32')
-    # reb_movie = cmovie(reb_movie, fr=freq / n_rebin)
-
-    print (f'Extracting shifts started. The output will be saved in {plot_name} file.' )
-#     fig, axs = plt.subplots(2, 1, figsize=(8, 8), sharex=True, sharey=True, dpi=150)
-    fig, axs = plt.subplots(1, 1, figsize=(8, 3.5), sharex=True, sharey=True, dpi=150)
-    axs = [axs, axs]
-#     axs[0].set_title("shifts (in pixels)")
-    axs[0].set_title("vertical: sold, horizontal: dashed")
-    axs[0].set_ylabel("shifts (in pixels)")
-#     axs[0].set_ylabel("vertical")
-#     axs[1].set_ylabel("horizontal")
-    axs[1].set_xlabel("time [s]")
-    shifts = np.zeros((len(reb_movie), 2))
-    max_shift_vert, max_shift_hor = max_dev
-
-    # diffmovie = np.diff(reb_movie[:,::reb_movie.shape[1]//10,::reb_movie.shape[2]//10], axis=0).mean((1,2))
-    if template is None:
-        ichoose = int(pinpoint_template*len(reb_movie))#np.argmin(np.abs(diffmovie))
-        template = reb_movie[ichoose]
-    i_extract = 0
-    for i_extract in range(Niter):
-        dshifts = reb_movie.extract_shifts(
-            max_shift_w=max_shift_hor,
-            max_shift_h=max_shift_vert,
-            template=template
-        )[0]
-        shifts += dshifts
-        maxshifts = np.abs(dshifts).max(axis=0)
-        print ("maximal shifts are ", maxshifts)
-        # print ("all dshifts ", dshifts)
-        c = axs[0].plot([])[0].get_color()
-        axs[0].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 0], label=i_extract,c=c)
-        axs[1].plot(np.arange(len(shifts)) / reb_movie.fr, shifts[:, 1], "--",c=c)
-        plt.tight_layout();fig.savefig(plot_name)
-        i_extract += 1
-        if (maxshifts[0] < max_dev[0]) and (maxshifts[1] < max_dev[1]):
-            break
-    if i_extract>1:
-        axs[0].legend()
-    maxyl = np.abs([ax.get_ylim() for ax in axs]).max()
-    for ax in axs:
-        ax.set_ylim(-maxyl, maxyl)
-    plt.tight_layout();fig.savefig(plot_name)
-    print (f'Extracting shifts finished.' )
-
-    if n_rebin > 1:
-        from . import cmovie
-        shifts = cmovie(shifts.reshape((1,) + shifts.shape)).resize(n_rebin, 1, 1)[0]
-    # pad the remaining frames if exist:
-    npad = len(movie)-len(shifts)
-    if npad>0:
-        shifts = np.vstack([shifts,[shifts[-1]]*npad])
-    # m_rshifted = np.zeros_like(movie)
-    di = movie.size//2**16 // 20
-    if di<1: di=1
-    mtype = movie.dtype
-    maxv = 2 ** int(str(mtype).split("int")[-1]) - 1
-
-    print (f'Applying shifts...' )
-    for i in tqdm(range(0, len(shifts), di)):
-        sl = slice(i, min(len(shifts), i + di))
-        tmpm = movie[sl].astype("float32").apply_shifts(shifts[sl])
-        tmpm[tmpm < 0] = 0
-        tmpm[tmpm > maxv] = maxv
-        # tmpm = np.round(tmpm)
-        # tmpm = dst.poisson.rvs(mu=tmpm)
-        # tmpm[tmpm > maxv] = maxv
-        m_rshifted[sl] = tmpm.astype(m_rshifted.dtype)
-    print ("Done.")
-    # return m_rshifted
 
 def load_json(path):
     from json import loads
