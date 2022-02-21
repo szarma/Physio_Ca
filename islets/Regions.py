@@ -497,6 +497,7 @@ class Regions:
                   spline=True,
                   bound=True,
                   lengths=None,
+                  smoothness=None,
                   **kwargs
                   ):
         if ix is None:
@@ -523,7 +524,8 @@ class Regions:
         fs = self.__dict__.get("filterSize", [])
         if fs is None:
             fs = []
-        smoothness = min(list(fs)+[3] )
+        if smoothness is None:
+            smoothness = int(np.mean(list(fs)+[3]))+1
         if separate:
             for i in ix:
                 if color is not None:
@@ -676,17 +678,17 @@ class Regions:
         else:
             self.df[saveAs] = activity
 
-    def color_according_to(self,col,cmap="turbo", vmin = None, vmax = None):
+    def color_according_to(self,col,cmap="turbo", vmin = None, vmax = None, nan_color=(.7,)*3):
         # check if column type is numeric
         if self.df[col].dtype.kind not in "biufc":
             raise ValueError(f"{col} elements not numeric.")
         x = self.df[col].values.copy().astype("float")
         if vmin is None:
-            vmin = np.percentile(x, 1)
+            vmin = np.nanpercentile(x, 1)
         if vmax is None:
-            vmax = np.percentile(x, 95)
+            vmax = np.nanpercentile(x, 95)
         x = (x-vmin)/(vmax-vmin)
-        rgbs = np.array([plt.cm.get_cmap(cmap)(xx)[:3] for xx in x])
+        rgbs = np.array([nan_color  if np.isnan(xx) else plt.cm.get_cmap(cmap)(xx)[:3] for xx in x])
         rgbs = (256*rgbs).astype(int)
         rgbs = np.minimum(rgbs,255)
         self.df["color"] = ['#%02x%02x%02x' % tuple(rgb) for rgb in rgbs]
