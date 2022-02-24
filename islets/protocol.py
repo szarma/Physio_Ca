@@ -44,6 +44,7 @@ class Protocol(pd.DataFrame):
     @classmethod
     def from_file(cls, path, tend, t0=0):
         lines = open(path).readlines()
+        lines = [l for l in lines if len(l)]
         for il,line in enumerate(lines):
             n_commas = line.count(",")
             if n_commas!=3:
