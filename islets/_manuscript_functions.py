@@ -580,6 +580,8 @@ def mystyle_axes(ax, retain=None, xlim=None, ylim=None, bounded=None):
     if bounded is None:
         bounded = [True] * len(retain)
     boundedDict = dict(zip(retain, bounded))
+    # renderer = ax.get_figure().canvas.get_renderer()
+    # ax.draw(renderer)
     for sp in ax.spines:
         ax.spines[sp].set_visible(sp in retain)
     if xlim is None:
