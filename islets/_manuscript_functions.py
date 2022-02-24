@@ -213,7 +213,7 @@ def silent_fit(model):
         return result, w
 
 
-def get_rate_effect(events, ref_leg=None, legs=None, ):
+def get_rate_effect(events, ref_leg=None, legs=None, groups = "experiment"):
     events = events.copy()
     if legs is None:
         legs = events["leg"].dropna().unique()
@@ -221,7 +221,7 @@ def get_rate_effect(events, ref_leg=None, legs=None, ):
         ref_leg = events[~events["leg"].isna()].iloc[0]['leg']
     events["log10_epmpr"] = np.log10(events["epmpr"])
     model = sm.MixedLM.from_formula(f"log10_epmpr ~ C(leg, Treatment('{ref_leg}')) + 1", data = events,
-                                    groups = "experiment")
+                                    groups = groups)
     result, warns = silent_fit(model)
     legs = [leg for leg in legs if leg != ref_leg]
     # summary = get_summary(model, legs, ref_leg)
@@ -253,6 +253,60 @@ def get_rate_effect(events, ref_leg=None, legs=None, ):
     display(HTML(html_summary))
     return result
 
+
+def get_effect(events, quantity, ref_leg=None, legs=None, control_for_roi=True, minEvents=10, groups="roi"):
+    events = events.copy()
+    if legs is None:
+        legs = events["leg"].dropna().unique()
+    if ref_leg is None:
+        ref_leg = events[~events["leg"].isna()].iloc[0]['leg']
+    depvar = f"log10_{quantity}"
+    events[depvar] = np.log10(events[quantity])
+    if control_for_roi:
+        events.dropna(inplace = True)
+        chooseRois = [roi for roi, ev in events.groupby("roi") if
+                      all([len(ev.query(f"leg=='{leg}'")) >= minEvents for leg in legs])]
+        print(f"There are {len(chooseRois)} rois, which have at least {minEvents} events in all legs.")
+        events = events[events.roi.isin(chooseRois)]
+        model = sm.MixedLM.from_formula(
+            f"{depvar} ~ C(leg, Treatment('{ref_leg}')) + 1",
+            data = events,
+            groups = groups,
+            vc_formula = None if groups == "roi" else {"roi": "0 + C(roi)"},
+
+        )
+    else:
+        model = sm.OLS.from_formula(f"{depvar} ~ C(leg, Treatment('{ref_leg}')) + 1", data = events)
+    result, warns = silent_fit(model)
+    legs = [leg for leg in legs if leg != ref_leg]
+    # summary = get_summary(model, legs, ref_leg)
+    html_summary = \
+        """<style type="text/css">
+            /* Fix details summary arrow
+               not shown in Firefox
+               due to bootstrap
+               display: block;
+             */
+            summary {
+                display: list-item;
+            }
+            </style>"""
+    html_summary += f"<div>reference leg: {ref_leg}</div>"
+    html_summary += "<table>"
+    for leg in legs:
+        coef = result.params[f"C(leg, Treatment('{ref_leg}'))[T.{leg}]"]
+        pv = result.pvalues[f"C(leg, Treatment('{ref_leg}'))[T.{leg}]"]
+        effect_in_pc = (10 ** coef - 1) * 100
+        html_summary += f"""<tr><td style="text-align:left">Obtained effect for leg '<span style='font-family:monospace'>{leg}</span>':</td><td>%+.2g%%,</td><td>with the p-value of %.2g</td></tr>""" % (
+            effect_in_pc, pv)
+    #         html_summary += "<br>"
+    html_summary += "</table>"
+    if len(warns):
+        html_summary += f"<span style='font-size:70%'>~ {len(warns)} warning(s) encountered when fitting you might want to check full output ~</span>"
+    summary = result.summary()
+    html_summary = f"{html_summary}<details><summary style='color:navy'>full output</summary>{summary._repr_html_()}</details>"
+    display(HTML(html_summary))
+    return result
 
 def get_hw_effect(events, ref_leg=None, legs=None, control_for_roi=True, minEvents=10, groups="roi"):
     events = events.copy()
@@ -306,7 +360,6 @@ def get_hw_effect(events, ref_leg=None, legs=None, control_for_roi=True, minEven
     html_summary = f"{html_summary}<details><summary style='color:navy'>full output</summary>{summary._repr_html_()}</details>"
     display(HTML(html_summary))
     return result
-
 
 # def get_summary(model, legs, ref_leg=None):
 #     if ref_leg is None:
@@ -667,7 +720,7 @@ def plot_events(Events,
     return output
 
 
-def get_events_per_min_per_nrois(Events, hwRegions, minEvents, reduceRois, Nbootstrap=20):
+def get_events_per_min_per_nrois(Events, hwRegions, minEvents, reduceRois, Nbootstrap=50, seed = 0):
     ### active rois are those that have at least 10 events
     activeRois = [roi for roi, evroi in Events.groupby("roi") if len(evroi) > minEvents]
     pc = len(activeRois) / len(Events['roi'].unique()) * 100
@@ -675,6 +728,7 @@ def get_events_per_min_per_nrois(Events, hwRegions, minEvents, reduceRois, Nboot
     nrois = len(activeRois) // reduceRois
     print(f"Out of them, {nrois} are sampled {Nbootstrap} times to estimate mean and std of the firing rate.")
     ev_pm_par = []  # number of events per min per active roi
+    np.random.seed(seed)
     for leg, ev in Events.groupby("leg"):
         duration = ev["peakpoint"].max() - ev["peakpoint"].min()
         for hwr in hwRegions:
@@ -846,7 +900,7 @@ def place_indicator(ax, duration, position=(0, 1), unit="s", linekwargs={}, font
     #    y = axx.get_ylim()[0]
     y = position[1]
     if "lw" not in linekwargs:
-        linekwargs["lw"] = 3
+        linekwargs["lw"] = 2
     if "color" not in linekwargs:
         linekwargs["color"] = "black"
     #     print ([x,x+duration],[y]*2,**linekwargs)
@@ -889,7 +943,7 @@ def plot_rois_colored_acc_quantity(regions, axs, discr_qty, cmap = "turbo", vmin
     if hist_kwargs is None:
         hist_kwargs = {"bins":50, "color":myGrey}
     regions.color_according_to(discr_qty, cmap=cmap, vmin = vmin, vmax = vmax)
-    regions.plotEdges(ax=axrois, scaleFontSize=7, separate=True, fill=True, alpha =.6)
+    regions.plotEdges(ax=axrois, scaleFontSize=6, separate=True, fill=True, alpha =1)
     regions.plotEdges(ax=axrois, separate=True, fill=False, image=False)
     axrois.set_xticks([])
     axrois.set_yticks([])
