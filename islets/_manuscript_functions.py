@@ -164,10 +164,18 @@ protocolColorScheme = {
     ("Ca", "2mM"): tuple(1 - (1 - np.array(plt.cm.Oranges(0))) / 2),
     ("Ca", "0.4mM"): plt.cm.Oranges(.1),
     ("Ca", "0mM"): plt.cm.Oranges(.3),
+    ("isradipine",  "5uM"): "lightblue",
+    ("diazoxide","100uM"): "xkcd:pale rose",
+    ("ryanodine","100nM"): "xkcd:very light purple",
+    ("ryanodine","100uM"): "xkcd:light purple",
+    ("acetylcholine","10uM"): "xkcd:light pastel green",
+    ("caffeine","10mM"): "xkcd:light brown",
+    ("xestospongin","3uM"): "goldenrod",
 }
 
 
 def beautify_protocol(protocol):
+    from .protocol import Protocol
     colors = []
     for i in protocol.index:
         colors += [protocolColorScheme[(protocol.loc[i, "compound"], protocol.loc[i, "concentration"])]]
@@ -176,10 +184,11 @@ def beautify_protocol(protocol):
         units = df["unit"].unique()
         if len(units) == 1:
             unit = units[0]
-            protocol.loc[df.index, "compound"] = [f"{comp} [{unit}]"] * len(df)
-            protocol.loc[df.index, "concentration"] = [f"{c}" for c in df["conc"]]
-    protocol = protocol.replace("Ca [mM]", r"Ca${}^{2\!+}$[mM] ")
+            # protocol.loc[df.index, "compound"] = [f"{comp} [{unit}]"] * len(df)
+            protocol.loc[df.index, "concentration"] = [df["concentration"].iloc[0]] + [f"{c}" for c in df["conc"][1:]]
+    # protocol = protocol.replace("Ca [mM]", r"Ca${}^{2\!+}$[mM] ")
     protocol = protocol.replace("Ca", r"Ca${}^{2\!+}$ ")
+    protocol = Protocol(protocol)
     return protocol
 
 
