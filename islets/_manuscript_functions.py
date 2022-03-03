@@ -997,3 +997,98 @@ def check_roi_heterogeneity(Events, regions, quantity = "halfwidth", min_events 
     plot_rois_colored_acc_quantity(regions, axs[::-1,0], hetvar, )
 
     return (fig, axs, bx)
+
+def get_event_shapes(events, regions, n_traces_min = 10, plot = False):
+    from scipy import signal
+    timescaleDict = {it: t for (it, t), _ in events.groupby(["its", "ts"])}
+    events = events.copy()
+    events["trace"] = [islets.utils.get_evshape(row, regions) for ir, row in events.iterrows()]
+    events["trace_points"] = events["trace"].apply(len)
+
+    its = sorted(events.its.unique())
+    nps = events["trace_points"].value_counts().sort_index()
+    M = np.array([[len(events.query(f"trace_points=={n} and its=={its_}")) for n in nps.index] for its_ in its])
+    if plot:
+        plt.imshow(M,aspect="auto")
+        plt.colorbar()
+        plt.yticks(np.arange(len(its)), [timescaleDict[i] for i in its]);
+        plt.xticks(np.arange(len(nps)), nps.index);
+        plt.xlabel("trace points")
+        plt.ylabel("filtering timescale index")
+        plt.show()
+
+    largest_values = np.argsort((-M).flat)
+    nr = 4
+    nc = 10
+    Shapes = []
+    if plot:
+        fig, axs = plt.subplots(
+            nr, nc, figsize = (nc * 2, nr * 2),
+            sharex = False, sharey = True
+        )
+        ia = 0
+
+    for ij in largest_values:
+        i, j = ij // M.shape[1], ij % M.shape[1]
+        value = M[i, j]
+        if value < n_traces_min:
+            continue
+        if plot: ax = axs.flat[ia]
+        n = nps.index[j]
+        it = its[i]
+        curTs = timescaleDict[it]
+        traces = np.vstack(events.query(f"trace_points=={n} and its=={it}")["trace"].values)
+        t = regions.showTime.get("%g" % curTs, regions.time)[:traces.shape[1]]
+        X = np.zeros_like(traces)
+        for j, tr in enumerate(traces):
+            x = tr - tr.mean()
+            x /= x.std()
+            if j < len(X):
+                X[j, :] = x
+        x = X.mean(0)
+        x -= np.percentile(x, 5)
+        if plot:
+            ax.plot(t, x, "C2", )
+        dt = t[1] - t[0]
+        xsmooth = islets.numeric.runningAverage(x,len(x)//10//2*2+1)
+        pks, pks_d = signal.find_peaks(xsmooth, prominence = .2)
+        w, h, t0, te = np.vstack(signal.peak_widths(xsmooth, pks, )) * dt
+        h /= dt
+        ix = np.argmax(pks_d["prominences"])
+        midline = [t0[ix] + dt / 2, te[ix] + dt / 2], [h[ix]] * 2
+        if plot:
+            ax.plot(*midline, "C1.-")
+            txt = f"ts: {curTs}Hz\nL: {n}\nN: {len(traces)}"
+            txt += "\nhw: %.3g" % w[ix]
+            ax.text(1, 1, txt, transform = ax.transAxes, va = "top", ha = "right")
+        Shapes += [{
+            "filtering timescale": curTs,
+            "halfwidth": w[ix],
+            "shape": (t, x, xsmooth),
+            "midline": midline,
+            "N traces": len(traces),
+            "N points": n
+        }]
+        if plot:
+            ia += 1
+            if ia >= axs.size // 1: break
+    if plot:
+        for ax in axs.flat[ia:]:
+            ax.remove()
+    Shapes = pd.DataFrame(Shapes)
+    if plot:
+        return (Shapes, fig, axs)
+    else:
+        return (Shapes, )
+
+def get_axsrow(ax, naxs, height_in_inches,  spacing = .1, rel_offset = -1.5):
+    fig = ax.get_figure()
+    figwidth, figheight = fig.get_size_inches()
+    axpos = ax.get_position()
+    axclspWidth = axpos.width/(naxs+(naxs-1)*spacing)
+    axclspHeight = height_in_inches/figheight
+    axclsp = [
+        fig.add_axes([axpos.x0+(spacing+1)*axclspWidth*jx, axpos.y0+axclspHeight*rel_offset, axclspWidth, axclspHeight])
+        for jx in range(naxs)
+    ]
+    return axclsp
