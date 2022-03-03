@@ -9,11 +9,11 @@ from tqdm import tqdm
 def define_legs(events, legs):
     if "leg" in events.columns:
         del events["leg"]
-    if "tend" not in events.columns:
-        events["tend"] = events['t0']+events["halfwidth"]
+#     if "tend" not in events.columns:
+#         events["tend"] = events['t0']+events["halfwidth"]
     for leg in legs:
         t0,tend = legs[leg]
-        indices = events.query(f"t0>{t0} and tend<{tend}").index
+        indices = events.query(f"peakpoint>{t0} and peakpoint<{tend}").index
         events.loc[indices,"leg"] = [leg]*len(indices)
     events['leg'] = events['leg'].astype("category")
 
