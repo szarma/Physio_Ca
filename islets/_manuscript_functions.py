@@ -915,7 +915,9 @@ def place_indicator(ax, duration, position=(0, 1), unit="s", linekwargs={}, font
     if "color" not in linekwargs:
         linekwargs["color"] = "black"
     #     print ([x,x+duration],[y]*2,**linekwargs)
-    axx.plot([x, x + duration], [y] * 2, **linekwargs)
+    ln = Line2D([x, x + duration], [y] * 2, **linekwargs)
+    ln.set_clip_on(False)
+    axx.add_artist(ln)
     if unit == "s":
         txt = "%gs"%duration
     if unit == "min":
