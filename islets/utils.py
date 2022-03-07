@@ -1304,7 +1304,10 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
                     print ("ser=",ser)
                 if recType=="Nikon":
                     series = "all"
-                rec.import_series(series, onlyMeta=True)
+                try:
+                    rec.import_series(series, onlyMeta=True)
+                except:
+                    continue
                 if series not in rec.Series:
                     continue
                 md = pd.Series()
@@ -1313,7 +1316,7 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
                 md["series"] = series
 
                 saveDir = os.path.join(analysisFolder, ser)
-                if len(rec.Series)==0: continue
+                if len(rec.Series)==0 or "metadata" not in rec.Series[series]: continue
                 for k,v in rec.Series[series]["metadata"].items():
                     md[k] = v
                 if "_" in ser:
@@ -1350,7 +1353,7 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
                 if md["movie done"]:
                     md["movie size [MB]"] = np.round(os.path.getsize(movieFilename)/10**6,1)
                 md["date"] = md["Start time"].date().__str__()
-                for k in ["bit depth", "Start time", "End time","Name","frame_range"]: # , "individual Series"
+                for k in ["bit depth", "End time","Name","frame_range"]: # , "individual Series"
                     try:    del md[k]
                     except: pass
                 times = ["00:00"]+[td2str(el) for el in md["individual Series"]["Duration"].cumsum()]
