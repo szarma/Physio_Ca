@@ -2,6 +2,7 @@ import pandas as pd
 import re
 import numpy as np
 import warnings
+import matplotlib.pyplot as plt
 num_alph = re.compile("\d[a-zA-Z]")
 
 class Protocol(pd.DataFrame):
@@ -109,13 +110,20 @@ class Protocol(pd.DataFrame):
         protocol = self.from_df(protocol)
         return protocol
         
-    def plot_protocol( self, ax, color=(.95,)*3, hspace = 0.2, only_number = True, linenkwargs={}, label = "close", fontsize=10, offset=.05):
+    def plot_protocol( self, ax = None, color=(.95,)*3, hspace = 0.2, only_number = False, linenkwargs={}, label = "close", fontsize=10, offset=.05):
         if only_number:
             col = "conc"
         else:
             col = "concentration"
+        if ax is None:
+            fig = plt.figure(figsize=(6,3))
+            ax = fig.add_axes([.2,.05,.75,.01])
+            ax.set_xlim(self["t_begin"].min(), self["t_end"].max())
+            from ._manuscript_functions import mystyle_axes
+            mystyle_axes(ax,retain = ["bottom"], bounded = [False])
 
-        fig = ax.get_figure()
+        else:
+            fig = ax.get_figure()
         compounds = list(self["compound"].unique())
         # put glucose first
         for ic,comp in enumerate(compounds):
@@ -157,6 +165,7 @@ class Protocol(pd.DataFrame):
                 axp.text(self.t_begin.min(),yt,comp+" ",va="bottom", ha="right", fontsize = fontsize)
         axp.set_clip_on(False)
         axp.set_xlim(ax.get_xlim())
+        mystyle_axes(axp)
         #ax.set_yticks([])
         #mystyle_axes(ax)
         return axp
