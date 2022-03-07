@@ -111,6 +111,7 @@ class Protocol(pd.DataFrame):
         return protocol
         
     def plot_protocol( self, ax = None, color=(.95,)*3, hspace = 0.2, only_number = False, linenkwargs={}, label = "close", fontsize=10, offset=.05):
+        from ._manuscript_functions import mystyle_axes
         if only_number:
             col = "conc"
         else:
@@ -119,7 +120,6 @@ class Protocol(pd.DataFrame):
             fig = plt.figure(figsize=(6,3))
             ax = fig.add_axes([.2,.05,.75,.01])
             ax.set_xlim(self["t_begin"].min(), self["t_end"].max())
-            from ._manuscript_functions import mystyle_axes
             mystyle_axes(ax,retain = ["bottom"], bounded = [False])
 
         else:
