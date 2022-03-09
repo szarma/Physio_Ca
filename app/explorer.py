@@ -226,7 +226,7 @@ app.layout = html.Div(
                        "height": "100px",
                        'overflowX': 'scroll',
                        'overflowY': 'scroll',
-                       'display': 'none',
+                       'display': "block"  if debug else "none",
                    }),
 
                    html.Div(id = "explorer-link", children = "nothing yet", style = buttonStyle),
@@ -324,8 +324,9 @@ def show(active_cell, selected_rows, data):
         "selected_rows": selected_rows,
         #         "data": data
     }
-    i = active_cell["row"]
-    col = active_cell["column"]
+    # if active_call is not None:
+    #     i = active_cell["row"]
+    #     col = active_cell["column"]
     if selected_rows is not None:
         out["selected_row"] = selected_rows[-1]
     return json.dumps(out)
@@ -438,7 +439,7 @@ def serve_stuff(selected_rows, username, data):
                 html.Div(
                     protocolPath,
                     id = "protocol-path",
-                    style = {"display": "none"}
+                    style = {"display": "inline-block"  if debug else "none",}
                 ),
                 dcc.Textarea(
                     id = "protocol-text",
@@ -490,7 +491,7 @@ def serve_stuff(selected_rows, username, data):
                 html.Div(
                     addinfoPath,
                     id = "addinfo-path",
-                    style = {"display": "none"}
+                    style = {"display": "inline-block"  if debug else "none",}
                 ),
                 dcc.Textarea(
                     id = "addinfo-text",
