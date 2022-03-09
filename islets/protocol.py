@@ -44,13 +44,19 @@ class Protocol(pd.DataFrame):
 
     @classmethod
     def from_file(cls, path, tend, t0=0):
-        lines = open(path).readlines()
+        from io import StringIO
+        lines = open(path).read().split("\n")
         lines = [l for l in lines if len(l)]
         for il,line in enumerate(lines):
             n_commas = line.count(",")
             if n_commas!=3:
-                raise ValueError(f"Line {il} of {path} has {n_commas}, but each line must have exactly 3.")
-        df = pd.read_csv(path, na_values = [" "*j for j in range(1,10)])
+                print(f"Line {il} of {path} has {n_commas} commas, but each line must have exactly 3. It may work like this, but you should inspect the protocol by eye.")
+                print (f"'{line}'")
+                if n_commas<3:
+                    lines[il] = lines[il]+","*(3-n_commas)
+                if n_commas>3:
+                    lines[il] = ",".join(lines[il].split(",")[:4])
+        df = pd.read_csv(StringIO("\n".join(lines)), na_values = [" "*j for j in range(1,10)])
         if len(df)==0:
             raise pd.errors.EmptyDataError
         beginNa = df.index[df["begin"].isna()]
