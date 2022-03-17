@@ -763,6 +763,33 @@ def get_events_per_min_per_nrois(Events, hwRegions, minEvents, reduceRois, Nboot
     ev_pm_par = pd.DataFrame(ev_pm_par)
     return ev_pm_par
 
+def get_activity(Events, minEvents, reduceRois, Nbootstrap=50, seed = 0):
+    ### active rois are those that have at least 10 events
+    activeRois = [roi for roi, evroi in Events.groupby("roi") if len(evroi) > minEvents]
+    pc = len(activeRois) / len(Events['roi'].unique()) * 100
+    print(f"There are {len(activeRois)} rois with more than {minEvents} events ({pc:.0f}%).")
+    nrois = len(activeRois) // reduceRois
+    print(f"Out of them, {nrois} are sampled {Nbootstrap} times to estimate mean and std of the activity.")
+    out = []  # number of events per min per active roi
+    np.random.seed(seed)
+    for leg, ev in Events.groupby("leg"):
+        duration = ev["peakpoint"].max() - ev["peakpoint"].min()
+        tmp = []
+        for j in range(Nbootstrap):
+            acts = np.random.choice(activeRois, nrois, replace = False)
+            ## take only events that belong to active rois
+            evs = Events[Events.roi.isin(acts)]
+            evs = evs.query(f"leg=='{leg}'")
+            tmp += [evs['auc'].sum()]
+
+        out += [{
+            "leg": leg,
+            "activity": np.mean(tmp) / duration / nrois * 60,
+            "activity_std": np.std(tmp) / duration / nrois * 60,
+        }]
+    out = pd.DataFrame(out)
+    return out
+
 
 from typing import Dict, List, Optional, Tuple, Iterable
 
