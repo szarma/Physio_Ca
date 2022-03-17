@@ -319,6 +319,7 @@ def get_effect(events, quantity, ref_leg=None, legs=None, control_for_roi=True, 
     return result
 
 def get_hw_effect(events, ref_leg=None, legs=None, control_for_roi=True, minEvents=10, groups="roi"):
+    print ("This function is deprecated, please use get_effect(..., quantity = 'halfiwdth'), which then also accepts other quantities like 'height' and 'auc'.")
     events = events.copy()
     if legs is None:
         legs = events["leg"].dropna().unique()
