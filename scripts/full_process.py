@@ -12,17 +12,10 @@ from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
 # Token for the bot, which will be used to post in slack for notifications
-SLACK_BOT_TOKEN = 'xoxb-1186403589973-2442412187872-CtxhZTgETZGcfXGQ5uF2Y4kF'
+SLACK_BOT_TOKEN = open("/usr/share/slackbot.token").read()
 
 # Member IDs of the users connected to slack
-SLACK_USER_IDS = {
-    'jupyter-johannes': 'U015WBY6A6M',
-    'jupyter-sandra': 'U015MNRBCPM',
-    'jupyter-marjan': 'U015J2J3NG2',
-    'jupyter-nastja': 'U01C6HAJXNZ',
-    'jupyter-srdjan': 'U01545E6T9V'
-}
-
+SLACK_USER_IDS = dict(zip(*pd.read_csv("/usr/share/slack_users.txt", header=None).values.T))
 
 # noinspection PyBroadException
 def create_movie_from_tif(recording, frequency, restrict):
@@ -82,7 +75,7 @@ def create_movie(recording, frequency, restrict, series, input_type, channel, ve
         movie, metadata = create_movie_from_tif(recording, frequency, restrict)
 
     else:
-        ##### input_type is either nikon or leica
+        ##### input_type is either 
         try:
             bioformats.javabridge.run_script("2+2")
         except:
@@ -104,7 +97,7 @@ def create_movie(recording, frequency, restrict, series, input_type, channel, ve
                     specifying the exact series, or the series range.""")
         else:
             if series is not None:
-                raise UserWarning("For nikon files, the series argument is ignored.")
+                raise UserWarning("For files other than leica, the series argument is ignored.")
             series = "all"
         if restrict is None:
             restrict_ = None
@@ -163,6 +156,8 @@ def main(args):
         input_type = "leica"
     elif args.recording.lower().endswith("nd2"):
         input_type = "nikon"
+    elif args.recording.lower().endswith("czi"):
+        input_type = "zeiss"
     else:
         raise NotImplementedError("Filetype not recognized. Currently, only tif, nd2, and lif are supported.")
 
