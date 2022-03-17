@@ -28,7 +28,7 @@ class Hdf5Serializer(IDataSerializer):
         file_path : Path
             Path of the file to be loaded/saved.
         """
-        self.file_path = Path(file_path) if type(file_path) == str else file_path
+        self.filepath = Path(file_path) if type(file_path) == str else file_path
 
     @property
     def filepath(self) -> Path:
