@@ -848,7 +848,7 @@ class Regions:
                 del self.df[col]
         self.showTime = {}
 
-    def detrend_traces(self,method="debleach", timescale=None):
+    def detrend_traces(self,method="debleach", timescale=None, **kwargs):
 #         from .numeric import mydebleach
 #         traces = np.vstack(self.df.trace.values)
 #         trend = multi_map( mydebleach, traces, processes=processes)
@@ -861,7 +861,7 @@ class Regions:
             self.df["trend"] = trend
             self.df["detrended"] = [self.df.trace[i] - self.df.trend[i] for i in self.df.index]
         elif method=="fast":
-            self.fast_filter_traces(timescale, Npoints=np.inf)
+            self.fast_filter_traces(timescale, Npoints=np.inf, **kwargs)
             self.df["detrended"] = self.df["faster_%g"%timescale]
             self.df["trend"]     = self.df["slower_%g"%timescale]
             del self.df["faster_%g"%timescale], self.df["slower_%g"%timescale], self.df["zScore_%g"%timescale]
