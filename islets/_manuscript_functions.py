@@ -222,14 +222,15 @@ def silent_fit(model):
         return result, w
 
 
-def get_rate_effect(events, ref_leg=None, legs=None, groups = "experiment"):
+def get_rate_effect(events, quantity="epmpr", ref_leg=None, legs=None, groups = "experiment"):
     events = events.copy()
     if legs is None:
         legs = events["leg"].dropna().unique()
     if ref_leg is None:
         ref_leg = events[~events["leg"].isna()].iloc[0]['leg']
-    events["log10_epmpr"] = np.log10(events["epmpr"])
-    model = sm.MixedLM.from_formula(f"log10_epmpr ~ C(leg, Treatment('{ref_leg}')) + 1", data = events,
+    log_quantity = f"log10_{quantity}"
+    events[log_quantity] = np.log10(events[quantity])
+    model = sm.MixedLM.from_formula(f"{log_quantity} ~ C(leg, Treatment('{ref_leg}')) + 1", data = events,
                                     groups = groups)
     result, warns = silent_fit(model)
     legs = [leg for leg in legs if leg != ref_leg]
