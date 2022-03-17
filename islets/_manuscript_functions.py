@@ -976,7 +976,7 @@ def plot_closeup_traces(ax, regions, rois, closeup, **tracekwargs):
     ax.set_xlim(closeup)
     ax.relim()
 
-def plot_rois_colored_acc_quantity(regions, axs, discr_qty, cmap = "turbo", vmin = None, vmax = None, hist_kwargs = None, rel_height = .1, rel_pos = 1.05):
+def plot_rois_colored_acc_quantity(regions, axs, discr_qty, cmap = "turbo", vmin = None, vmax = None, hist_kwargs = None, rel_height = .1, rel_pos = 1.05, scaleFontSize=6):
     axrois, axcolor = axs
     if vmin is None:
         vmin = np.nanpercentile(regions.df[discr_qty],1)
@@ -985,7 +985,7 @@ def plot_rois_colored_acc_quantity(regions, axs, discr_qty, cmap = "turbo", vmin
     if hist_kwargs is None:
         hist_kwargs = {"bins":50, "color":myGrey}
     regions.color_according_to(discr_qty, cmap=cmap, vmin = vmin, vmax = vmax)
-    regions.plotEdges(ax=axrois, scaleFontSize=6, separate=True, fill=True, alpha =1)
+    regions.plotEdges(ax=axrois, scaleFontSize=scaleFontSize, separate=True, fill=True, alpha =1)
     regions.plotEdges(ax=axrois, separate=True, fill=False, image=False)
     axrois.set_xticks([])
     axrois.set_yticks([])
