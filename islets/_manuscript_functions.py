@@ -632,7 +632,7 @@ def emphasize_region(ax, x, y, extend=(0, 0), clip_on = False, **line_kwargs):
     xe = xe + dx
     xb = xb - dx
 
-    dy = xe - xb
+    dy = ye - yb
     dy = extend[1] * dy
     ye = ye + dy
     yb = yb - dy
