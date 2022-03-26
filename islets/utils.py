@@ -1249,7 +1249,7 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
     for cur,ds,fs in os.walk(mainFolder):
         #### if you wish to restrict to only certain folders: ####
         for f in fs:
-            if not (f.endswith(".lif") or f.endswith(".nd2")):
+            if not (f.endswith(".lif") or f.endswith(".nd2") or f.endswith(".czi")):
                 continue
             if any([constr.strip() in cur+f for constr in constrain.split(",")]):
                 path = os.path.join(cur,f)
@@ -1266,7 +1266,7 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
         except:
             warn("Could not import %s"%pathToRecording)
             continue
-        recType = "Nikon" if pathToRecording.endswith(".nd2") else "Leica"
+        recType = "Leica" if pathToRecording.endswith(".lif") else "nonLeica"
         if forceMetadataParse:
             rec.parse_metadata()
             rec.save_metadata()
@@ -1302,7 +1302,7 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
             for ser in subdirs:
                 if verbose>=2:
                     print ("ser=",ser)
-                if recType=="Nikon":
+                if recType!="Leica":
                     series = "all"
                 try:
                     rec.import_series(series, onlyMeta=True)
