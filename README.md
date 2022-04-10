@@ -39,4 +39,4 @@ One of our most used tools is the _''roi examiner''_ for live interaction with t
 We have also build
 
 ## Docker
-We are working on a docker container with all important bits of our toolbox installed. For more details click [here](docker/deployment.md).
+We are working on a docker container with all important bits of our toolbox installed. Check the [docker directory](docker/) for more details.
