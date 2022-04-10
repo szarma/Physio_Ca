@@ -335,7 +335,7 @@ mf.mystyle_axes(ax)
 ```
 
 
-![png](temp_files/temp_7_0.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__7_0.png)
 
 
 
@@ -368,7 +368,7 @@ for ax in axs.flat[ia:]:
 ```
 
 
-![png](temp_files/temp_8_0.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__8_0.png)
 
 
 
@@ -397,115 +397,115 @@ for i in data.index:
 
 
 
-![png](temp_files/temp_9_1.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_1.png)
 
 
 
-![png](temp_files/temp_9_2.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_2.png)
 
 
 
-![png](temp_files/temp_9_3.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_3.png)
 
 
 
-![png](temp_files/temp_9_4.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_4.png)
 
 
 
-![png](temp_files/temp_9_5.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_5.png)
 
 
 
-![png](temp_files/temp_9_6.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_6.png)
 
 
 
-![png](temp_files/temp_9_7.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_7.png)
 
 
 
-![png](temp_files/temp_9_8.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_8.png)
 
 
 
-![png](temp_files/temp_9_9.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_9.png)
 
 
 
-![png](temp_files/temp_9_10.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_10.png)
 
 
 
-![png](temp_files/temp_9_11.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_11.png)
 
 
 
-![png](temp_files/temp_9_12.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_12.png)
 
 
 
-![png](temp_files/temp_9_13.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_13.png)
 
 
 
-![png](temp_files/temp_9_14.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_14.png)
 
 
 
-![png](temp_files/temp_9_15.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_15.png)
 
 
 
-![png](temp_files/temp_9_16.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_16.png)
 
 
 
-![png](temp_files/temp_9_17.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_17.png)
 
 
 
-![png](temp_files/temp_9_18.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_18.png)
 
 
 
-![png](temp_files/temp_9_19.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_19.png)
 
 
 
-![png](temp_files/temp_9_20.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_20.png)
 
 
 
-![png](temp_files/temp_9_21.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_21.png)
 
 
 
-![png](temp_files/temp_9_22.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_22.png)
 
 
 
-![png](temp_files/temp_9_23.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_23.png)
 
 
 
-![png](temp_files/temp_9_24.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_24.png)
 
 
 
-![png](temp_files/temp_9_25.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_25.png)
 
 
 
-![png](temp_files/temp_9_26.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_26.png)
 
 
 
-![png](temp_files/temp_9_27.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_27.png)
 
 
 
-![png](temp_files/temp_9_28.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__9_28.png)
 
 
 
@@ -546,7 +546,7 @@ axs[1].legend(loc=4)
 
 
 
-![png](temp_files/temp_10_1.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__10_1.png)
 
 
 
@@ -950,7 +950,7 @@ mf.check_roi_heterogeneity(Events.query("halfwidth<20"),regions, boxplot_kwargs=
 ```
 
 
-![png](temp_files/temp_15_0.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__15_0.png)
 
 
 
@@ -1005,7 +1005,7 @@ axs[0].text(1,1.03,r"$\tau_{1/2}<%g$"%hwRegions["short"][1],ha="right",transform
 
 
 
-![png](temp_files/temp_18_1.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__18_1.png)
 
 
 
@@ -1096,7 +1096,7 @@ axs[0].text(1,1.03,r"$\tau_{1/2}<%g$"%hwRegions["short"][1],ha="right",transform
 
 
 
-![png](temp_files/temp_23_1.png)
+![png](Step4_pooling_single_treatment_variable_of_interest__files/Step4_pooling_single_treatment_variable_of_interest__23_1.png)
 
 
 

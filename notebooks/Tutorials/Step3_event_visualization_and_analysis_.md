@@ -39,7 +39,7 @@ fig, axs = mf.plot_events(Events, regions)
 
 
 
-![png](temp_files/temp_6_1.png)
+![png](Step3_event_visualization_and_analysis__files/Step3_event_visualization_and_analysis__6_1.png)
 
 
 If you use this function on a shorter experiment, you will see that the figure size changes depending on the duration.
@@ -372,7 +372,7 @@ fig, axs = mf.plot_events(Events, regions, protocol=protocol)
 
 
 
-![png](temp_files/temp_14_1.png)
+![png](Step3_event_visualization_and_analysis__files/Step3_event_visualization_and_analysis__14_1.png)
 
 
 ## Define legs
@@ -432,7 +432,7 @@ for leg in legDict:
 
 
 
-![png](temp_files/temp_22_1.png)
+![png](Step3_event_visualization_and_analysis__files/Step3_event_visualization_and_analysis__22_1.png)
 
 
 Let's annotate Events with these legs.
@@ -454,7 +454,7 @@ fig, axs = mf.plot_events(Events, regions, protocol=protocol, plottype="scatter"
 
 
 
-![png](temp_files/temp_26_1.png)
+![png](Step3_event_visualization_and_analysis__files/Step3_event_visualization_and_analysis__26_1.png)
 
 
 When the events have legs, you can also use a function that outputs a figure with more information content:
@@ -472,7 +472,7 @@ mf.big_plot(regions, Events, )
 
 
 
-![png](temp_files/temp_28_2.png)
+![png](Step3_event_visualization_and_analysis__files/Step3_event_visualization_and_analysis__28_2.png)
 
 
 You might also wish to see the cumulative density function (see explanation below), or the average trace of all rois (raw, unfiltered).
@@ -487,7 +487,7 @@ mf.big_plot(regions, Events, cdf=True, plot_sum=True)
 
 
 
-![png](temp_files/temp_30_1.png)
+![png](Step3_event_visualization_and_analysis__files/Step3_event_visualization_and_analysis__30_1.png)
 
 
 ### basic plots of legs
@@ -514,7 +514,7 @@ ax.legend(loc = (1.01,0.01))
 
 
 
-![png](temp_files/temp_32_1.png)
+![png](Step3_event_visualization_and_analysis__files/Step3_event_visualization_and_analysis__32_1.png)
 
 
 
@@ -537,7 +537,7 @@ ax.legend(loc = (1.01,0.01))
 
 
 
-![png](temp_files/temp_33_1.png)
+![png](Step3_event_visualization_and_analysis__files/Step3_event_visualization_and_analysis__33_1.png)
 
 
 
@@ -559,7 +559,7 @@ ax.legend(loc = (1.01,0.01))
 
 
 
-![png](temp_files/temp_34_1.png)
+![png](Step3_event_visualization_and_analysis__files/Step3_event_visualization_and_analysis__34_1.png)
 
 
 
@@ -583,7 +583,7 @@ ax.legend(loc = (1.01,0.01))
 
 
 
-![png](temp_files/temp_35_1.png)
+![png](Step3_event_visualization_and_analysis__files/Step3_event_visualization_and_analysis__35_1.png)
 
 
 Looks like the median halfwidth increases in `leg1` and then decreases in `leg2`. Let's investigate this.
@@ -619,7 +619,7 @@ ax.legend(loc = (1.01,0.01))
 
 
 
-![png](temp_files/temp_40_1.png)
+![png](Step3_event_visualization_and_analysis__files/Step3_event_visualization_and_analysis__40_1.png)
 
 
 We could also plot boxplots
@@ -631,7 +631,7 @@ plt.grid(False)
 ```
 
 
-![png](temp_files/temp_42_0.png)
+![png](Step3_event_visualization_and_analysis__files/Step3_event_visualization_and_analysis__42_0.png)
 
 
 Looks like the events prolong in the leg1 and shrink back a bit in leg2
@@ -926,7 +926,7 @@ regions.plotEdges(ix=chooseRois)
 ```
 
 
-![png](temp_files/temp_57_0.png)
+![png](Step3_event_visualization_and_analysis__files/Step3_event_visualization_and_analysis__57_0.png)
 
 
 
@@ -974,7 +974,7 @@ ax.legend(loc=(1.01,.01))
 
 
 
-![png](temp_files/temp_59_1.png)
+![png](Step3_event_visualization_and_analysis__files/Step3_event_visualization_and_analysis__59_1.png)
 
 
 
@@ -1139,7 +1139,7 @@ ax.text(0,-.3,f"* active rois are those that have at least {minEvents} events re
 
 
 
-![png](temp_files/temp_71_1.png)
+![png](Step3_event_visualization_and_analysis__files/Step3_event_visualization_and_analysis__71_1.png)
 
 
 Note that the error bars here represent the uncertainty due to finite number of rois only. A potentially much larger source of uncertainty is the finite duration of observation. Namely, for a system with large synchronicity, the number of events within some time period depends greatly on how many bursts happened, which depends essentially on their frequency. If the frequency is high and the experiment captured for many bursts in a leg, I might have bootstrapped over time slices too to capture that. Unfortunatelly, this is typically not the case.  

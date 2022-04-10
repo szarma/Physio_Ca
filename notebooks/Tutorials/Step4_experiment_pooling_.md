@@ -130,7 +130,7 @@ for ax in axs.flat[ia:]:
 ```
 
 
-![png](temp_files/temp_9_0.png)
+![png](Step4_experiment_pooling__files/Step4_experiment_pooling__9_0.png)
 
 
 If we are happy with what you see, you go further.
@@ -154,15 +154,15 @@ for i in data.index:
 ```
 
 
-![png](temp_files/temp_13_0.png)
+![png](Step4_experiment_pooling__files/Step4_experiment_pooling__13_0.png)
 
 
 
-![png](temp_files/temp_13_1.png)
+![png](Step4_experiment_pooling__files/Step4_experiment_pooling__13_1.png)
 
 
 
-![png](temp_files/temp_13_2.png)
+![png](Step4_experiment_pooling__files/Step4_experiment_pooling__13_2.png)
 
 
 ## Defining legs
@@ -198,7 +198,7 @@ mf.mystyle_axes(ax)
 ```
 
 
-![png](temp_files/temp_20_0.png)
+![png](Step4_experiment_pooling__files/Step4_experiment_pooling__20_0.png)
 
 
 
@@ -229,15 +229,15 @@ for i in data.index:
 ```
 
 
-![png](temp_files/temp_23_0.png)
+![png](Step4_experiment_pooling__files/Step4_experiment_pooling__23_0.png)
 
 
 
-![png](temp_files/temp_23_1.png)
+![png](Step4_experiment_pooling__files/Step4_experiment_pooling__23_1.png)
 
 
 
-![png](temp_files/temp_23_2.png)
+![png](Step4_experiment_pooling__files/Step4_experiment_pooling__23_2.png)
 
 
 ### Store legs directly in the csv file (strongly recommended!)
@@ -327,7 +327,7 @@ axs[1].legend(loc=4)
 
 
 
-![png](temp_files/temp_37_1.png)
+![png](Step4_experiment_pooling__files/Step4_experiment_pooling__37_1.png)
 
 
 Say we are interested in two types of events: below 10s and above 20s
@@ -640,7 +640,7 @@ fig.savefig("example_plot.png", dpi = 300)
 ```
 
 
-![png](temp_files/temp_49_0.png)
+![png](Step4_experiment_pooling__files/Step4_experiment_pooling__49_0.png)
 
 
 We can try to run a mixed linear model where groups are experiments, but this might not bring much in some cases (too few experiments)
@@ -936,7 +936,7 @@ ax.set_ylabel("activity [a.u.]")
 
 
 
-![png](temp_files/temp_60_1.png)
+![png](Step4_experiment_pooling__files/Step4_experiment_pooling__60_1.png)
 
 
 
@@ -1299,7 +1299,7 @@ fig.text(0,1.1,f"*active rois are rois that have at least {minEvents} events det
 
 
 
-![png](temp_files/temp_70_1.png)
+![png](Step4_experiment_pooling__files/Step4_experiment_pooling__70_1.png)
 
 
 ### Infer Effects (of event properties)
@@ -2455,7 +2455,7 @@ df.plot.scatter(x = "prediction", y = "log10_hw", c = "leg", cmap = "tab10", ax 
 
 
 
-![png](temp_files/temp_119_1.png)
+![png](Step4_experiment_pooling__files/Step4_experiment_pooling__119_1.png)
 
 
 Let's define the error and check it's properties
@@ -2480,7 +2480,7 @@ df.hist("error", by="leg", histtype="step", bins = 20, sharex=True, sharey=True,
 
 
 
-![png](temp_files/temp_122_1.png)
+![png](Step4_experiment_pooling__files/Step4_experiment_pooling__122_1.png)
 
 
 
@@ -2496,7 +2496,7 @@ df.hist("error", bins = 1000, cumulative=True, histtype = "step")
 
 
 
-![png](temp_files/temp_123_1.png)
+![png](Step4_experiment_pooling__files/Step4_experiment_pooling__123_1.png)
 
 
 We should check the errors of the whole dataset we used to fit:
@@ -2519,7 +2519,7 @@ for exp,ax in zip(exps,axs.flat):
 ```
 
 
-![png](temp_files/temp_126_0.png)
+![png](Step4_experiment_pooling__files/Step4_experiment_pooling__126_0.png)
 
 
 I don't see any systematic differences between experiments, that's good.

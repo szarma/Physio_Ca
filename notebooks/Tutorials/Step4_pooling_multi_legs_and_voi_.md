@@ -369,7 +369,7 @@ ax.set_title("leg colors")
 
 
 
-![png](temp_files/temp_5_1.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__5_1.png)
 
 
 
@@ -413,7 +413,7 @@ mf.mystyle_axes(ax)
 ```
 
 
-![png](temp_files/temp_10_0.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__10_0.png)
 
 
 ### Data preparation
@@ -468,7 +468,7 @@ for ax in axs.flat[ia:]:
 
 
 
-![png](temp_files/temp_12_1.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__12_1.png)
 
 
 
@@ -496,119 +496,119 @@ for i in data.index:
 ```
 
 
-![png](temp_files/temp_13_0.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_0.png)
 
 
 
-![png](temp_files/temp_13_1.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_1.png)
 
 
 
-![png](temp_files/temp_13_2.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_2.png)
 
 
 
-![png](temp_files/temp_13_3.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_3.png)
 
 
 
-![png](temp_files/temp_13_4.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_4.png)
 
 
 
-![png](temp_files/temp_13_5.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_5.png)
 
 
 
-![png](temp_files/temp_13_6.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_6.png)
 
 
 
-![png](temp_files/temp_13_7.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_7.png)
 
 
 
-![png](temp_files/temp_13_8.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_8.png)
 
 
 
-![png](temp_files/temp_13_9.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_9.png)
 
 
 
-![png](temp_files/temp_13_10.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_10.png)
 
 
 
-![png](temp_files/temp_13_11.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_11.png)
 
 
 
-![png](temp_files/temp_13_12.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_12.png)
 
 
 
-![png](temp_files/temp_13_13.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_13.png)
 
 
 
-![png](temp_files/temp_13_14.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_14.png)
 
 
 
-![png](temp_files/temp_13_15.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_15.png)
 
 
 
-![png](temp_files/temp_13_16.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_16.png)
 
 
 
-![png](temp_files/temp_13_17.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_17.png)
 
 
 
-![png](temp_files/temp_13_18.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_18.png)
 
 
 
-![png](temp_files/temp_13_19.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_19.png)
 
 
 
-![png](temp_files/temp_13_20.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_20.png)
 
 
 
-![png](temp_files/temp_13_21.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_21.png)
 
 
 
-![png](temp_files/temp_13_22.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_22.png)
 
 
 
-![png](temp_files/temp_13_23.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_23.png)
 
 
 
-![png](temp_files/temp_13_24.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_24.png)
 
 
 
-![png](temp_files/temp_13_25.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_25.png)
 
 
 
-![png](temp_files/temp_13_26.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_26.png)
 
 
 
-![png](temp_files/temp_13_27.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_27.png)
 
 
 
-![png](temp_files/temp_13_28.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__13_28.png)
 
 
 
@@ -649,7 +649,7 @@ axs[1].legend(loc=4)
 
 
 
-![png](temp_files/temp_14_1.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__14_1.png)
 
 
 ### Analysis
@@ -918,7 +918,7 @@ fig.text(0,-.01,f"*active rois are rois that have at least {minEvents} events de
 
 
 
-![png](temp_files/temp_24_1.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__24_1.png)
 
 
 
@@ -1125,5 +1125,5 @@ fig.text(0,-.01,f"*active rois are rois that have at least {minEvents} events de
 
 
 
-![png](temp_files/temp_30_1.png)
+![png](Step4_pooling_multi_legs_and_voi__files/Step4_pooling_multi_legs_and_voi__30_1.png)
 
