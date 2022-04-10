@@ -21,7 +21,7 @@
 %\renewcommand\thesubfigure{\alph{subfigure})}
 \hypersetup{
   pdfauthor = {Srdjan Sarikas},
-  pdftitle={Intracellular Receptors},
+  pdftitle={Physio_Ca technical details},
   colorlinks=TRUE,
   linkcolor=blue,
   citecolor=red,
@@ -32,9 +32,9 @@
 %\setlength{\parindent}{0pt}
 %\setlength{\parskip}{1.2ex}
 
-\title{Intracellular Receptors \\ {\small Materials and Methods: Analysis and Processing}}
+\title{Materials and Methods \\ {\small Analysis and Processing}}
 
-\author{Srdjan}
+\author{Srdjan Sarikas}
 \date{\today}
 
 \begin{document}
@@ -171,7 +171,7 @@ The same reasoning holds for rebinning a single trace, where the resulting trace
  \centering
  \includegraphics[trim=25mm 0 20mm 10mm, clip,scale=0.9]{mmfigs/mean_vs_var.pdf}
  \caption{
- {\it Left}: Regions of interest for the two experiments recorded using the raw photon-counting mode ({\it top}, used for {\bf \color{red} Fig.1} in the main text), and the standard mode with large gain ({\it bottom}). Pixels which had at least 10 saturated values are shown in green. In thick red contours we emphasize ROIs with at least 30 green pixels used to emphasize the influence of saturation (see below).
+ {\it Left}: Regions of interest for the two experiments recorded using the raw photon-counting mode ({\it top}), and the standard mode with large gain ({\it bottom}). Pixels which had at least 10 saturated values are shown in green. In thick red contours we emphasize ROIs with at least 30 green pixels used to emphasize the influence of saturation (see below).
  \\
  For each recording, we filter the ROI traces at $1$s ({\it middle}) and $10$s ({\it right}) to separate the trace into slow and fast component. For each ROI we then randomly choose $100$ values of the slow component together with the variance of the fast component from a window around the same timepoint, with window size the same as the timescale. 
  (Note the log-log scale of the axes, so that for a dependence of type $y=kx^n$, the apparent offset in the log-log plot is defined by slope of the dependence $k$, and the apparent slope in the plot by the exponent $n$.)
@@ -184,7 +184,7 @@ In agreement with our assumptions, the variances and the means are linearly depe
 
 
 \subsubsection{Realistic detectors}
-All\marginpar{{\color{red}All?}} the experiments discussed in this manuscript were recorded on a Leica setup with Hybrid detector in photon counting mode.
+Majority of experiments discussed in this manuscript were recorded on a Leica microscope with Hybrid detector in photon counting mode.
 In this case, we see no significant departure from our assumption of Poisson distribution.
 Even with non-unit gain, the linear dependence between variance and mean remains, though the slope is different from $1$ (fig.~\ref{fig:mean_vs_var}).
 
@@ -234,14 +234,13 @@ We term this procedure event {\it distilling} (see fig.~\ref{fig:evdist_demo}).
 
 
 
-
-\section{Analyses}
-\subsection{El Toro}
-\subsection{Isradipine}
-\subsection{Low Ca}
-\subsection{etc}
-
-\newpage
+% \section{Analyses}
+% \subsection{El Toro}
+% \subsection{Isradipine}
+% \subsection{Low Ca}
+% \subsection{etc}
+% 
+% \newpage
 
 \bibliographystyle{plain}% E-Life prefers apa
 \bibliography{matmet}
