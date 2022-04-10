@@ -27,8 +27,16 @@ Then, you may want to detect all transients (i.e. events) in the traces ([Step 2
 For a more didactical introduction into filtering and event detection, you may want to check [this page](docs/events.html).
 And for a more indepth dive into more technical details, have a look [here](docs/matmet.pdf).
 
-One of our most used tools is the _``roi examiner''_ for live interaction with the ROIs and their traces within a jupyter notebook.
+For answering actual scientific questions, we need to pool different experiments. In a simple case, where each experiment is to be treated as independent replicate, you can follow [this example analysis](notebooks/Tutorials/Step4_experiment_pooling.html).
+
+If the experiments differ in some important variable (e.g. some mice are treated, and are not), and we are interested in quantifying the difference between them (i.e. effect of the variable of interest), you can follow [this example analysis](notebooks/Tutorials/Step4_pooling_multi_legs_and_voi.html).
+
+## Features
+
+One of our most used tools is the _''roi examiner''_ for live interaction with the ROIs and their traces within a jupyter notebook.
 ![examiner_demo](https://user-images.githubusercontent.com/2512087/162623035-c054b171-c222-47b0-905e-6f91fcb0caab.gif)
 
+We have also build
 
-And [here](docker/deployment.md) is page dedicated to docker deployment.
+## Docker
+We are working on a docker container with all important bits of our toolbox installed. For more details click [here](docker/deployment.md).
