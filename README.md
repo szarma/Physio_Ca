@@ -16,10 +16,18 @@ The main elements of our pipeline are the following:
 
 ![pipeline](https://user-images.githubusercontent.com/2512087/162617713-efd571a5-784e-4b2c-99ee-663f25457527.png)
 
+## Documentation
 
-For a more indepth dive into how we implement segmentation and filtering, have a look [here](docs/matmet.pdf).
+For brief instructions on how to process a recording, have a look at [Step 0 of processing](notebooks/Tutorials/Processing_Tutorial.html). 
 
-One of our most used tools is the _``roi examiner''_ for live interaction with the ROIs and their traces.
+This will get your recording motion corrected and segmented, potentially with hundreds of ROIs. You will then want to clean them up a bit ([Step 1](notebooks/Tutorials/Step1_roi_massages.html)). 
+
+Then, you may want to detect all transients (i.e. events) in the traces ([Step 2](notebooks/Tutorials/Step2_rois2events.html)), and do some basic exploratory analysis and visualizations of the events ([Step 3](notebooks/Tutorials/Step3_event_visualization_and_analysis.html)).
+
+For a more didactical introduction into filtering and event detection, you may want to check [this page](docs/events.html).
+And for a more indepth dive into more technical details, have a look [here](docs/matmet.pdf).
+
+One of our most used tools is the _``roi examiner''_ for live interaction with the ROIs and their traces within a jupyter notebook.
 ![examiner_demo](https://user-images.githubusercontent.com/2512087/162623035-c054b171-c222-47b0-905e-6f91fcb0caab.gif)
 
 
