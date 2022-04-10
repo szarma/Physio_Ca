@@ -1,7 +1,6 @@
 # Physio_Ca
 
-A toolbox to analyze and interact with Ca imaging data.
-It developed within the Cell and Tissue Networks research group led by [prof. Marjan Slak-Rupnik](https://www.meduniwien.ac.at/web/index.php?id=688&res_id=37&name=Marjan_Slak%20Rupnik) at the Medical University of Vienna. 
+A toolbox to analyze and interact with Ca imaging data, developed within the Cell and Tissue Networks research group led by [prof. Marjan Slak-Rupnik](https://www.meduniwien.ac.at/web/index.php?id=688&res_id=37&name=Marjan_Slak%20Rupnik) at the Medical University of Vienna. 
 
 A typical experiment involving imaging of pancreatic slices in our lab concerns a single field of view
 showing up to hundreds of cells, in a recording of at least several, often dozens, gigabytes.
