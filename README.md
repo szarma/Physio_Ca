@@ -17,5 +17,10 @@ The main elements of our pipeline are the following:
 ![pipeline](https://user-images.githubusercontent.com/2512087/162617713-efd571a5-784e-4b2c-99ee-663f25457527.png)
 
 
+For a more indepth dive into how we implement segmentation and filtering, have a look [here](docs/matmet.pdf).
+
+One of our most used tools is the _``roi examiner''_ for live interaction with the ROIs and their traces.
+![examiner_demo](https://user-images.githubusercontent.com/2512087/162623035-c054b171-c222-47b0-905e-6f91fcb0caab.gif)
+
 
 And [here](docker/deployment.md) is page dedicated to docker deployment.
