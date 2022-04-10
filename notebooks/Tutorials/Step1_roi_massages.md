@@ -47,7 +47,7 @@ regions.plotEdges()
 ```
 
 
-![png](Step1_roi_massages_files/Step1_roi_massages_7_0.png)
+![png](temp_files/temp_7_0.png)
 
 
 ### Massage ROIs (merge, discard...)
@@ -83,7 +83,7 @@ if len(currois):
 
 
 
-![png](Step1_roi_massages_files/Step1_roi_massages_10_1.png)
+![png](temp_files/temp_10_1.png)
 
 
 If now you wish to delete them, feel free to run:
@@ -112,7 +112,7 @@ G = islets.utils.getGraph_of_ROIs_to_Merge(df.iloc[:,:2],regions,plot=True,ax=ax
 ```
 
 
-![png](Step1_roi_massages_files/Step1_roi_massages_12_0.png)
+![png](temp_files/temp_12_0.png)
 
 
 
@@ -160,7 +160,7 @@ if len(currois):
 
 
 
-![png](Step1_roi_massages_files/Step1_roi_massages_15_1.png)
+![png](temp_files/temp_15_1.png)
 
 
 Before deleting them, I wish to have a look
@@ -171,7 +171,7 @@ regions.plotTraces(currois)
 ```
 
 
-![png](Step1_roi_massages_files/Step1_roi_massages_17_0.png)
+![png](temp_files/temp_17_0.png)
 
 
 I conclude there are too many good traces here to remove them all in bulk. I could go back to examiner to remove some by hand. For that I'd run `regions.examine(startShow=currois)`.
@@ -207,7 +207,7 @@ if len(currois):
 
 
 
-![png](Step1_roi_massages_files/Step1_roi_massages_20_1.png)
+![png](temp_files/temp_20_1.png)
 
 
 Again, I would now run `regions.examine(startShow=currois)` to make sure I don't delete something actually important.
@@ -265,7 +265,7 @@ if len(currois):
 
 
 
-![png](Step1_roi_massages_files/Step1_roi_massages_27_1.png)
+![png](temp_files/temp_27_1.png)
 
 
 
@@ -320,7 +320,7 @@ if len(currois):
 
 
 
-![png](Step1_roi_massages_files/Step1_roi_massages_34_1.png)
+![png](temp_files/temp_34_1.png)
 
 
 I don't see obvious outliers here, and will just continue. Often, you can see here some clear outliers which you would want to eliminate. I always suggest `regions.examine(startShow=currois)` just to make sure.
@@ -353,7 +353,7 @@ plt.tight_layout()
 ```
 
 
-![png](Step1_roi_massages_files/Step1_roi_massages_38_0.png)
+![png](temp_files/temp_38_0.png)
 
 
 This view may help us select/deselect cells. E.g. a cell that is always blue is probably worth discarding.
@@ -394,7 +394,7 @@ if len(currois):
 
 
 
-![png](Step1_roi_massages_files/Step1_roi_massages_41_1.png)
+![png](temp_files/temp_41_1.png)
 
 
 another example you asked about where we filter for rois which are active at 10s and __not__ active at 100s
@@ -433,7 +433,7 @@ if len(currois):
 
 
 
-![png](Step1_roi_massages_files/Step1_roi_massages_43_1.png)
+![png](temp_files/temp_43_1.png)
 
 
 Sometimes, you can see the outliers well in this view. In that case, you can either merge them, or drop them...
@@ -551,7 +551,7 @@ if len(currois):
 
 
 
-![png](Step1_roi_massages_files/Step1_roi_massages_49_1.png)
+![png](temp_files/temp_49_1.png)
 
 
 Don't forget to specify a unique name for the quantity to save, otherwise it will be saved as `"acitiviy"`, and will overwrite it in case it exists.  
