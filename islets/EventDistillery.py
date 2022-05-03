@@ -393,7 +393,7 @@ def plot_events(events,
         ax.set_xlabel("time [s]")
         for sp in ["left","right","top"]: ax.spines[sp].set_visible(False)
     if "color" not in events.columns:
-        events["color"] = list(plt.cm.get_cmap(cmap)(events.coltrans))
+        events["color"] = list(plt.cm.get_cmap(cmap)(events["coltrans"]))
     if allrois is None:
         allrois = events.roi.unique()
     ir=0
