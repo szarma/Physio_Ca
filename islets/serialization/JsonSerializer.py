@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import List, Optional, Union
 
 from .IDataSerializer import IDataSerializer
-from .. import Regions
+from islets import Regions
 
 
 class JsonSerializer(IDataSerializer):
@@ -62,8 +62,13 @@ class JsonSerializer(IDataSerializer):
         json_obj = orjson.loads(file_content.encode())
 
         df = pd.DataFrame.from_dict(json_obj['df'])
+        df["trace"] = [np.array(tr) for tr in df["trace"]]
         df['peak'] = df['peak'].apply(lambda x: tuple(x))
         df['pixels'] = df['pixels'].apply(lambda x: [tuple(y) for y in x])
+        try:
+            df.index = df.index.astype(int)
+        except:
+            pass
         del json_obj['df']
 
         json_obj['metadata'] = pd.Series(json_obj['metadata'])
@@ -72,21 +77,19 @@ class JsonSerializer(IDataSerializer):
 
         for key, value in json_obj['statImages'].items():
             json_obj['statImages'][key] = np.array(value)
-
+        
         regions = Regions(dict(zip(df['peak'], df['pixels'])))
         for key, value in json_obj.items():
             regions.__setattr__(key, value)
         regions.df = df
         regions.update()
+        regions.time = np.array(regions.time)
 
         regions = Regions(regions)
         protocol_files = list(self.__file_path.parent.glob('*protocol*.*'))
         if len(protocol_files) > 0:
             regions.import_protocol(protocol_files[0].as_posix())
         regions.pathToPickle = self.__file_path.as_posix()
-        regions.detrend_traces()
-        regions.infer_gain(plot=False)
-        regions.merge_closest(Niter=15)
 
         return regions
 
