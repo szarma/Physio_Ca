@@ -13,6 +13,7 @@ from dash import no_update
 import json
 import os
 from islets.general_functions import td2str
+import pandas as pd
 from islets.utils import import_data
 
 addinfoFeatures = """comments
@@ -26,9 +27,14 @@ microscope
 """.splitlines()
 
 def trcbk():
-    return repr(traceback.format_tb())
+    tb = sys.exc_info()[2]
+    out = traceback.format_tb(tb)
+    out = "".join(out).splitlines()
+    out = [html.Div(o) for o in out]
+    return html.Div(out)
 
-users = sorted(["srdjan","johannes","sandra","marjan","nastja","ya-chi","dean","lidija","anita","natalia","jan_k","tito"])
+users = [fldr.replace("jupyter-","") for fldr in os.listdir("/home") if "jupyter-" in fldr]
+users = sorted(users)
 
 def save_meta(n_clicks, txt, path, filetype):
     if n_clicks > 0:
@@ -183,80 +189,103 @@ for i in sortedCols:
 
 buttonStyle = {"font-family": "Courier New", "background-color": "navy", "display": "inline-block", "color": "white",
                "padding": "5px"}
-app.layout = html.Div(
-    children = [
-                   html.H2(children = 'Exp!Lorer'),
-                   #     html.H4("the experiments explorer"),
-                   dcc.Markdown(" ~ _the experiments explorer_ ~"),
-                   html.Div([
-                       html.Div("Who are you?",
-                                style = {"width": "130px", "display": "inline-block"}),
-                       dcc.Dropdown(id = "username",
-                                    options = [{"value": un, "label": un} for un in users],
-                                    #                      value="srdjan",
-                                    placeholder = "Please choose your username",
-                                    style = {"width": "250px", "display": "inline-block"}
-                                    ),
-                   ], style = {'align-items': 'center', 'display': 'flex'}),
-                   html.Div([
-                       html.Div("Folder to parse:",
-                                style = {"width": "130px", "display": "inline-block"}),
-                       dcc.Input(
-                           id = "main_folder",
-                           value = startFolder,
-                           size = "47"
-                       ),
-                       html.Br(),
-                       html.Div("Constrain:", style = {"width": "130px", "display": "inline-block"}),
-                       dcc.Input(
-                           id = "constrain",
-                           value = constr if "constr" in globals() else "",
-                           placeholder = "e.g. _08_, lif",
-                           size = "30"
-                       ),
-                       html.Button(id = "update-table", children = "Update table", n_clicks = 1),
-                       html.Pre(id = "table-feedback", style = {"font-color":"lightgrey"} ),
-                   ], ),
-                   checkboxes,
-                   html.Div(id = "parser", children = "", style = {
-                       "font-family": "Courier New",
-                       "font-size": "80%",
-                       'border': 'thin lightgrey solid',
-                       "width": "80%",
-                       "height": "100px",
-                       'overflowX': 'scroll',
-                       'overflowY': 'scroll',
-                       'display': "block"  if debug else "none",
-                   }),
+Layout = [
+    html.H2(children = 'Exp!Lorer'),
+    dcc.Markdown(" ~ _the experiments explorer_ ~"),
+    ]
+Layout += [
+    html.Div([
+        html.Div("Who are you?",
+                 style = {"width": "130px", "display": "inline-block"}),
+        dcc.Dropdown(id = "username",
+                     options = [{"value": un, "label": un} for un in users],
+                     value="srdjan" if debug else None,
+                     placeholder = "Please choose your username",
+                     style = {"width": "250px", "display": "inline-block"}
+                    ),
+    ],
+    style = {'align-items': 'center', 'display': 'flex'})
+]
+Layout += [
+    html.Div([
+        html.Div("Folder to parse:",
+                 style = {"width": "130px", "display": "inline-block"}),
+        dcc.Input(
+            id = "main_folder",
+            value = startFolder,
+            size = "47"
+        ),
+        html.Br(),
+        html.Div("Constrain:",
+                 style = {"width": "130px", "display": "inline-block"}),
+        dcc.Input(
+            id = "constrain",
+            value = constr if "constr" in globals() else "",
+            placeholder = "e.g. _08_, lif",
+            size = "30"
+        ),
+        html.Button(id = "update-table", children = "Update table", n_clicks = 1),
+        html.Div(id = "table-feedback",
+                 style = {
+                     "font-family": "Courier New",
+                     "width":"600px",
+                     "height":"30px",
+                     'overflowY': 'scroll',
+                 }
+                 ),
+    ])
+]
 
-                   html.Div(id = "explorer-link", children = "nothing yet", style = buttonStyle),
-                   html.Div(id = "video", children = "nothing yet",
-                            style = {"font-family": "Courier New", }),
-                   html.Div(
-                       dash_table.DataTable(
-                           id = 'table',
-                           columns = [el for el in presentationCols if el["name"] in showCols],
-                           row_selectable = 'single',
-                           data = dfrec,
-                           #             selected_rows=[min(len(dfrec),3)],
-                           style_header = {'whiteSpace': 'normal'},
-                           filter_action = "native",
-                           sort_action = "native",
-                           css = [{'selector': 'table', 'rule': 'table-layout: fixed'}],
-                           style_table = {
-                               'overflowX': 'auto'
-                           },
-                           style_cell = {
-                               'width': '70px',
-                               'overflow': 'hidden',
-                               'textOverflow': 'ellipsis',
-                           },
-                           tooltip_duration = None,
-                           style_cell_conditional = conditionalFormats,
-                       ),
-                   ),
-               ] + [html.Br()] * 10)
+Layout += [checkboxes]
 
+Layout += [
+   html.Div(id = "parser", children = "", style = {
+       "font-family": "Courier New",
+       "font-size": "80%",
+       'border': 'thin lightgrey solid',
+       "width": "80%",
+       "height": "100px",
+       'overflowX': 'scroll',
+       'overflowY': 'scroll',
+       'display': "block"  if debug else "none",
+   }),
+]
+
+Layout += [
+   html.Div(id = "explorer-link", children = "nothing yet", style = buttonStyle),
+   html.Div(id = "video", children = "nothing yet",
+            style = {"font-family": "Courier New", }),
+]
+
+Layout += [
+   html.Div(
+       dash_table.DataTable(
+           id = 'table',
+           columns = [el for el in presentationCols if el["name"] in showCols],
+           row_selectable = 'single',
+           data = dfrec,
+           #             selected_rows=[min(len(dfrec),3)],
+           style_header = {'whiteSpace': 'normal'},
+           filter_action = "native",
+           sort_action = "native",
+           css = [{'selector': 'table', 'rule': 'table-layout: fixed'}],
+           style_table = {
+               'overflowX': 'auto'
+           },
+           style_cell = {
+               'width': '70px',
+               'overflow': 'hidden',
+               'textOverflow': 'ellipsis',
+           },
+           tooltip_duration = None,
+           style_cell_conditional = conditionalFormats,
+       ),
+   ),
+]
+
+Layout += [html.Br()] * 10
+
+app.layout = html.Div(Layout)
 
 @app.callback(
     Output("table", "columns"),
@@ -353,7 +382,7 @@ def serve_explorer_link(selected_rows, username, data):
             #             out = dcc.Link("Examine", href=link, )
             return out
     except:
-        return trcbk()
+        return html.Div(trcbk())
 
 
 @app.callback(
@@ -362,9 +391,10 @@ def serve_explorer_link(selected_rows, username, data):
     [State("table", "data"), ]
 )
 def serve_stuff(selected_rows, username, data):
+    out = []
     try:
         if selected_rows is None:
-            return "Select a row to show details."  #######################
+            out += ["Select a row to show details."]  #######################
         ix = selected_rows[-1]
         protocolPath = data[ix]["path to protocol"]
         out = []
@@ -526,8 +556,8 @@ def serve_stuff(selected_rows, username, data):
 
     except:
         out += [trcbk()]
-    return out
+    return html.Div(out)
 
 
 if __name__ == '__main__':
-    app.run_server(debug = True)
+    app.run_server(debug = debug)
