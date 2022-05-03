@@ -1425,18 +1425,131 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
         status["protocol"] = [""]*len(status)
     return status
 
-def get_trace(row):
-    return tuple([np.array(row[k].replace("\n"," ").strip(" []").split(), dtype="float") for k in ["time","trace"]])
 
-def get_evshape(row, regions,):
-    ts = row.ts
-    sts = "%g"%ts
-    roi = row.roi
-    t = regions.showTime.get(sts, regions.time)
-    it0 = np.searchsorted(t,row.t0)
-    dt = t[1]-t[0]
-    dhw = int(np.ceil(row.halfwidth/dt))
-    dix = max(5,(dhw//5*5))
-    slc = slice(it0-dix, it0+dix*4 )
-    x = regions.df.loc[roi,"faster_%g"%ts][slc]# + regions.df.loc[roi,"slower_%g"%ts][slc]
-    return x
+def import_data_new(mainFolder, constrain="", forceMetadataParse=False, verbose=0, extensions=None):
+    from islets.general_functions import td2str
+    from tqdm import tqdm
+    from islets.Recording import Recording
+
+    if extensions is None:
+        extensions = ["tif", "tiff", "nd2", "lif"]
+    recordings = []
+    for cur, ds, fs in os.walk(mainFolder):
+        for f in fs:
+            if not any([f.endswith(ext) for ext in extensions]):
+                continue
+            if any([constr.strip() in cur + f for constr in constrain.split(",")]):
+                path = os.path.join(cur, f)
+                recordings += [path]
+    recordings = sorted(recordings)
+
+    status = []
+    for pathToRecording in tqdm(recordings):
+        if verbose >= 1:
+            print("#" * 20, pathToRecording)
+        try:
+            rec = Recording(pathToRecording)
+        except:
+            print ("Could not import %s" % pathToRecording)
+            continue
+        # if pathToRecording.endswith(".nd2"):
+        #     recType = "Nikon"
+        # if pathToRecording.endswith(".lif"):
+        #     recType = "Leica"
+        # if pathToRecording.endswith("tif") or pathToRecording.endswith("tiff"):
+        #     recType = "tif"
+        if forceMetadataParse:
+            rec.parse_metadata()
+            rec.save_metadata()
+
+        analysisFolder = os.path.join(rec.folder, rec.Experiment + "_analysis")
+        if not os.path.isdir(analysisFolder):
+            continue
+        subDirs = []
+        for fs in os.listdir(analysisFolder):
+            if fs[0] == ".": continue
+            fullpath = os.path.join(analysisFolder, fs)
+            if os.path.isdir(fullpath) and len(os.listdir(fullpath)) > 0:
+                subDirs += [fullpath]
+
+        for subdir in subDirs:
+            md = pd.Series()
+            md["folder"] = subdir
+            md["path to exp"] = pathToRecording
+            md["experiment"] = os.path.split(pathToRecording)[-1]
+
+            fs = os.path.split(subdir)[1]
+            if "_c" in fs:
+                fs, channel = fs.split("_c")
+                md["channel"] = int(channel)
+            else:
+                md["channel"] = 0
+            if "_" in fs:
+                fs, trange = fs.split('_', maxsplit=1)
+                md["time_range"] = trange
+            else:
+                trange = None
+            md["series"] = fs
+
+            rec.import_series(fs, onlyMeta=True, restrict=trange, channel=md["channel"])
+
+            for k, v in rec.Series[md["series"]]["metadata"].items():
+                md[k] = v
+
+            md["Duration [s]"] = md["SizeT"] / md["Frequency"]
+
+            movies = [os.path.join(subdir, fn) for fn in os.listdir(subdir) if fn.endswith(".mp4")]
+            md["movies"] = sorted(movies, key=lambda xi: os.stat(xi).st_mtime)[::-1]
+            images = [os.path.join(subdir, fn) for fn in os.listdir(subdir) if fn.endswith(".png")]
+            md["images"] = sorted(images, key=lambda xi: os.stat(xi).st_mtime)[::-1]
+
+            md["date"] = md["Start time"].date().__str__()
+            for k in ["End time", "Name", "frame_range"]:  # , "individual Series"
+                try:
+                    del md[k]
+                except:
+                    pass
+            times = ["00:00"] + [td2str(el) for el in md["individual Series"]["Duration"].cumsum()]
+            md["Duration"] = times[-1]
+            md["Series Durations"] = " \n".join(["%s [%s-%s]" % (name.lstrip("Series0"), t0, t1) for name, t0, t1 in
+                                                 zip(md["individual Series"]["Name"], times[:-1], times[1:])])
+            del md["individual Series"]
+
+            protocols = [os.path.join(subdir, fn) for fn in os.listdir(subdir) if fn.endswith("protocol.txt")]
+            if len(protocols) == 0:
+                pathToProtocol = os.path.join(subdir, "%s_%s_protocol.txt" % (md["experiment"], md["series"]))
+            elif len(protocols) == 1:
+                pathToProtocol = os.path.join(subdir, protocols[0])
+            else:
+                pathToProtocol = os.path.join(subdir, sorted(protocols, key=lambda xi: os.path.getsize(xi))[-1])
+
+            md["path to protocol"] = pathToProtocol
+            try:
+                protocol = pd.read_csv(pathToProtocol)
+                if len(protocol):
+                    protocol = " ".join(set([
+                        "%s:%s" % (
+                        row["compound"].capitalize() if "glu" in row["compound"].lower() else row["compound"],
+                        row["concentration"].replace(" ", "")) for _, row in protocol.iterrows()]))
+                    protocol = protocol.replace("Glucose", "Glu")
+                    md["protocol"] = protocol
+            except:
+                pass
+
+            pathToAddInfo = os.path.join(subdir, "additional_info.txt")
+            md["path to add_info"] = pathToAddInfo
+
+            try:
+                addInfo = pd.read_csv(pathToAddInfo, sep=":", header=None, index_col=0).T
+                addInfo = addInfo.iloc[0]
+                for kk, vv in addInfo.items:
+                    md[str(kk).strip()] = str(vv).strip()
+            except:
+                pass
+
+            status += [dict(md.items())]
+
+    status = pd.DataFrame(status)
+    if "protocol" not in status.columns:
+        status["protocol"] = [""] * len(status)
+    return status
