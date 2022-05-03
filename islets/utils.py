@@ -1262,66 +1262,66 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
     from .Recording import Recording, parse_leica
     # tqdm().pandas()
     recordings = []
-    for cur,ds,fs in os.walk(mainFolder):
+    for cur, ds, fs in os.walk(mainFolder):
         #### if you wish to restrict to only certain folders: ####
         for f in fs:
             if not (f.endswith(".lif") or f.endswith(".nd2") or f.endswith(".czi")):
                 continue
-            if any([constr.strip() in cur+f for constr in constrain.split(",")]):
-                path = os.path.join(cur,f)
+            if any([constr.strip() in cur + f for constr in constrain.split(",")]):
+                path = os.path.join(cur, f)
                 recordings += [path]
     recordings = sorted(recordings)
 
     status = []
     ilifs = 0
     for pathToRecording in tqdm(recordings):
-        if verbose>=1:
-            print ("#"*20, pathToRecording)
+        if verbose >= 1:
+            print("#" * 20, pathToRecording)
         try:
             rec = Recording(pathToRecording)
         except:
-            warn("Could not import %s"%pathToRecording)
+            warn("Could not import %s" % pathToRecording)
             continue
         recType = "Leica" if pathToRecording.endswith(".lif") else "nonLeica"
         if forceMetadataParse:
             rec.parse_metadata()
             rec.save_metadata()
-        if recType=="Leica":
+        if recType == "Leica":
             sers = parse_leica(rec)
         else:
             sers = [rec.Experiment.split(".")[0]]
 
-        analysisFolder = os.path.join(rec.folder, rec.Experiment+"_analysis")
+        analysisFolder = os.path.join(rec.folder, rec.Experiment + "_analysis")
         if not os.path.isdir(analysisFolder):
             continue
         existingSeries = []
         for fs in os.listdir(analysisFolder):
-            if not os.path.isdir(os.path.join(analysisFolder, fs)) : continue
-            if len(os.listdir(os.path.join(analysisFolder, fs)))==0: continue
-            if fs[0]=="." : continue
+            if not os.path.isdir(os.path.join(analysisFolder, fs)): continue
+            if len(os.listdir(os.path.join(analysisFolder, fs))) == 0: continue
+            if fs[0] == ".": continue
             ############
             fssplit = fs.split('_')
-            if len(fssplit)==1:
+            if len(fssplit) == 1:
                 existingSeries += [fs]
                 continue
             trange = fssplit[-1].split("-")
-            if len(trange)>1:
+            if len(trange) > 1:
                 fs = "_".join(fssplit[:-1])
             existingSeries += [fs]
-        if verbose>1:
-            print (existingSeries)
-        sers = np.unique(sers+existingSeries)
+        if verbose > 1:
+            print(existingSeries)
+        sers = np.unique(sers + existingSeries)
         for series in sers:
             subdirs = get_series_dir(pathToRecording, series)
-            if verbose>=2:
-                print ("series=",series,", with subdirs:", subdirs)
+            if verbose >= 2:
+                print("series=", series, ", with subdirs:", subdirs)
             for ser in subdirs:
-                if verbose>=2:
-                    print ("ser=",ser)
-                if recType!="Leica":
+                if verbose >= 2:
+                    print("ser=", ser)
+                if recType != "Leica":
                     series = "all"
                 try:
-                    rec.import_series(series, onlyMeta=True)
+                    rec.import_series(series, onlyMeta = True)
                 except:
                     continue
                 if series not in rec.Series:
@@ -1332,30 +1332,30 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
                 md["series"] = series
 
                 saveDir = os.path.join(analysisFolder, ser)
-                if len(rec.Series)==0 or "metadata" not in rec.Series[series]: continue
-                for k,v in rec.Series[series]["metadata"].items():
+                if len(rec.Series) == 0 or "metadata" not in rec.Series[series]: continue
+                for k, v in rec.Series[series]["metadata"].items():
                     md[k] = v
                 if "_" in ser:
                     fssplit = ser.split("_")
                     trange = fssplit[-1].split("-")
-                    if verbose>2:
+                    if verbose > 2:
                         print(trange)
-                    if len(trange)>=2:
+                    if len(trange) >= 2:
                         try:
-                            t0,t1 = [float(t.strip("s")) for t in fssplit[-1].split("-", maxsplit=1)]
-                            md["Time Range"] = "%i-%i"%(t0,t1)
-                            md["Duration [s]"] = t1-t0
+                            t0, t1 = [float(t.strip("s")) for t in fssplit[-1].split("-", maxsplit = 1)]
+                            md["Time Range"] = "%i-%i" % (t0, t1)
+                            md["Duration [s]"] = t1 - t0
                         except:
-                            print ("Oops, having problems parsing ",ser)
+                            print("Oops, having problems parsing ", ser)
                             continue
                     else:
                         md["Time Range"] = "all"
-                        md["Duration [s]"] = md["SizeT"]/md["Frequency"]
+                        md["Duration [s]"] = md["SizeT"] / md["Frequency"]
                 else:
                     md["Time Range"] = "all"
-                    md["Duration [s]"] = md["SizeT"]/md["Frequency"]
+                    md["Duration [s]"] = md["SizeT"] / md["Frequency"]
                 fs = get_filterSizes(md.pxSize)
-                movies = [os.path.join(saveDir,fn) for fn in os.listdir(saveDir) if fn.endswith(".mp4")]
+                movies = [os.path.join(saveDir, fn) for fn in os.listdir(saveDir) if fn.endswith(".mp4")]
                 if len(movies):
                     movies = sorted(movies, key = lambda xi: os.stat(xi).st_mtime)
                     md["movie done"] = True
@@ -1364,28 +1364,31 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
                 else:
                     md["path to movie"] = "None"
                     md["movie done"] = False
-                
-                
+
                 if md["movie done"]:
-                    md["movie size [MB]"] = np.round(os.path.getsize(movieFilename)/10**6,1)
+                    md["movie size [MB]"] = np.round(os.path.getsize(movieFilename) / 10 ** 6, 1)
                 md["date"] = md["Start time"].date().__str__()
-                for k in ["bit depth", "End time","Name","frame_range"]: # , "individual Series"
-                    try:    del md[k]
-                    except: pass
-                times = ["00:00"]+[td2str(el) for el in md["individual Series"]["Duration"].cumsum()]
+                for k in ["bit depth", "End time", "Name", "frame_range"]:  # , "individual Series"
+                    try:
+                        del md[k]
+                    except:
+                        pass
+                times = ["00:00"] + [td2str(el) for el in md["individual Series"]["Duration"].cumsum()]
                 md["Duration"] = times[-1]
-                md["Series Durations"] = " \n".join(["%s [%s-%s]"%(name.lstrip("Series0"), t0, t1) for name, t0, t1 in zip(md["individual Series"]["Name"], times[:-1], times[1:])])
+                md["Series Durations"] = " \n".join(["%s [%s-%s]" % (name.lstrip("Series0"), t0, t1) for name, t0, t1 in
+                                                     zip(md["individual Series"]["Name"], times[:-1], times[1:])])
                 del md["individual Series"]
                 pklsDone = {}
                 for fsize in fs:
-                    pickleFile = os.path.join(saveDir, ".".join(map(str,fsize))+"_rois.pkl")
+                    pickleFile = os.path.join(saveDir, ".".join(map(str, fsize)) + "_rois.pkl")
                     pickleThere = os.path.isfile(pickleFile)
                     pklsDone[fsize] = pickleThere
                 md["pickles done"] = pklsDone
                 if md["movie done"]:
-                    pathToProtocol = movieFilename.replace(".mp4","_protocol.txt").replace("_corrected","").replace("_original","")
+                    pathToProtocol = movieFilename.replace(".mp4", "_protocol.txt").replace("_corrected", "").replace(
+                        "_original", "")
                 else:
-                    pathToProtocol = os.path.join(saveDir, "%s_%s_protocol.txt"%(md["experiment"],md["series"]))
+                    pathToProtocol = os.path.join(saveDir, "%s_%s_protocol.txt" % (md["experiment"], md["series"]))
                 md["path to protocol"] = pathToProtocol
                 md["protocol done"] = False
                 try:
@@ -1393,8 +1396,10 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
                     if len(protocol):
                         md["protocol done"] = True
                         protocol = " ".join(np.unique([
-                            "%s:%s"%(row["compound"].capitalize() if "glu" in row["compound"].lower() else row["compound"], row["concentration"].replace(" ","")) for _,row in protocol.iterrows()]))
-                        protocol = protocol.replace("Glucose","Glu")
+                            "%s:%s" % (
+                            row["compound"].capitalize() if "glu" in row["compound"].lower() else row["compound"],
+                            row["concentration"].replace(" ", "")) for _, row in protocol.iterrows()]))
+                        protocol = protocol.replace("Glucose", "Glu")
                         md["protocol"] = protocol
                 except:
                     pass
@@ -1402,14 +1407,14 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
                 pathToAddInfo = os.path.join(pathToAddInfo, "additional_info.txt")
                 md["path to add_info"] = pathToAddInfo
                 md["add_info done"] = os.path.isfile(pathToAddInfo)
-                if md["add_info done"] and os.path.getsize(pathToAddInfo)>10:
+                if md["add_info done"] and os.path.getsize(pathToAddInfo) > 10:
                     # print (ser, )
                     try:
-                        addInfo = pd.read_csv(pathToAddInfo, sep=":", header=None, index_col=0).T
+                        addInfo = pd.read_csv(pathToAddInfo, sep = ":", header = None, index_col = 0).T
                     except:
                         md["add_info done"] = False
                         continue
-                    if len(addInfo)==0:
+                    if len(addInfo) == 0:
                         md["add_info done"] = False
                         continue
                     for kk in addInfo.columns:
@@ -1417,12 +1422,12 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
                         md[str(kk).strip()] = str(addInfo[kk].iloc[0]).strip()
                 status += [dict(md.items())]
 
-        ilifs +=1
+        ilifs += 1
     #     if ilifs>3:
     #         break
     status = pd.DataFrame(status)
     if "protocol" not in status.columns:
-        status["protocol"] = [""]*len(status)
+        status["protocol"] = [""] * len(status)
     return status
 
 
