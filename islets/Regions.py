@@ -1758,7 +1758,7 @@ class Regions:
         for x,ix,c in zip(xs, indices, colors):
             traceAxes.plot(t,x+offset,lw=.5,color=c)
             if labels:
-                traceAxes.text(0,offset,str(ix)+" ",color=c,ha="right")
+                traceAxes.text(t[0],offset+x[:len(x)//20].mean(),str(ix)+" ",color=c,ha="right", va="center")
             offset += xs.std()*Offset
         if createAxes:
             axs[1].set_yticks([])
