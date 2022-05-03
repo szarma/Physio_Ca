@@ -1,18 +1,24 @@
 import matplotlib.pyplot as plt
-from scipy.stats import ttest_1samp
 import numpy as np
-import islets
 import pandas as pd
-from scipy.stats import distributions as dst
-from matplotlib.lines import Line2D
-import warnings
-
-from IPython.display import display, HTML
 import statsmodels.api as sm
+import warnings
+from IPython.display import display, HTML
+from matplotlib.lines import Line2D
+from scipy.stats import distributions as dst
+from scipy.stats import ttest_1samp
+from typing import Dict, List, Optional, Tuple, Iterable
+import islets
 
 myGrey = (.2,)*3
-default_fontsize = 7
-figlabeldict = dict(fontsize=8,fontweight="bold")
+
+def expFormat(x, spacer=r"\times"):
+    if x<.01:
+        v,e = ("%.1e"%x).split("e")
+        e = int(e)
+        return r"%s{%s}10^{%i}"%(v,spacer, e)
+    else:
+        return "%.3f"%x
 
 def showLineScan(linescan, axs, pixel_limits, Tind = 1, slice_ = None, offset = 1):
     data = linescan.data[slice_]
@@ -30,7 +36,7 @@ def showLineScan(linescan, axs, pixel_limits, Tind = 1, slice_ = None, offset = 
     ax.text(tmax*.05,txtOffset+distance/2," "+str(distance)+"µm", va="center", color="w")
     # ax.imshow(x, cmap="Greys", vmin = 0, vmax = x.max(), aspect="auto")
     ax.plot([tmax*.05, tmax*.03+Tind],[.03*physicalSize]*2,"lightgrey")
-    ax.text(tmax*.05+Tind/2,.03*physicalSize,str(Tind)+"s\n", ha="center", va="center", color="w", fontsize=7)
+    ax.text(tmax*.05+Tind/2,.03*physicalSize,str(Tind)+"s\n", ha="center", va="center", color="w", )
     ax1 = axs[1]
     off = 0
     for px0,px1 in pixel_limits:
@@ -168,6 +174,7 @@ protocolColorScheme = {
     ("diazoxide","100uM"): "xkcd:pale rose",
     ("ryanodine","100nM"): "xkcd:very light purple",
     ("ryanodine","100uM"): "xkcd:light purple",
+    ("ryanodine","10uM"): "xkcd:light purple",
     ("acetylcholine","10uM"): "xkcd:light pastel green",
     ("caffeine","10mM"): "xkcd:light brown",
     ("xestospongin","3uM"): "goldenrod",
@@ -790,8 +797,38 @@ def get_activity(Events, minEvents, reduceRois, Nbootstrap=50, seed = 0):
     out = pd.DataFrame(out)
     return out
 
+def get_trace_activity(regions: islets.Regions,
+                       legs: dict,
+                       ts: float = 300,
+                       reduceRois: int = 2,
+                       Nbootstrap: int = 30,
+                       seed: int = 0,
+                       verbose: bool = True
+                       ) -> pd.DataFrame:
+    regions.fast_filter_traces(ts,Npoints=int(3*ts), verbose=verbose, write=True)
+    ratio = np.vstack(regions.df['faster_%g'%ts]) / np.vstack(regions.df['slower_%g'%ts])
+    t = regions.showTime.get('%g' % ts, regions.time)
+    dt = np.diff(t).mean()
+    nrois = len(regions.df)
+    AUCs = []
+    np.random.seed(seed)
+    nrois_choose = int(np.ceil(nrois / reduceRois))
+    for leg in legs:
+        begin, end = legs[leg]
+        duration = end-begin
+        fltr = (t > begin) & (t < end)
+        integrals = ratio[:,fltr].sum(1)*dt/duration
+        if Nbootstrap==1 and reduceRois==1:
+            AUCs += [{"leg": leg, "activity": integrals.sum(), "activity_std": np.nan}]
+        else:
+            x = np.ones(nrois)
+            for j in range(Nbootstrap):
+                subset = np.random.choice(nrois, size=nrois_choose)
+                x[j] = integrals[subset].sum()
+            AUCs += [{"leg":leg, "activity": x.mean(), "activity_std": x.std()}]
+    return pd.DataFrame(AUCs)
 
-from typing import Dict, List, Optional, Tuple, Iterable
+
 
 
 def big_plot(regions: islets.Regions,
@@ -944,7 +981,7 @@ def place_indicator(ax, duration, position=(0, 1), unit="s", linekwargs={}, font
     if "color" not in linekwargs:
         linekwargs["color"] = "black"
     #     print ([x,x+duration],[y]*2,**linekwargs)
-    ln = Line2D([x, x + duration], [y] * 2, **linekwargs)
+    ln = Line2D([x, x + duration], [y] * 2, solid_capstyle="butt",**linekwargs)
     ln.set_clip_on(False)
     axx.add_artist(ln)
     if unit == "s":
@@ -1018,10 +1055,165 @@ def plot_closeup_traces(ax, regions, rois, closeup, **tracekwargs):
         x,y = l.get_data()
         fltr = (x>closeup[0]) & (x<closeup[1])
         l.set_data((x[fltr], y[fltr]))
-    ax.set_xlim(closeup)
     ax.relim()
 
-def plot_rois_colored_acc_quantity(regions, axs, discr_qty, cmap = "turbo", vmin = None, vmax = None, hist_kwargs = None, rel_height = .1, rel_pos = 1.05, scaleFontSize=6):
+def paper_plot(Events, regions,
+               roi_ax_data = dict(),
+               events_ax_data = dict(),
+               protocol = None,
+               format = "A4",
+               draft = False,
+               axroidim = 2,
+               axhexHeight = 2.6,
+               trace_ax_data = None,
+               caxratio = .8,
+               dpi = 72
+               ):
+    from matplotlib.ticker import AutoMinorLocator
+    Events = Events.sort_values("z_max").copy()
+    if protocol is None:
+        protocol = regions.protocol
+    figwidth, figheight = {
+        "A4": (2*8.27,11.69*2),
+        "Letter": (8.5*2,11.*2),
+    }[format]
+    fig_discard = plt.figure(figsize = (figwidth, figheight), dpi = dpi)
+    fig = plt.figure(figsize=(figwidth, figheight), dpi = dpi)
+    if draft:
+        ruler(fig, margin = 1)
+        # ruler(fig_discard, margin = 1)
+    axtrWidth = figwidth - 5-axroidim
+
+    ## Rois plot
+    axrois = fig.add_axes([(1.2)/figwidth, 1-(axroidim+1.2)/figheight, axroidim/figwidth, axroidim/figheight], facecolor="none", label="rois")
+    axcolor = fig.add_axes([(1.2) / figwidth, 1-(axroidim*1.57+1.2)/figheight, axroidim / figwidth, axroidim * .4 / figheight], label="roi colors")
+    axc1, h = plot_rois_colored_acc_quantity(regions, [axrois, axcolor], **roi_ax_data)
+    axc1.set_label("roi colorbar")
+
+    if "discr_qty" in roi_ax_data and "threshold" in roi_ax_data:
+        validRois = regions.df.query(f"{roi_ax_data['discr_qty']}>={roi_ax_data['threshold']}").index
+        discard_Events = Events[~Events.roi.isin(validRois)].copy()
+        valid_Events = Events[Events.roi.isin(validRois)].copy()
+    else:
+        valid_Events = Events.copy()
+        discard_Events = Events[:0].copy()
+
+    # Events plot
+    axhex = fig.add_axes([(3+axroidim)/figwidth, 1-(axhexHeight+1.2)/figheight, axtrWidth/figwidth, axhexHeight/figheight], facecolor="none", label="events")
+    caxhex = fig.add_axes([(3+axroidim+axtrWidth+.2)/figwidth, 1-(axhexHeight*(1-(1-caxratio)/2)+1.2)/figheight, .2/figwidth, axhexHeight*caxratio/figheight], facecolor="none",label="events cax")
+    axhexes = [axhex]
+    caxhexes = [caxhex]
+    eventsList = [valid_Events]
+    if len(discard_Events):
+        axhexes = [fig_discard.add_axes(axhex.get_position())] + axhexes
+        caxhexes = [fig_discard.add_axes(caxhex.get_position())] + caxhexes
+        eventsList = [discard_Events] + eventsList
+    if "style" in events_ax_data:
+        events_plot = events_ax_data.pop("style")
+    else:
+        events_plot = "scatter"
+
+    for ax_, cax_, Events in zip(axhexes, caxhexes, eventsList):
+        if events_plot == "scatter":
+            if "cmap" not in events_ax_data:
+                events_ax_data["cmap"] = "viridis_r"
+            pth = ax_.scatter(
+                Events["peakpoint"],
+                Events["halfwidth"],
+                c = Events["z_max"],
+                **events_ax_data
+            )
+            ax_.set_yscale("log")
+            ax_.set_xlim(-10,regions.time[-1]+10)
+            clb = plt.colorbar(pth, cax=cax_)
+            cax_.text(0,1.1,r"$z$-score", transform = cax_.transAxes)
+
+        elif events_plot == 'hexbin':
+            if "granularity" in events_ax_data:
+                granularity = events_ax_data.pop("granularity")
+            else:
+                granularity = 40
+            if "cmap" not in events_ax_data:
+                events_ax_data["cmap"] = "hot"
+            pth = ax_.hexbin(
+                Events["peakpoint"],
+                Events["halfwidth"],
+                yscale="log",
+                mincnt = 1,
+                gridsize=(np.array([axtrWidth*1.2, axhexHeight])*granularity).astype(int),
+                extent = (regions.time[0]-10, regions.time[-1]+10, -1.05,2.4),
+                **events_ax_data
+            )
+            ax_.set_xlim(-10, regions.time[-1] + 10)
+            clb = plt.colorbar(pth,cax=cax_)
+            cax_.text(0, 1.1, "bin count", transform = cax_.transAxes)
+        else:
+            raise ValueError(f"Only 'scatter' and 'hexbin' allowed as styles in `events_ax_data`")
+        ax_.spines['left'].set_position(("outward",5))
+        ax_.spines['top'].set_position(("outward", 5))
+        ax_.set_yticks([.1, 1, 10, 100])
+        ax_.set_yticklabels([.1, 1, 10, 100])
+        ax_.set_ylabel(r"halfwidth, $\tau_{1/2}$ [s]")
+        ax_.text(0, 1.1, "time [s]  ", transform = ax_.transAxes, ha = "right", va="center")
+        ax_.xaxis.set_minor_locator(AutoMinorLocator())
+        mystyle_axes(ax_, retain = ["left","top"], bounded=[False,False])
+
+        axp = protocol.plot_protocol( ax=ax_, position = "bottom", )
+
+    ## Trace plot
+    if trace_ax_data is not None and len(trace_ax_data):
+        axtrHeight = trace_ax_data.pop("height",1)/figheight
+        axtrOffset = trace_ax_data.pop("spacing",.1)/figheight
+        roi_label_position = trace_ax_data.pop("roi_label_position",-.01)
+        showRois = trace_ax_data.pop('show_rois')
+        axppos = axp.get_position()
+        axtr = fig.add_axes([axppos.x0,axppos.y0-axtrOffset-axtrHeight, axtrWidth/figwidth, axtrHeight], label="traces")
+        regions.plotTraces(showRois, axs = axtr, protocol = False, labels = True, **trace_ax_data)
+        axtr.set_xticks(axhex.get_xticks())
+        axtr.set_xticklabels(axhex.get_xticklabels())
+        axtr.set_xticks(axhex.get_xticks(minor=True), minor=True)
+        axtr.set_xlim(axhex.get_xlim())
+        mystyle_axes(axtr, retain=['bottom'], bounded=[False])
+
+        regions.plotEdges(showRois, color="k", ax=axrois, image=False)
+        showRoiDF = pd.DataFrame(regions.df.loc[showRois, 'pixels'].apply(lambda xi: np.mean(xi, 0)))
+        showRoiDF.columns = ["center"]
+        showRoiDF["x0"] = [xy[1] for xy in showRoiDF['center']]
+        showRoiDF["y0"] = [xy[0] for xy in showRoiDF['center']]
+        showRoiDF["tan"] = (showRoiDF["y0"] - regions.image.shape[0] / 2) / showRoiDF["x0"]
+        rpos = np.arange(0, len(showRois)) * regions.image.shape[0]/10
+        rpos += -rpos.mean() + max(axrois.get_ylim()) / 2
+        for yr, roi in zip(rpos, showRoiDF.sort_values("tan").index):
+            x = regions.image.shape[1] * roi_label_position
+            # axrois.plot([x, showRoiDF.loc[roi, "x0"]], [yr, showRoiDF.loc[roi, "y0"]], "k-", lw = .7)
+            # axrois.plot(x, yr, showRoiDF.loc[roi, "marker"], ms = 5, mfc = "w", mec = "k", mew = .7)
+            axrois.annotate(str(roi),
+                            xy = showRoiDF.loc[roi, ["x0","y0"]],
+                            xytext = (x, yr),
+                            arrowprops = dict(arrowstyle = "-"),
+                            fontsize=plt.rcParams['font.size']*.8,
+                            horizontalalignment = "right",
+                            verticalalignment = "center",
+                            )
+    if len(discard_Events):
+        ax = fig_discard.get_axes()[-1]
+        ax.text(1,0,"\n\n above: discarded events (left of the threshold in the lower plot)",transform=ax.transAxes, ha='right', va='top')
+        ax.text(1,0,"\n\n\n\n This message will need to cropped manually for embedding this figure into document.",transform=ax.transAxes, ha='right', va='top', size="x-small")
+        pos = ax.get_position()
+        fig_discard.add_artist(Line2D([1-pos.x0-pos.width,pos.x0+pos.width],[pos.y0-.05]*2,color='k'),)
+        fig_discard.show()
+        fig.show()
+    else:
+        plt.close(fig_discard)
+        fig_discard = None
+    axs = {ax._label: ax for ax in fig.get_axes() if ax._label is not None}
+    return (fig, axs), fig_discard
+
+def dummy():
+    fig = plt.figure()
+    plt.close(fig)
+
+def plot_rois_colored_acc_quantity(regions, axs, discr_qty, cmap = "RdBu", vmin = None, vmax = None, hist_kwargs = None, rel_height = .2, rel_pos = 1.1, scaleFontSize=None, ceiling=None, threshold=None):
     axrois, axcolor = axs
     if vmin is None:
         vmin = np.nanpercentile(regions.df[discr_qty],1)
@@ -1029,12 +1221,16 @@ def plot_rois_colored_acc_quantity(regions, axs, discr_qty, cmap = "turbo", vmin
         vmax = np.nanpercentile(regions.df[discr_qty],95)
     if hist_kwargs is None:
         hist_kwargs = {"bins":50, "color":myGrey}
+    if scaleFontSize is None:
+        scaleFontSize = plt.rcParams['font.size']*.8
     regions.color_according_to(discr_qty, cmap=cmap, vmin = vmin, vmax = vmax)
-    regions.plotEdges(ax=axrois, scaleFontSize=scaleFontSize, separate=True, fill=True, alpha =1)
-    regions.plotEdges(ax=axrois, separate=True, fill=False, image=False)
+    regions.plotEdges(ax=axrois, scaleFontSize=scaleFontSize, separate=True, fill=True, alpha =1, lw=0, smoothness = 2)
+    regions.plotEdges(ax=axrois,color="grey", image=False,lw=.3, separate=True, smoothness = 2)
     axrois.set_xticks([])
     axrois.set_yticks([])
-    h = axcolor.hist(regions.df[discr_qty],**hist_kwargs)[0]
+    if ceiling is None:
+        ceiling = 1.1 * vmax
+    h = axcolor.hist(np.minimum(regions.df[discr_qty], ceiling*.98),**hist_kwargs)[0]
     axc_pos = axcolor.get_position()
     fig = axrois.get_figure()
     axc1 = fig.add_axes([axc_pos.x0, axc_pos.y0+axc_pos.height*rel_pos, axc_pos.width, axc_pos.height*rel_height])
@@ -1048,6 +1244,8 @@ def plot_rois_colored_acc_quantity(regions, axs, discr_qty, cmap = "turbo", vmin
     axc1.set_xlim(axcolor.get_xlim())
     axc1.set_yticks([])
     axc1.set_xticks([])
+    if threshold is not None:
+        axcolor.axvline(threshold,color="r", ls="dotted", lw=1)
     return axc1, h
 
 
