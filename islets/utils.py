@@ -1239,6 +1239,22 @@ def autocorr2d(sett, dxrange, dyrange):
                                   sett[dx:     , dy:     ].flatten())[0,1]
     return ret
 
+def get_trace(row):
+    return tuple([np.array(row[k].replace("\n"," ").strip(" []").split(), dtype="float") for k in ["time","trace"]])
+
+def get_evshape(row, regions,):
+    ts = row.ts
+    sts = "%g"%ts
+    roi = row.roi
+    t = regions.showTime.get(sts, regions.time)
+    it0 = np.searchsorted(t,row.t0)
+    dt = t[1]-t[0]
+    dhw = int(np.ceil(row.halfwidth/dt))
+    dix = max(5,(dhw//5*5))
+    slc = slice(it0-dix, it0+dix*4 )
+    x = regions.df.loc[roi,"faster_%g"%ts][slc]# + regions.df.loc[roi,"slower_%g"%ts][slc]
+    return x
+
 
 def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
     from .general_functions import td2str
