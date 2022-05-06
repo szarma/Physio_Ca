@@ -21,18 +21,18 @@ The main elements of our pipeline are the following:
 
 ## Documentation
 
-For brief instructions on how to process a recording, have a look at [Step 0 of processing](notebooks/Tutorials/Processing_Tutorial.html). 
+For brief instructions on how to process a recording, have a look at [Step 0 (Processing)](notebooks/Tutorials/Processing_Tutorial.md). 
 
-This will get your recording motion corrected and segmented, potentially with hundreds of ROIs. You will then want to clean them up a bit ([Step 1](notebooks/Tutorials/Step1_roi_massages.html)). 
+This will get your recording motion corrected and segmented, potentially with hundreds of ROIs. You will then want to clean them up a bit ([Step 1](notebooks/Tutorials/Step1_roi_massages_.md)). 
 
-Then, you may want to detect all transients (i.e. events) in the traces ([Step 2](notebooks/Tutorials/Step2_rois2events.html)), and do some basic exploratory analysis and visualizations of the events ([Step 3](notebooks/Tutorials/Step3_event_visualization_and_analysis.html)).
+Then, you may want to detect all transients (i.e. events) in the traces ([Step 2](notebooks/Tutorials/Step2_rois2events.html)), and do some basic exploratory analysis and visualizations of the events ([Step 3](notebooks/Tutorials/Step3_event_visualization_and_analysis_.md)).
 
-For a more didactical introduction into filtering and event detection, you may want to check [this page](docs/events.html).
+For a more didactical introduction into filtering and event detection, you may want to check [this page](https://htmlpreview.github.io/?https://github.com/szarma/Physio_Ca/blob/master/docs/events.html).
 And for a more indepth dive into more technical details, have a look [here](docs/matmet.pdf).
 
-For answering actual scientific questions, we need to pool different experiments. In a simple case, where each experiment is to be treated as independent replicate, you can follow [this example analysis](notebooks/Tutorials/Step4_experiment_pooling.html).
+For answering actual scientific questions, we need to pool different experiments. In a simple case, where each experiment is to be treated as independent replicate, you can follow [this example analysis](notebooks/Tutorials/Step4_experiment_pooling_.md).
 
-If the experiments differ in some important variable (e.g. some mice are treated, and are not), and we are interested in quantifying the difference between them (i.e. effect of the variable of interest), you can follow [this example analysis](notebooks/Tutorials/Step4_pooling_multi_legs_and_voi.html).
+If the experiments differ in some important variable (e.g. some mice are treated, and are not), and we are interested in quantifying the difference between them (i.e. effect of the variable of interest), you can follow [this example analysis](notebooks/Tutorials/Step4_pooling_multi_legs_and_voi_.md).
 
 ## Features
 
