@@ -160,7 +160,7 @@ class Recording:
             if metadata.loc[i,"SizeZ"]>1:
                 metadata.loc[i,"Z-stack height"] = im.Pixels.get_PhysicalSizeZ()
             if metadata.loc[i,"SizeT"]>1:
-                lastT = im.Pixels.Plane(int(metadata.loc[i,"SizeT"]-1)).DeltaT
+                lastT = im.Pixels.Plane(int(metadata.loc[i,"Nchannels"] * metadata.loc[i,"SizeT"]-1)).DeltaT
                 if lastT!=0 and lastT is not None: 
                     if verbose:
                         print (im.Name, metadata.loc[i,"SizeT"], type(metadata.loc[i,"SizeT"]), lastT)
