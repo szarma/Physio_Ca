@@ -548,7 +548,9 @@ def showRoisOnly(regions, indices=None, im=None, showall=True, lw=None,fill=Fals
         f.add_trace(pts)
         
     if im!="none":
+        im = np.maximum(im, np.percentile(im,5))
         imgpointer = createStaticImage(regions,
+                                       im = im,
                                        showall=showall,
                                        lw=lw,
                                        fill=fill
@@ -634,11 +636,11 @@ def createStaticImage(regions,im=None,showall=True,returnPath=False,origin="lowe
         pass
     if "cmap" not in imkwargs:
         imkwargs["cmap"] = plt.cm.Greys
-    ax.imshow(np.log(im+1), origin=origin, **imkwargs)
+    ax.imshow( np.log(im+1), origin=origin, **imkwargs )
     for sp in ax.spines: ax.spines[sp].set_visible(False)
     if showall:
         try:
-            regions.plotEdges(ax=ax,image=False,lw=figsize[0]*lw,separate=True,scaleFontSize=25,fill=fill)
+            regions.plotEdges(ax=ax, image=False, lw=figsize[0]*lw, separate=True, scaleFontSize=25, fill=fill )
         except:
             pass
     plt.xticks([])
@@ -774,9 +776,7 @@ def correct_phase(movie, m_phasecor, freqMC=.5, max_dev=5, plot_name="phase_shif
         ax.set_ylabel("shifts (in pixels)")
         ax.set_xlabel("time [s]")
 
-
         # first pass on the pairs of neighboring frames:
-
         dshifts = []
         for iframe in range(reb_movie.shape[0]):
             evenFrame = reb_movie[iframe,::2]
