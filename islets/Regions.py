@@ -69,7 +69,7 @@ class Regions:
             warnings.warn("no dataframe created yet.")
             return self
     def __init__(self, movie_,
-                 diag=False,
+                 diag=True,
                  debleach=False,
                  gSig_filt=None,
                  mode="highperc+mean",
@@ -245,25 +245,27 @@ class Regions:
         return image
 
 
-    def constructRois(self, image, img_th=None, dks=3, verbose=False, diag=False, merge=True):
-        from cv2 import dilate,erode
-        try:
-            dks = max(3, (max(self.filterSize)) // 2 * 2 + 1)
-        except:
-            pass
-        dilation_kernel = getCircularKernel(dks)
-        eks = max(3,dks-4)
-        erosion_kernel  = getCircularKernel(eks)
+    def constructRois(self, image, img_th=None, morph_transform=True, verbose=False, diag=False, merge=True):
         if img_th is None:
-            img_th = 0.02#median_abs_deviation(image.flat)/3
-        ok = (image>img_th).astype(np.uint8)
-        if eks<dks:
-            ok = erode(ok, erosion_kernel)
+            img_th = 0.02  # median_abs_deviation(image.flat)/3
+        ok = (image > img_th).astype(np.uint8)
+        if morph_transform:
+            from cv2 import dilate, erode
+            if hasattr(self,"filterSize") and len(self.filterSize):
+                erosion_kernel_size  = (max(self.filterSize)) // 8 * 2 + 1
+                dilation_kernel_size = (max(self.filterSize)) // 6 * 2 + 1
+            else:
+                erosion_kernel_size = 3
+                dilation_kernel_size = 3
+            dilation_kernel = getCircularKernel(dilation_kernel_size)
+            erosion_kernel  = getCircularKernel(erosion_kernel_size)
+            if erosion_kernel_size>dilation_kernel_size:
+                ok = erode(ok, erosion_kernel)
+                if verbose:
+                    print ("eroding valid pixels by", erosion_kernel_size)
+            ok = dilate(ok, dilation_kernel)
             if verbose:
-                print ("eroding valid pixels by", eks)
-        ok = dilate(ok, dilation_kernel)
-        if verbose:
-            print ("dilating valid pixels by", dks)
+                print ("dilating valid pixels by", dilation_kernel_size)
         ok = ok.astype(bool)
         self.validPixels = ok
         B_ = crawl_dict_via_graph(image, ok, diag=diag)
