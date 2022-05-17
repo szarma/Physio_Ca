@@ -579,6 +579,10 @@ class Regions:
                 pass
               
         if image and scaleFontSize>=0 and hasattr(self, "metadata") and "pxSize" in self.metadata:
+            try:
+                float(self.metadata["pxSize"])
+            except:
+                return None
             if lengths is None:
                 lengths = [10,20,50,100,200,500]
             il = np.searchsorted(lengths,self.metadata.pxSize*self.image.shape[1]/10)
