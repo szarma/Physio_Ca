@@ -11,6 +11,11 @@ import sys
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
+import traceback
+def trcbk():
+    out = "".join(traceback.format_tb(sys.exc_info()[-1]))
+    print (out)
+    return out
 # Token for the bot, which will be used to post in slack for notifications
 SLACK_BOT_TOKEN = open("/usr/share/slackbot.token").read()
 
@@ -73,14 +78,13 @@ def create_movie(recording, frequency, restrict, series, input_type, channel, ve
         global rec
     if input_type == "tif":
         movie, metadata = create_movie_from_tif(recording, frequency, restrict)
-
-    else:
-        ##### input_type is either 
-        try:
-            bioformats.javabridge.run_script("2+2")
-        except:
-            bioformats.javabridge.start_vm(class_path = bioformats.JARS)
-            islets.utils._init_logger()
+    else: ##### input_type is either
+        if input_type != "stk":
+            try:
+                bioformats.javabridge.run_script("2+2")
+            except:
+                bioformats.javabridge.start_vm(class_path = bioformats.JARS)
+                islets.utils._init_logger()
 
         rec = islets.Recording(recording)
 
@@ -125,7 +129,7 @@ def create_movie(recording, frequency, restrict, series, input_type, channel, ve
                 raise ValueError("Can not parse the frequency argument.")
 
         movie = islets.cmovie(images, fr = fr)
-        movie.filename = images.filename
+        # movie.filename = images.filename
         del rec
     return movie, metadata
 
@@ -158,8 +162,10 @@ def main(args):
         input_type = "nikon"
     elif args.recording.lower().endswith("czi"):
         input_type = "zeiss"
+    elif args.recording.lower().endswith("stk"):
+        input_type = "stk"
     else:
-        raise NotImplementedError("Filetype not recognized. Currently, only tif, nd2, and lif are supported.")
+        raise NotImplementedError("Filetype not recognized. Currently, only tif, nd2, czi, stk, and lif are supported.")
 
     if args.notify:
         process = " ".join(sys.argv[1:])
@@ -322,7 +328,7 @@ if __name__ == "__main__":
         sys.exit()
     try:
         main(args)
-    except Exception as e:
-        print (e)
+    except:
+        print(trcbk())
     finally:
         sys.exit(0)
