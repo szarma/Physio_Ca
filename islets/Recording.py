@@ -8,6 +8,7 @@ import pandas as pd
 from . import cmovie
 from nd2reader import ND2Reader
 from tifffile import memmap as tiffmemmap
+from tifffile import TiffFile
 from .utils import autocorr2d
 from IPython.display import display
 
@@ -128,54 +129,75 @@ class Recording:
                 print(exc_info())
                 pass
             return None
-        md = bf.get_omexml_metadata(self.path)
-        self.xml = bf.OMEXML(md)
-        self.nSeries = self.xml.get_image_count()
-        self.allSeries = [self.xml.image(i).Name for i in range(self.nSeries)]
-        
-        
-        for i in range(self.nSeries):
-            im = self.xml.image(i)
-            for c in metadata.columns:
-                try:
-                    metadata.loc[i,c] = getattr(im.Pixels, c)
-                    metadata.loc[i,c] = int(metadata.loc[i,c])
-                except:
-                    pass
-            metadata.loc[i,"Name"] = im.Name
-            metadata.loc[i,"pxSize"] = im.Pixels.get_PhysicalSizeX()
-            metadata.loc[i,"pxUnit"] = im.Pixels.get_PhysicalSizeXUnit()
-            metadata.loc[i,"bit depth"] = im.Pixels.get_PixelType()
-            metadata.loc[i,"Nchannels"] = im.Pixels.get_channel_count()
-            if self.is_nd2:
-                try:
-                    with ND2Reader(self.path) as nd2data:
-                        date = nd2data.metadata['date']
-                except:
-                    date = pd.to_datetime("")
-                    print (f"Error reading date from {self.path}: ", exc_info())
-            else:
-                date = im.get_AcquisitionDate()
-            metadata.loc[i,"Start time"] = date
-            if metadata.loc[i,"SizeZ"]>1:
-                metadata.loc[i,"Z-stack height"] = im.Pixels.get_PhysicalSizeZ()
-            if metadata.loc[i,"SizeT"]>1:
-                lastT = im.Pixels.Plane(int(metadata.loc[i,"Nchannels"] * metadata.loc[i,"SizeT"]-1)).DeltaT
-                if lastT!=0 and lastT is not None: 
-                    if verbose:
-                        print (im.Name, metadata.loc[i,"SizeT"], type(metadata.loc[i,"SizeT"]), lastT)
-                    metadata.loc[i,"Frequency"] = (metadata.loc[i,"SizeT"])/lastT
-                        
-        for c,t in list(zip(metadata.columns,["str"]+["int"]*5+["float","str","str","float"])):
-            metadata[c] = metadata[c].astype(t)
-        metadata["Start time"] = pd.to_datetime(metadata["Start time"])
-        metadata["Duration"] = pd.to_timedelta(metadata["SizeT"]/metadata["Frequency"], unit="s")
-        metadata["End time"] = metadata["Start time"]+metadata["Duration"]
-        self.metadata = metadata
-        try:
-            self.tag_linescans()
-        except:
-            self.metadata["line scan"]="none"
+        if self.path.endswith(".stk"):
+            stkFile = TiffFile(self.path)
+            metadata.loc[0,"SizeT"] = stkFile.stk_metadata['NumberPlanes']
+            metadata.loc[0,"Start time"] = stkFile.stk_metadata['CreateTime']
+            metadata.loc[0,"End time"] = stkFile.stk_metadata['LastSavedTime']
+            metadata.loc[0,"Duration"] = (stkFile.stk_metadata['LastSavedTime'] - stkFile.stk_metadata['CreateTime']).total_seconds()
+            page = stkFile.pages[0].asarray()
+            metadata.loc[0,"SizeX"] = page.shape[1]
+            metadata.loc[0,"SizeY"] = page.shape[2]
+            metadata.loc[0,"bit depth"] = page.dtype.name
+            metadata.loc[0,"pxSize"] = "_"
+            metadata.loc[0,"pxUnit"] = "_"
+            metadata.loc[0,"Name"] = "all"
+            # dts = np.diff(stkFile.stk_metadata["DatetimeCreated"])
+            # dt = np.median(dts) / np.timedelta64(1, 's')
+            # metadata.loc[0,"Frequency"] = 1/dt
+            metadata["Frequency"] = metadata['SizeT']/metadata['Duration']
+            self.metadata = metadata
+            return None
+
+        else:
+            md = bf.get_omexml_metadata(self.path)
+            self.xml = bf.OMEXML(md)
+            self.nSeries = self.xml.get_image_count()
+            self.allSeries = [self.xml.image(i).Name for i in range(self.nSeries)]
+
+
+            for i in range(self.nSeries):
+                im = self.xml.image(i)
+                for c in metadata.columns:
+                    try:
+                        metadata.loc[i,c] = getattr(im.Pixels, c)
+                        metadata.loc[i,c] = int(metadata.loc[i,c])
+                    except:
+                        pass
+                metadata.loc[i,"Name"] = im.Name
+                metadata.loc[i,"pxSize"] = im.Pixels.get_PhysicalSizeX()
+                metadata.loc[i,"pxUnit"] = im.Pixels.get_PhysicalSizeXUnit()
+                metadata.loc[i,"bit depth"] = im.Pixels.get_PixelType()
+                metadata.loc[i,"Nchannels"] = im.Pixels.get_channel_count()
+                if self.is_nd2:
+                    try:
+                        with ND2Reader(self.path) as nd2data:
+                            date = nd2data.metadata['date']
+                    except:
+                        date = pd.to_datetime("")
+                        print (f"Error reading date from {self.path}: ", exc_info())
+                else:
+                    date = im.get_AcquisitionDate()
+                metadata.loc[i,"Start time"] = date
+                if metadata.loc[i,"SizeZ"]>1:
+                    metadata.loc[i,"Z-stack height"] = im.Pixels.get_PhysicalSizeZ()
+                if metadata.loc[i,"SizeT"]>1:
+                    lastT = im.Pixels.Plane(int(metadata.loc[i,"Nchannels"] * metadata.loc[i,"SizeT"]-1)).DeltaT
+                    if lastT!=0 and lastT is not None:
+                        if verbose:
+                            print (im.Name, metadata.loc[i,"SizeT"], type(metadata.loc[i,"SizeT"]), lastT)
+                        metadata.loc[i,"Frequency"] = (metadata.loc[i,"SizeT"])/lastT
+
+            for c,t in list(zip(metadata.columns,["str"]+["int"]*5+["float","str","str","float"])):
+                metadata[c] = metadata[c].astype(t)
+            metadata["Start time"] = pd.to_datetime(metadata["Start time"])
+            metadata["Duration"] = pd.to_timedelta(metadata["SizeT"]/metadata["Frequency"], unit="s")
+            metadata["End time"] = metadata["Start time"]+metadata["Duration"]
+            self.metadata = metadata
+            try:
+                self.tag_linescans()
+            except:
+                self.metadata["line scan"]="none"
         
     def calc_gaps(self):
         metadata = self.metadata
@@ -258,7 +280,6 @@ class Recording:
 
         for c in ["SizeX", "SizeY", "pxSize", "pxUnit", "bit depth"]:
             assert all([x == metadata[c].iloc[0] for x in metadata[c]])
-
         tsum = metadata[["Name", "SizeT", "Start time", "Duration", "End time"]].copy()
         metadata1 = metadata.iloc[0].copy()
         metadata1['SizeT'] = tsum["SizeT"].sum()
@@ -270,7 +291,6 @@ class Recording:
                 t_end = time.max() + t_end
             if t_end < t_begin:
                 t_end = time.max()
-
             frame_begin = np.where(time >= t_begin)[0][0]
             frame_end = np.where(time <= t_end)[0][-1]
             metadata1["frame_range"] = frame_begin, frame_end
@@ -371,30 +391,27 @@ class Recording:
                 )
             else:
                 raise ValueError("mode can only take the following values: 'ram', 'memmap', 'tif', and 'auto'.")
-
-            try:
-                self.rdr
-            except:
-                self.rdr = bf.ImageReader(self.path, perform_init=True)
-
-            assert metadata.SizeT.iloc[0] > frame_begin
-
-            for i in metadata.index:
-                #             firstFrame = self.rdr.read(series=i, rescale=False, t=0)
-                #             if len(firstFrame.shape)==3:
-                if metadata.index[0] == i:
-                    dt = frame_begin
-                else:
-                    dt = 0
-
-                offset = metadata.loc[:i - 1, "SizeT"].sum() - frame_begin
-                for t in range(dt, metadata.loc[i, "SizeT"]):
-                    if t + offset >= len(data): break
-                    data[t + offset] = self.rdr.read(series=i, rescale=False, t=t, c=channel)
-
-            if isLineScan:
-                data = data.reshape((np.prod(data.shape[:2]), 1, data.shape[-1]))
-
+            if self.path.endswith(".stk"):
+                stkFile = TiffFile(self.path)
+                data = stkFile.pages[0].asarray()[frame_begin: frame_end]
+            else:
+                try:
+                    self.rdr
+                except:
+                    self.rdr = bf.ImageReader(self.path, perform_init=True)
+                assert metadata.SizeT.iloc[0] > frame_begin
+                for i in metadata.index:
+                    if metadata.index[0] == i:
+                        dt = frame_begin
+                    else:
+                        dt = 0
+                    offset = metadata.loc[:i - 1, "SizeT"].sum() - frame_begin
+                    for t in range(dt, metadata.loc[i, "SizeT"]):
+                        if t + offset >= len(data):
+                            break
+                        data[t + offset] = self.rdr.read(series=i, rescale=False, t=t, c=channel)
+                if isLineScan:
+                    data = data.reshape((np.prod(data.shape[:2]), 1, data.shape[-1]))
         if save:
             self.Series[Series]["data"] = data
         else:
