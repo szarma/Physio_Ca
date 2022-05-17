@@ -172,7 +172,7 @@ protocolColorScheme = {
     ("Ca", "0mM"): plt.cm.Oranges(.3),
     ("isradipine",  "5uM"): "lightblue",
     ("diazoxide","100uM"): "xkcd:pale rose",
-    ("ryanodine","100nM"): "xkcd:very light purple",
+    ("ryanodine","100nM"): "#f6cefc",
     ("ryanodine","100uM"): "xkcd:light purple",
     ("ryanodine","10uM"): "xkcd:light purple",
     ("acetylcholine","10uM"): "xkcd:light pastel green",
@@ -183,6 +183,7 @@ protocolColorScheme = {
 
 def beautify_protocol(protocol):
     from .protocol import Protocol
+    protocol = protocol.copy()
     colors = []
     for i in protocol.index:
         colors += [protocolColorScheme[(protocol.loc[i, "compound"], protocol.loc[i, "concentration"])]]
@@ -1075,6 +1076,7 @@ def paper_plot(Events, regions,
         protocol = regions.protocol
     figwidth, figheight = {
         "A4": (2*8.27,11.69*2),
+        "A5": (11.69, 2*8.27),
         "Letter": (8.5*2,11.*2),
     }[format]
     fig_discard = plt.figure(figsize = (figwidth, figheight), dpi = dpi)
