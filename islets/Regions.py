@@ -17,7 +17,7 @@ import plotly.graph_objects as go
 from matplotlib.colors import LogNorm
 from matplotlib.axes import Axes
 from matplotlib.gridspec import GridSpec
-from plotly_express import colors as plc
+import plotly.express.colors as plc
 from typing import Dict, List, Optional, Tuple
 
 from .general_functions import getCircularKernel

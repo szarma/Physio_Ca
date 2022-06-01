@@ -5,7 +5,10 @@ from dash import dcc, html
 import numpy as np
 import plotly.graph_objects as go
 from dash.dependencies import Input, Output
-from jupyter_plotly_dash import JupyterDash
+try:
+    from jupyter_plotly_dash import JupyterDash
+except ModuleNotFoundError:
+    from jupyter_dash import JupyterDash
 
 from .numeric import rebin
 from .utils import getFigure

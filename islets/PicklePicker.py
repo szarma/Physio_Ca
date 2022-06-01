@@ -1,4 +1,7 @@
-from jupyter_plotly_dash import JupyterDash
+try:
+    from jupyter_plotly_dash import JupyterDash
+except ModuleNotFoundError:
+    from jupyter_dash import JupyterDash
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
 import os
