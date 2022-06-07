@@ -3,7 +3,8 @@ import traceback
 from sys import exc_info
 
 import numpy as np
-from plotly_express import colors as plc
+import pandas as pd
+import plotly.express.colors as plc
 from scipy.signal import peak_widths, find_peaks
 from .numeric import rebin
 from .fitting import generic_function
@@ -37,12 +38,14 @@ def examine_events(self, spikeDF, x, y,
     if mode=="jupyter-dash":
         from jupyter_dash import JupyterDash as Dash
     from dash.dependencies import Input, Output, State
-    from dash import dcc
-    from dash import html
+    try:
+        from dash import dcc, html
+    except ImportError:
+        import dash_core_components as dcc
+        import dash_html_components as html
     import plotly.graph_objects as go
     from dash import no_update
-    
-#     time = self.time
+
     if hasattr(self,"hb"):
         del self.hb
     from .plotly_hexbin import HBclass

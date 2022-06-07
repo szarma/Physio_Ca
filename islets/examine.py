@@ -41,8 +41,11 @@ def examine(self,
     if mode=="jupyter-dash":
         from jupyter_dash import JupyterDash as Dash
     from dash.dependencies import Input, Output, State
-    from dash import dcc
-    from dash import html
+    try:
+        from dash import dcc, html
+    except ImportError:
+        import dash_core_components as dcc
+        import dash_html_components as html
     import plotly.graph_objects as go
     from dash import no_update
     from networkx import adjacency_matrix

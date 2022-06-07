@@ -9,7 +9,7 @@ with warnings.catch_warnings():
     # if importlib.util.find_spec("caiman") is not None:
     try:
         from caiman import movie as cmovie
-    except:
+    except ModuleNotFoundError:
         from .movies import movie as cmovie
         # print("Managed to import cmovie from .movies")
     # try:

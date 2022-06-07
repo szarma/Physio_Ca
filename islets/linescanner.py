@@ -1,7 +1,5 @@
 import json
 from sys import exc_info
-
-from dash import dcc, html
 import numpy as np
 import plotly.graph_objects as go
 from dash.dependencies import Input, Output
@@ -9,6 +7,11 @@ try:
     from jupyter_plotly_dash import JupyterDash
 except ModuleNotFoundError:
     from jupyter_dash import JupyterDash
+try:
+    from dash import dcc, html
+except ImportError:
+    import dash_core_components as dcc
+    import dash_html_components as html
 
 from .numeric import rebin
 from .utils import getFigure

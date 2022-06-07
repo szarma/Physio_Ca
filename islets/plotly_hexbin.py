@@ -1,6 +1,10 @@
 import json
 
-from dash import dcc, html
+try:
+    from dash import dcc, html
+except ImportError:
+    import dash_core_components as dcc
+    import dash_html_components as html
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np

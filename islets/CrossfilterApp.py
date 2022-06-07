@@ -2,7 +2,12 @@ try:
     from jupyter_plotly_dash import JupyterDash
 except ModuleNotFoundError:
     from jupyter_dash import JupyterDash
-from dash import dcc, html
+try:
+    from dash import dcc, html
+except ImportError:
+    import dash_core_components as dcc
+    import dash_html_components as html
+
 from dash.dependencies import Input, Output
 import plotly.graph_objects as go
 
