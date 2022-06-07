@@ -48,16 +48,18 @@ def expFormat(x, spacer=r"\times"):
     else:
         return "%.3f"%x
 
-def showLineScan(linescan, axs, pixel_limits, Tind = 1, slice_ = None, offset = 1):
+def showLineScan(linescan, axs, pixel_limits, Tind = 1, slice_ = slice(None), offset = 1, nrebin = None):
     data = linescan.data[slice_]
-    x = islets.numeric.rebin(data,100,1, func=np.sum)
+    if nrebin is None:
+        nrebin = data.shape[1]//100
+    x = islets.numeric.rebin(data,nrebin,1, func=np.sum)
     for j in range(x.shape[0]):
         x[j] -= np.percentile(x[j],10)
     ax = axs[0]
     distance = 10
     physicalSize = linescan.metadata["pxSize"]*data.shape[0]
     txtOffset = physicalSize-1.5*distance
-    tmax = linescan.time[-1]
+    tmax = data.shape[1]/linescan.Freq#linescan.time[-1]
     ax.imshow(x, cmap="turbo", vmin = 0, vmax = x.max(), aspect="auto", extent = (0,tmax, 0, physicalSize), origin = "lower")
 
     ax.plot([tmax*.05]*2,[txtOffset,txtOffset+distance],"lightgrey")
@@ -70,8 +72,8 @@ def showLineScan(linescan, axs, pixel_limits, Tind = 1, slice_ = None, offset = 
     for px0,px1 in pixel_limits:
         emphasize_region(ax,ax.get_xlim(), [px0*physicalSize/x.shape[0],px1*physicalSize/x.shape[0]], color="lightgrey", extend = (-.01,0),lw=1)
         ax1.plot(np.linspace(0,tmax,x.shape[1]), x[px0:px1].mean(0) + off, lw=.5, color=myGrey)
-        ar = ax.arrow(tmax*1.05, np.mean([px0, px1])*physicalSize/x.shape[0], tmax*.2, 0, color=myGrey, lw=1, clip_on=False, head_width = tmax, head_length = .2)
-        ar.set_clip_on(False)
+        # ar = ax.arrow(tmax*1.05, np.mean([px0, px1])*physicalSize/x.shape[0], tmax*.2, 0, color=myGrey, lw=1, clip_on=False, head_width = tmax, head_length = .2)
+        # ar.set_clip_on(False)
         ax.set_xlim(0,tmax)
         off += offset
     
