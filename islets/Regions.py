@@ -1049,6 +1049,7 @@ class Regions:
                        usecol="trace",
                        order=5,
                        verbose=False,
+                       mode='fft',
                        ):
         from .numeric import sosFilter
         if Npoints is None: Npoints = 30
@@ -1085,7 +1086,12 @@ class Regions:
                 if "%g"%ironTimeScale in self.showTime:
                     del self.showTime["%g"%ironTimeScale]
         cutFreq = .5/ironTimeScale
-        sf = sosFilter(cutFreq, freq, order=order)
+        if mode == 'fft':
+            sf = sosFilter(cutFreq, freq, order=order)
+        elif mode == "manual":
+            sf = ManualFilter(ironTimeScale, freq, )
+        else:
+            raise ValueError("mode can only be 'fft' or 'manual'.")
         if write:
             self.sosFilter = sf
         return {
