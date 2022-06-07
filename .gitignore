@@ -30,3 +30,4 @@ build
 /docs/diff.tex
 /app/dope.py
 /app/nope.py
+/wheels/
