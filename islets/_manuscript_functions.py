@@ -9,8 +9,36 @@ from scipy.stats import distributions as dst
 from scipy.stats import ttest_1samp
 from typing import Dict, List, Optional, Tuple, Iterable
 import islets
+from sklearn.mixture import GaussianMixture
+from warnings import warn
 
 myGrey = (.2,)*3
+
+def gm_fit(x, ncs=None, crit="bic", debug=False, mindist = 0):
+    if ncs is None:
+        ncs = [1,2,3]
+    gms = [GaussianMixture(nc,
+                           means_init=np.percentile(x,np.linspace(1,99,nc)).reshape(-1,1)
+                          ).fit(x.reshape(-1,1)) for nc in ncs]
+    iopt = np.argmin([getattr(gm,crit)(x.reshape(-1,1)) for gm in gms])
+    gm = gms[iopt]
+    if mindist>0:
+        while True:
+            gm = gms[iopt]
+            if gm.n_components==1:
+                break
+            dists = np.diff(sorted(gm.means_.flat))
+            if dists.min()<mindist:
+                iopt -= 1
+                if iopt<0:
+                    warn("Could not satisfy minimal distance between components.")
+                    break
+            else:
+                break
+    if debug:
+        return gm, gms
+    else:
+        return gm
 
 def expFormat(x, spacer=r"\times"):
     if x<.01:
