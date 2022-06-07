@@ -62,7 +62,7 @@ def examine_events(self, spikeDF, x, y,
 
     if mode=="jupyter":
         app = Dash(name,
-                  width=1500,
+                  width=2000,
                   height=600,
                  )
     else:
@@ -95,7 +95,7 @@ def examine_events(self, spikeDF, x, y,
                 html.Pre("", style={"display":"inline-block","margin-left":"5px","margin-right":"5px"},id="roi-indicator"),
                 html.Button('>',id="next-button", n_clicks=0, style={"display":"inline-block"}),
             ],style={"margin-left":"150px"}),
-            html.Div(id="trace-output")
+            html.Div(id="trace-output",style = {"width": "1000px"})
             ])
     ],
         style={"family":"Arial","display":"flex"}
@@ -215,7 +215,7 @@ def examine_events(self, spikeDF, x, y,
                     mode=mode,
                     marker_size=4,
                     line=dict(width=.7 if col=="trace" else 1,
-#                               color=color
+                              # color=color
                              ),
                     name=name
                 ))
@@ -223,8 +223,8 @@ def examine_events(self, spikeDF, x, y,
                     dh = (x.max()-x.min())*1.2
                     hmin = x.min()-dh/1.2*.1
                     fig.add_trace(go.Scatter(
-        #                 x=[row.t0]*2,
-        #                 y=[x.min(), x.max()],
+                        # x=[row.t0]*2,
+                        # y=[x.min(), x.max()],
                         x=np.array([0,0,1,1,0])*row.halfwidth+row.t0,
                         y=np.array([0,1,1,0,0])*dh+hmin,
                         mode="lines",
@@ -292,21 +292,21 @@ def examine_events(self, spikeDF, x, y,
                     line=dict(dash="dot",width=1,color="black"),
                     name=name,
                     showlegend=True))
-#                     fig.add_trace(go.Scatter(
-#                         x=t[[ifit0,ifit_end-1]],
-#                         y=x_fit[[ifit0,ifit_end-1]],
-#                         mode="lines",
-#                         line=dict(width=3,color="red",),
-#                         opacity = .3,
-#                         showlegend=False
-#                     ))
-#                     fig.add_trace(go.Scatter(
-#                         t[[ifit0,ifit_end-1]],
-#                         x_fit[[ifit0,ifit_end-1]],
-#                         mode="lines",
-#                         line=dict(width=.5,color="red"),
-#                         fill="toself"
-#                     ))
+                    # fig.add_trace(go.Scatter(
+                    #     x=t[[ifit0,ifit_end-1]],
+                    #     y=x_fit[[ifit0,ifit_end-1]],
+                    #     mode="lines",
+                    #     line=dict(width=3,color="red",),
+                    #     opacity = .3,
+                    #     showlegend=False
+                    # ))
+                    # fig.add_trace(go.Scatter(
+                    #     t[[ifit0,ifit_end-1]],
+                    #     x_fit[[ifit0,ifit_end-1]],
+                    #     mode="lines",
+                    #     line=dict(width=.5,color="red"),
+                    #     fill="toself"
+                    # ))
                 for l in [ll,rl]:
                     fig.add_trace(go.Scatter(
                         x=[l]*2,
@@ -329,26 +329,32 @@ def examine_events(self, spikeDF, x, y,
                     showlegend=False,
                     name=None,
                 ))
-#                     fig.add_trace(go.Scatter(
-#                         x=t[0]+np.array([ll,ll,rl,rl,ll]),
-#                         y=np.array([0,1,1,0,0])*dh+hmin,
-#                         mode="lines",
-#                         line_width=0,
-#                         opacity=.3,
-#                         fill="toself",
-#                         showlegend=False,
-#                     ))
-
-#                 except:
-#                     pass
+                #     fig.add_trace(go.Scatter(
+                #         x=t[0]+np.array([ll,ll,rl,rl,ll]),
+                #         y=np.array([0,1,1,0,0])*dh+hmin,
+                #         mode="lines",
+                #         line_width=0,
+                #         opacity=.3,
+                #         fill="toself",
+                #         showlegend=False,
+                #     ))
+                #
+                # except:
+                #     pass
     
             fig.update_layout(
                 xaxis_title='time [s]',
-                margin=dict(l=10, r=10, t=30)
+                margin=dict(l=10, r=10, t=30),
+                # width=500
             )
-            out += [dcc.Graph(figure=fig)]
+            out += [html.Div(dcc.Graph(figure=fig), style= {'width':"700px","display":"inline-block"})]
             if debug:
-                out += [html.Pre(repr(row), style={"height":"200px", "overflowX":"scroll", "overflowY":"scroll"})]
+                row = row.copy()
+                for k,v in list(row.items()):
+                    if  hasattr(v, '__iter__') and len(v) > 3:
+                        del row[k]
+                out += [html.Pre(repr(row), style={ "width":"200px", "overflowX":"scroll", "overflowY":"scroll","display":"inline-block", "border":"thin grey solid"})]
+
         except:
             exc_type, exc_value, exc_traceback = exc_info()
             out += [html.Br(), str(exc_type)]
