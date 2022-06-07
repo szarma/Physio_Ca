@@ -1,0 +1,17 @@
+jupyter-plotly-dash
+jupyterlab
+pandas~=1.3.5
+scikit-learn
+scikit-image
+tqdm
+bidict
+xlrd
+scipy
+matplotlib
+statsmodels
+opencv-python
+numba
+ffmpeg-python
+nd2reader
+mgzip
+orjson
