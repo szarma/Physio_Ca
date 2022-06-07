@@ -144,6 +144,26 @@ class sosFilter:
         w, h = sosfreqz(self.sos_pars, worN=worN)
         return 0.5*self.frequency*w/np.pi, np.abs(h)
 
+class ManualFilter:
+    def __init__(self, cutoff, frequency, percentile=10, average=True):
+        self.wIron = int(frequency / cutoff / 2) * 2 + 1
+        self.percentile = percentile,
+        self.average = average
+
+    def run(self, traces, n_processes=1):
+        global iterf
+        if self.average:
+            def iterf(x_):
+                out = lowPass(x_, self.wIron, self.wIron, perc = self.percentile)
+                return out
+        else:
+            def iterf(x_):
+                out = lowPass(x_, self.wIron, perc = self.percentile)
+                return out
+        if len(traces.shape)==1:
+            return iterf(traces)
+        return multi_map(iterf, traces, processes = n_processes)
+
 def power_spectrum(x, fr, mean=True):
     from scipy.fft import rfft, rfftfreq
     freq = rfftfreq(x.shape[-1], 1/fr)
