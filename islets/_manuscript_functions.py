@@ -1199,7 +1199,7 @@ def paper_plot(Events, regions,
         roi_label_position = trace_ax_data.pop("roi_label_position",-.01)
         showRois = trace_ax_data.pop('show_rois')
         axppos = axp.get_position()
-        axtr = fig.add_axes([axppos.x0,axppos.y0-axtrOffset-axtrHeight, axtrWidth/figwidth, axtrHeight], label="traces")
+        axtr = fig.add_axes([axppos.x0,axppos.y0-axtrOffset-axtrHeight, axtrWidth/figwidth, axtrHeight], label="traces", facecolor='none')
         regions.plotTraces(showRois, axs = axtr, protocol = False, labels = True, **trace_ax_data)
         axtr.set_xticks(axhex.get_xticks())
         axtr.set_xticklabels(axhex.get_xticklabels())
