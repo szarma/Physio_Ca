@@ -1194,6 +1194,7 @@ class Regions:
             self.df["slower_%g"%ironTimeScale] = slower
             self.df["faster_%g"%ironTimeScale] = faster
             self.df["zScore_%g"%ironTimeScale] = list(z)
+            self.df = self.df.copy()
         else:
             return np.array(slower), np.array(faster), z
 
