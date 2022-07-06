@@ -7,8 +7,27 @@ import numpy as np
 from numba import jit, prange
 from scipy.optimize import curve_fit  # ,minimize,basinhopping
 from islets.utils import multi_map
+from scipy.stats import median_abs_deviation
+from scipy.spatial import distance_matrix
+
 
 mad2std = 1.4826 # https://en.wikipedia.org/wiki/Median_absolute_deviation#Relation_to_standard_deviation
+
+def jitter(x, dist=None, amount=None):
+    x = np.array(x)
+    if len(x)==0:
+        return np.zeros_like(x)
+    if dist is None:
+        dist = median_abs_deviation(x)
+    if amount is None:
+        amount = dist
+    jtr = np.random.rand(len(x))-.5
+    dm = distance_matrix(x.reshape(-1,1),x.reshape(-1,1))
+    for j in range(len(x)):
+        jtr[j] *= max(0,(dm[j]<dist).sum()-2)
+    if jtr.max()>0:
+        jtr *= amount/jtr.max()
+    return jtr
 
 def hillCurve(x, h=2, xc=4):
     return (x/xc)**h/(1+(x/xc)**h)*.94+.03
