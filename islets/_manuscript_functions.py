@@ -14,6 +14,17 @@ from warnings import warn
 
 myGrey = (.2,)*3
 
+def cleanup_minor_ticks(ax, which):
+    ax.get_figure().canvas.draw()
+    for z in which:
+        minors = eval(f"plt.Axes.get_{z}ticks")(ax,minor=True)
+        majors = eval(f"plt.Axes.get_{z}ticks")(ax)
+        min_, max_ = eval(f"plt.Axes.get_{z}lim")(ax)
+        min_ = majors[np.searchsorted(majors, min_)]
+        max_ = majors[np.searchsorted(majors, max_-1)]
+        m = [v for v in minors if v>min_ and v<max_]
+        eval(f"plt.Axes.set_{z}ticks")(ax, m, minor=True)
+
 def gm_fit(x, ncs=None, crit="bic", debug=False, mindist = 0):
     if ncs is None:
         ncs = [1,2,3]
@@ -201,6 +212,7 @@ protocolColorScheme = {
     ("Ca", "0.4mM"): plt.cm.Oranges(.1),
     ("Ca", "0mM"): plt.cm.Oranges(.3),
     ("isradipine",  "5uM"): "lightblue",
+    ("isradipine",  "5µM"): "lightblue",
     ("diazoxide","100uM"): "xkcd:pale rose",
     ("ryanodine","100nM"): "#f6cefc",
     ("ryanodine","100uM"): "xkcd:light purple",
@@ -675,11 +687,11 @@ def emphasize_region(ax, x, y, extend=(0, 0), clip_on = False, **line_kwargs):
     ye = ye + dy
     yb = yb - dy
     if clip_on:
-        ax.plot(
+        ln = ax.plot(
             [xb, xe, xe, xb, xb],
             [yb, yb, ye, ye, yb],
             **line_kwargs
-        )
+        )[0]
     else:
         ln = Line2D(
             [xb, xe, xe, xb, xb],
@@ -688,7 +700,7 @@ def emphasize_region(ax, x, y, extend=(0, 0), clip_on = False, **line_kwargs):
         )
         ln.set_clip_on(False)
         ax.add_line(ln)
-
+    return ln
 
 def plot_events(Events,
                 regions,
@@ -700,6 +712,7 @@ def plot_events(Events,
                 axheight=2,
                 offset=2,
                 ySpineOffset=100,
+                default_color = myGrey,
                 **kwargs):
     if protocol is None:
         protocol = regions.protocol.copy()
