@@ -1167,13 +1167,13 @@ def paper_plot(Events, regions,
 
     for ax_, cax_, Events in zip(axhexes, caxhexes, eventsList):
         if events_plot == "scatter":
-            if "cmap" not in events_ax_data:
-                events_ax_data["cmap"] = "viridis_r"
+            defaults = dict(s = 10, linewidth = .3, edgecolor = 'k', vmax = 10, cmap = "magma_r")
+            defaults.update(events_ax_data)
             pth = ax_.scatter(
                 Events["peakpoint"],
                 Events["halfwidth"],
                 c = Events["z_max"],
-                **events_ax_data
+                **defaults
             )
             ax_.set_yscale("log")
             ax_.set_xlim(-10,regions.time[-1]+10)
