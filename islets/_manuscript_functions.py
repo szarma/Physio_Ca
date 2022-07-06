@@ -770,11 +770,15 @@ def plot_events(Events,
         if "markersize" not in kwargs and "ms" not in kwargs:
             kwargs.update({"markersize": 2})
         ax.set_yscale("log")
-        for leg, ev in list(Events.groupby("leg")) + [(None, Events[Events.leg.isna()])]:
+        if "leg" in Events.columns:
+            iterlist = list(Events.groupby("leg")) + [(None, Events[Events.leg.isna()])]
+        else:
+            iterlist = [(None, Events)]
+        for leg, ev in iterlist:
             x, y = ev["peakpoint"].values.copy(), ev["halfwidth"]
             if timeUnits == "min":
                 x = x / 60
-            ax.plot(x, y, ".", c = "lightgrey" if leg is None else legColorDict[leg], **kwargs)
+            ax.plot(x, y, ".", c = default_color if leg is None else legColorDict[leg], **kwargs)
     else:
         raise ValueError("plottype can only be 'scatter' or 'hexbin")
     ax.set_xlim(regions.time[0] - ySpineOffset, regions.time[-1])
