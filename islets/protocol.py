@@ -91,6 +91,10 @@ class Protocol(pd.DataFrame):
             for k in out:
                 if "glucose" not in out[k]:
                     out[k]["glucose"] = ("0","")
+        tranges = list(out.keys())
+        for tr0, tr1 in zip(tranges[:-1], tranges[1:]):
+            if tr0[1]<tr1[0]:
+                raise ValueError("Inconsistent times, there is at least one gap in the protocol times. Edit the file and try again.")
         return out
 
     def get_scheme(self, symbolDict):
