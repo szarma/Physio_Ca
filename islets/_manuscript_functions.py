@@ -1133,19 +1133,22 @@ def paper_plot(Events, regions,
         # ruler(fig_discard, margin = 1)
     axtrWidth = figwidth - 5-axroidim
 
+    if "discr_qty" in roi_ax_data and "threshold" in roi_ax_data:
+        validRois = regions.df.query(f"{roi_ax_data['discr_qty']}>={roi_ax_data['threshold']}").index
+        discard_Events = Events[~Events.roi.isin(validRois)].copy()
+        valid_Events = Events[Events.roi.isin(validRois)].copy()
+    else:
+        roi_ax_data = {"discr_qty": "activity", "threshold":0}
+        valid_Events = Events.copy()
+        discard_Events = Events[:0].copy()
+
     ## Rois plot
     axrois = fig.add_axes([(1.2)/figwidth, 1-(axroidim+1.2)/figheight, axroidim/figwidth, axroidim/figheight], facecolor="none", label="rois")
     axcolor = fig.add_axes([(1.2) / figwidth, 1-(axroidim*1.57+1.2)/figheight, axroidim / figwidth, axroidim * .4 / figheight], label="roi colors")
     axc1, h = plot_rois_colored_acc_quantity(regions, [axrois, axcolor], **roi_ax_data)
     axc1.set_label("roi colorbar")
 
-    if "discr_qty" in roi_ax_data and "threshold" in roi_ax_data:
-        validRois = regions.df.query(f"{roi_ax_data['discr_qty']}>={roi_ax_data['threshold']}").index
-        discard_Events = Events[~Events.roi.isin(validRois)].copy()
-        valid_Events = Events[Events.roi.isin(validRois)].copy()
-    else:
-        valid_Events = Events.copy()
-        discard_Events = Events[:0].copy()
+
 
     # Events plot
     axhex = fig.add_axes([(3+axroidim)/figwidth, 1-(axhexHeight+1.2)/figheight, axtrWidth/figwidth, axhexHeight/figheight], facecolor="none", label="events")
