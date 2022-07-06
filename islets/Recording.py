@@ -368,7 +368,7 @@ class Recording:
                     # self.tempdir = os.path.join(tempdir, f"{np.random.randint(int(1e10))}")
                     # os.makedirs(self.tempdir)
                 filename = os.path.join(self.tempdir,
-                                        f"{Series}_d1_{metadata1.SizeX}_d2_{metadata1.SizeY}_d3_{metadata1.SizeZ}_order_C_frames_{metadata1.SizeT}_.{mode}")
+                                        f"{Series.replace('/','_')}_d1_{metadata1.SizeX}_d2_{metadata1.SizeY}_d3_{metadata1.SizeZ}_order_C_frames_{metadata1.SizeT}_.{mode}")
                 if mode=="memmap":
                     data = np.memmap(
                         filename,

@@ -175,6 +175,7 @@ def main(args):
     ## import data
     movie, metadata = create_movie(args.recording, args.frequency, args.restrict, args.series, input_type, args.channel,
                                    verbose = args.verbose)
+    metadata["Name"] = metadata["Name"].replace("/"," ").replace(" ","_").replace("__","_")
     if movie[::len(movie)//10+1].std()/movie[::len(movie)//10+1].mean()<.1:
         raise NotImplementedError("Sorry, this movie seems to be just a still image.")
     ### prepare outputs
