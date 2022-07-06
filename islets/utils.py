@@ -117,6 +117,7 @@ def show_frame(file, frame=0, ax=None, show=True):
         .input(file)
         .filter('select', 'eq(n,{})'.format(frame))
         .output("pipe:", format="rawvideo", pix_fmt="rgb24")
+        .global_args('-loglevel', 'error')
     #     .output('pipe:', vframes=1, format='image2', vcodec='mjpeg')
         .run(capture_stdout=True)
     )
