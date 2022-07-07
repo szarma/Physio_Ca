@@ -178,6 +178,20 @@ def main(args):
     ## import data
     movie, metadata = create_movie(args.recording, args.frequency, args.restrict, args.series, input_type, args.channel,
                                    verbose = args.verbose)
+    if args.rebin>0:
+        # need/try to rebin
+        if args.rebin>1:
+            # need to rebin
+            nrebin = args.rebin
+        else: # args.rebin == 1
+            # try to rebin
+            nrebin = int(np.ceil(0.9/metadata['pxSize']))
+        if nrebin>1:
+            if args.verbose:
+                print ("Rebinning the movie by", nrebin)
+            movie = islets.cmovie( islets.numeric.rebin(movie,(nrebin,)*2, (1,2)), fr = movie.fr)
+            metadata['pxSize'] *= nrebin
+
     metadata["Name"] = metadata["Name"].replace("/"," ").replace(" ","_").replace("__","_")
     if movie[::len(movie)//10+1].std()/movie[::len(movie)//10+1].mean()<.1:
         raise NotImplementedError("Sorry, this movie seems to be just a still image.")
@@ -306,6 +320,9 @@ if __name__ == "__main__":
     parser.add_argument('--channel', default = 0, type = int,
                         help = 'specify a channel to be used for construction of rois (for multi-channel recording). '
                                'Default is 0')
+    parser.add_argument('--rebin', default = 1, type = int,
+                        help = 'specify by how much to rebin the video and reduce its size. To disable this, set rebin to 0. '
+                               'Default of 1 (rebin is determined automatically if the pixel size is small. )')
     parser.add_argument('--pixels-cutoff', default = 0.02, type = float,
                         help =
                      """specifies the cutoff value of what will be considered noise in the filtered image. The lower
