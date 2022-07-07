@@ -231,7 +231,7 @@ class PicklePicker:
                     return no_update
                 if path.endswith("pkl"):  ####### pickles ################
                     self.regions = load_regions(path)
-                    self.regions.get_activity(10)
+                    self.regions.get_activity(max(10, 1/self.regions.Freq*5))
                     feedback += [
                         "Regions imported successfully.",
                         "Original movie:",
