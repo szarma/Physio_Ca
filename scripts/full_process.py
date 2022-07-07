@@ -13,7 +13,10 @@ from slack_sdk.errors import SlackApiError
 
 import traceback
 def trcbk():
-    out = "".join(traceback.format_tb(sys.exc_info()[-1]))
+    excinfo = sys.exc_info()
+    out = "".join(traceback.format_tb(excinfo[-1]))
+    print(excinfo[0])
+    print(excinfo[1])
     print (out)
     return out
 # Token for the bot, which will be used to post in slack for notifications
