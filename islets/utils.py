@@ -1288,7 +1288,11 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
             rec.parse_metadata()
             rec.save_metadata()
         if recType == "Leica":
-            sers = parse_leica(rec)
+            try:
+                sers = parse_leica(rec)
+            except:
+                sers = list(rec.metadata['Name'])
+                
         else:
             sers = [rec.Experiment.split(".")[0]]
 
@@ -1325,7 +1329,7 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
                     rec.import_series(series, onlyMeta = True)
                 except:
                     continue
-                if series not in rec.Series:
+                if not hasattr(rec, "Series") or series not in rec.Series:
                     continue
                 md = pd.Series()
                 md["path to exp"] = pathToRecording
