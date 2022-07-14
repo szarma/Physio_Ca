@@ -1,18 +1,24 @@
+# pip
+# ipykernel
+# setuptools
+# python-javabridge
+python-bioformats
 jupyter-plotly-dash
 jupyterlab
+matplotlib
+opencv-python
 pandas~=1.3.5
 scikit-learn
 scikit-image
 tqdm
 bidict
-xlrd
+# xlrd
 scipy
-matplotlib
 statsmodels
-opencv-python
 numba
 ffmpeg-python
 nd2reader
 mgzip
 orjson
 slack_sdk
+openpyxl
