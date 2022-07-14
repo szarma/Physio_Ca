@@ -25,8 +25,8 @@ def jitter(x, dist=None, amount=None):
     dm = distance_matrix(x.reshape(-1,1),x.reshape(-1,1))
     for j in range(len(x)):
         jtr[j] *= max(0,(dm[j]<dist).sum()-2)
-    if jtr.max()>0:
-        jtr *= amount/jtr.max()
+    if np.abs(jtr).max()>0:
+        jtr *= amount/np.abs(jtr).max()
     return jtr
 
 def hillCurve(x, h=2, xc=4):
