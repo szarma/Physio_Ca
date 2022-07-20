@@ -40,7 +40,6 @@ import numpy as np
 
 from tqdm import tqdm
 from typing import Any, Dict, List, Tuple, Union
-import warnings
 # try:
 #     cv2.setNumThreads(0)
 # except:
@@ -350,7 +349,7 @@ class movie(np.ndarray):
             min_val = 0
 
         if type(self[0, 0, 0]) is not np.float32:
-            warnings.warn('Casting the array to float32')
+            logging.warning('Casting the array to float32')
             self = np.asanyarray(self, dtype=np.float32)
 
         _, h_i, w_i = self.shape
