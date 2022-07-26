@@ -58,6 +58,7 @@ def extract_frameshift_3d(
         # idx_max = cv2.minMaxLoc(res)[3]
     elif method == 'skimage':
         res = match_template(frame, template)
+        assert res.max()>0
         idx_max = np.unravel_index(np.argmax(res), res.shape)
         # idx_max = idx_max[::-1]
     else:
@@ -66,10 +67,12 @@ def extract_frameshift_3d(
 
     shifts = np.array([ np.clip(idx_max[j], 1, 2 * max_shifts[j] - 1) for j in range(3) ])
     shift_subpx = shifts.astype("float")
-    log_cor = np.log(1e-10 + res)
+    log_cor = np.log(1e-10 + np.maximum(res,0))
     # now we fit quadratic for the logged correlation coeficients to check for subpixel shifts
     # y = a*x^2 + bx + c in each of the dimensions
     for dim, sh in enumerate(shifts):
+        if max_shifts[dim]==0:
+            continue
         slice_ = list(shifts)
         # n = shifts[dim]
         slice_[dim] = slice(sh - 1, sh + 2)
@@ -78,8 +81,11 @@ def extract_frameshift_3d(
         b = (y[2] - y[0]) / 2 - 2 * a * shifts[dim]
         # position of the minimum in dimension dim is redefined,
         # but only if the new value is close to the original
-        if np.abs(-b / 2 / a - shifts[dim]) < 1:
-            shift_subpx[dim] = -b / 2 / a
+        if np.abs(a)<1e-10:
+            shift_subpx[dim] = 0
+        else:
+            if np.abs(-b / 2 / a - shifts[dim]) < 1:
+                shift_subpx[dim] = -b / 2 / a
     corr_est = res.max()
     for j in range(3):
         shift_subpx[j] = np.clip( - max_shifts[j] + shift_subpx[j], -max_shifts[j]-.5, max_shifts[j]+.5)
@@ -129,7 +135,7 @@ def extract_shifts_3d(
         #     print (f"step {i} of a consecutive mode")
         dshifts = np.array([[0] * 3] + list(multi_map(iterf_, zip(movie, movie[1:]), processes = n_processes)))
         shifts_ = np.cumsum(dshifts, axis = 0)
-        shifts_ = shifts_ - np.median(shifts, axis = 0)
+        shifts_ = shifts_ - np.median(shifts_, axis = 0)
         movie = apply_shifts_3d(movie, shifts_, )
         shifts += shifts_
         # c = plot([])[0].get_color()
@@ -138,7 +144,7 @@ def extract_shifts_3d(
         #     break
     else:
         movie = movie.copy()
-
+    corrs = None
 
     if "template" in mode:
         def iterf_(frame):
@@ -163,7 +169,7 @@ def extract_shifts_3d(
                 break
             else:
                 movie = apply_shifts_3d(movie, dshifts)
-    corrs = np.array([np.corrcoef(frame.flat,template.flat)[0,1] for frame in movie])
+        corrs = np.array([np.corrcoef(frame.flat,template.flat)[0,1] for frame in movie])
 
     return (shifts, corrs)
 
