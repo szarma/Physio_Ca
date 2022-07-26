@@ -1,11 +1,10 @@
+import logging
 import os
-from _warnings import warn
 from collections import OrderedDict
 import tifffile
 import matplotlib
 import networkx as nx
 import numpy as np
-import warnings
 import ffmpeg
 import pandas as pd
 from tqdm import tqdm
@@ -27,7 +26,7 @@ def load_tif(file_name, subindices = None):
     with tifffile.TiffFile(file_name) as tffl:
         multi_page = True if tffl.series[0].shape[0] > 1 else False
         if len(tffl.pages) == 1:
-            warnings.warn('Your tif file is saved a single page' +
+            logging.warning('Your tif file is saved a single page' +
                             'file. Performance will be affected')
             multi_page = False
         if subindices is not None:
@@ -145,8 +144,6 @@ def renderLatex(formula, fontsize=12, dpi=200, format='png', file=None):
             )
 
     output = BytesIO() if file is None else file
-#     with warnings.catch_warnings():
-#         warnings.filterwarnings('ignore', category=MathTextWarning)
     fig.savefig(output, dpi=dpi, transparent=True, format=format,
                 bbox_inches='tight', pad_inches=0.05, frameon=False)
 
@@ -910,7 +907,7 @@ def saveRois(regions,outDir,filename="",movie=None,col=["trace"],formats=["vienn
                 feedback += [f"ROI info saved in {roifile}."]
 
             elif format=="maribor":
-                warnings.warn(f"you requested to save multiple traces, but maribor format supports only one, so only first ({col[0]}) will be used.")
+                logging.warning(f"you requested to save multiple traces, but maribor format supports only one, so only first ({col[0]}) will be used.")
                 col = col[0]
                 traces = pd.DataFrame(np.vstack(regions.df[col]).T)
                 try:
@@ -1081,7 +1078,7 @@ def getPeak2BoundaryDF(C, verbose=0, distTh=None):
         # dists = OrderedDict()
         for j in C.loc[i,"neighbors"]:
             if j not in C.index:
-                warnings.warn(f"{j} is listed as a neighbor of {i}, but it does not exist")
+                logging.warning(f"{j} is listed as a neighbor of {i}, but it does not exist")
                 continue
             bd = C.loc[j,"boundary"]
             x = np.linalg.norm(np.array(bd)-np.repeat([pk],len(bd),axis=0), axis=1)
@@ -1281,7 +1278,7 @@ def import_data(mainFolder, constrain="", forceMetadataParse=False, verbose=0):
         try:
             rec = Recording(pathToRecording)
         except:
-            warn("Could not import %s" % pathToRecording)
+            logging.warning("Could not import %s" % pathToRecording)
             continue
         recType = "Leica" if pathToRecording.endswith(".lif") else "nonLeica"
         if forceMetadataParse:
