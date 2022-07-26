@@ -185,7 +185,10 @@ def main(args):
             nrebin = args.rebin
         else: # args.rebin == 1
             # try to rebin
-            nrebin = int(np.ceil(0.9/metadata['pxSize']))
+            if "pxSize" in metadata:
+                nrebin = int(np.ceil(0.9/metadata['pxSize']))
+            else:
+                nrebin = 0
         if nrebin>1:
             if args.verbose:
                 print ("Rebinning the movie by", nrebin)
@@ -322,7 +325,9 @@ if __name__ == "__main__":
                                'Default is 0')
     parser.add_argument('--rebin', default = 1, type = int,
                         help = 'specify by how much to rebin the video and reduce its size. To disable this, set rebin to 0. '
-                               'Default of 1 (rebin is determined automatically if the pixel size is small. )')
+                               'Default value is 1 if pxSize can be read (rebin is determined automatically if the pixel size is small. )'
+                               'Otherwise, rebin is not attempted (e.g. for raw tiffs).'
+                        )
     parser.add_argument('--pixels-cutoff', default = 0.02, type = float,
                         help =
                      """specifies the cutoff value of what will be considered noise in the filtered image. The lower
