@@ -349,7 +349,15 @@ def show_movie(m_show,
     from matplotlib import animation
     if tmax is not None:
         pass
-    m_show = m_show.copy()
+    if m_show.ndim==4:
+        logging.warning("Assuming this a 3D recording.")
+        t,z,h,w = m_show.shape
+        m_show = np.concatenate(np.transpose(m_show, (1, 0, 2, 3)), axis = -1, )
+        for i in range(2):
+            m_show = np.insert(m_show, i + np.arange(w, m_show.shape[-1], w + i),
+                          np.ones((h, 1)) * m_show.max() / 2, axis = 2)
+    else:
+        m_show = m_show.copy()
     if NTimeFrames is not None:
         n_rebin = len(m_show)//NTimeFrames
         if n_rebin>1:
