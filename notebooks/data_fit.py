@@ -179,5 +179,6 @@ class Fit():
             ax.set_ylim(0,ylim)
         axs[1].set_xlim(x_conc[1], x_conc[-1]*.95)
         xt = axs[1].get_xticks()
+        axs[1].set_xticks(xt)
         axs[1].set_xticklabels(["%g"%t for t in xt])
         return fig, axs
