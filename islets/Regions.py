@@ -92,10 +92,11 @@ class Regions:
                 if verbose:
                     print ("Initiating from an image, with a mode", mode)
                 self.statImages = {mode:movie_}
-            if len(movie_.shape)==3:
+            if movie_.ndim>=3:
                 if verbose:
                     print ("Initiating from a movie.")
                 self.movie = movie_
+                self.is_3D = movie_.ndim>3
                 time = np.arange(len(movie_))/movie_.fr
                 if FrameRange is None:
                     FrameRange = [0, len(movie_)]
@@ -429,10 +430,11 @@ class Regions:
 
     def update(self, movie_=None):
         self.df["size"] = self.df["pixels"].apply(len)
-        self.calcEdges()
-        self.df["boundary"] = [edges2nodes(self.df["edges"][j]) for j in self.df.index]
-        self.calcNNmap()
-        self.df["interest"] = [np.sum([self.image[px[0],px[1]] for px in pxs]) for pxs in self.df["pixels"]]
+        if not self.is_3D:
+            self.calcEdges()
+            self.df["boundary"] = [edges2nodes(self.df["edges"][j]) for j in self.df.index]
+            self.calcNNmap()
+        # self.df["interest"] = [np.sum([self.image[px[0],px[1]] for px in pxs]) for pxs in self.df["pixels"]]
         if movie_ is not None:
             self.calcTraces(movie_)
             self.movie = movie_
