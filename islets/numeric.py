@@ -686,47 +686,52 @@ def crawlDict(image, crawl_th=0, diag=False, processes=10, excludePixels=None, v
     return B_
 
 
-def crawl_dict_via_graph(image, validPixelsImage, diag=False, offset=(0,0) ):
+def crawl_dict_via_graph(image, validPixelsImage, diag=False, offset=None ):
     gph = nx.DiGraph()
+    if offset is None:
+        offset = np.zeros(image.ndim, dtype=int)
     for start in zip(*np.where(validPixelsImage)):
         end = climb(start, image, Niter=1, diag=diag)
         gph.add_edge(start, end)
     c = dict()
     for attrs, nodes in zip(nx.algorithms.attracting_components(gph), nx.connected_components(gph.to_undirected())):
-        assert len(attrs)==1
+        assert len(attrs)==1 # why would it be different? For cyclic graphs perhaps.
         peak = attrs.pop()
-        peak = (peak[0]+offset[0], peak[1]+offset[1])
-        c[peak] = [(x+offset[0], y+offset[1]) for x,y in nodes]
+        peak = tuple(peak[j]+offset[j] for j in range(image.ndim))
+        c[peak] = [ tuple(coords+offset) for coords in nodes]
     return c
 
 
-def climb(x,blurredWeights,
+def climb(x, blurredWeights,
           diag=True,
           excludePixels=None,
-          Niter=1000
+          Niter=1
          ):
     if excludePixels is None:
         excludePixels = []
-    dims = blurredWeights.shape
-    # x = (60,60)
-    x = x+(blurredWeights[x[0],x[1]],)
-    xs = [x]
-    for i in range(Niter):
+    dims = np.array(blurredWeights.shape)
+    x = tuple(x)
+    # x = x+(blurredWeights[tuple(x)],)
+    ndim = len(dims)
+    v = blurredWeights[x]
+    for k in range(Niter):
         vs = []
-        for di,dj in product([-1,0,1],[-1,0,1]):
+        xs = []
+        for dcoords in product(*([[-1,0,1]]*ndim)):
             if not diag:
-                if di*dj!=0: continue
-            i,j = x[0]+di,x[1]+dj
-            if i<0 or i>=dims[0] or j<0 or j>=dims[1]:
+                if np.prod(dcoords)!=0: continue
+            coords = x + np.asanyarray(dcoords)
+            if any(coords<0):
                 continue
-            if (i,j) in excludePixels:
+            if any(coords>=dims):
                 continue
-            vs += [(i,j,blurredWeights[i,j])]
-        x1 = vs[np.argmax(vs,axis=0)[-1]]
-        dx = x1[-1]-x[-1]
-        if dx<=0:
-            break
+            if tuple(coords) in excludePixels:
+                continue
+            vs += [blurredWeights[tuple(coords)]]
+            xs += [coords]
+        v1 = max(vs)
+        if v1>v:
+            x = tuple(xs[np.argmax(vs)])
         else:
-            x = x1
-            xs += [x]
-    return x[:2]
+            break
+    return x
