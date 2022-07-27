@@ -58,14 +58,16 @@ def extract_frameshift_3d(
         # idx_max = cv2.minMaxLoc(res)[3]
     elif method == 'skimage':
         res = match_template(frame, template)
-        assert res.max()>0
+        if res.max()<=0:
+            logging.warning("No reasonable shift found. Defaulting to 0.")
+            return np.ones(3, dtype="float"), 1
         idx_max = np.unravel_index(np.argmax(res), res.shape)
         # idx_max = idx_max[::-1]
     else:
         raise Exception('Unknown motion correction method!')
 
 
-    shifts = np.array([ np.clip(idx_max[j], 1, 2 * max_shifts[j] - 1) for j in range(3) ])
+    shifts = np.array([ np.clip(idx_max[j], 1, 2 * max_shifts[j] - 1) if max_shifts[j]>0 else 0 for j in range(3) ])
     shift_subpx = shifts.astype("float")
     log_cor = np.log(1e-10 + np.maximum(res,0))
     # now we fit quadratic for the logged correlation coeficients to check for subpixel shifts
