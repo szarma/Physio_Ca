@@ -38,6 +38,8 @@ def load_regions(path,
                 ):
     with open(path,"rb") as f:
         regions = pickle.load(f)
+    if not hasattr(regions, "is_3D"):
+        regions.is_3D = False
     try:
         regions.update()
         regions.pathToRois = path
