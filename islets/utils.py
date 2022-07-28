@@ -911,7 +911,10 @@ def saveRois(regions,outDir,filename="",movie=None,col=["trace"],formats=["vienn
                 with open(roifile,"wb") as f:
                     pickle.dump(subRegions,f)
                 regions.pathToPickle = roifile
-                create_preview_image(regions)
+                if regions.is_3D:
+                    feedback += ["Could not create a preview image for 3D regions. Not implemented yet."]
+                else:
+                    create_preview_image(regions)
                 feedback += [f"ROI info saved in {roifile}."]
 
             elif format=="maribor":

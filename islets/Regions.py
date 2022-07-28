@@ -283,7 +283,7 @@ class Regions:
         ]))
         self.df["peakValue"] = [image[p] for p in B_]
         self.update()
-        if merge:
+        if merge and not self.is_3D:
             self.merge_closest(mergeDist=.71, mergeSizeTh=100, verbose=verbose, )
 
     def mergeBasedOnGraph(self, Gph, verbose=0):
@@ -845,8 +845,8 @@ class Regions:
         traces = np.ones((len(self.df),(ie-i0)))*np.nan
         for i,ix in enumerate(self.df.index):
             x = self.df.loc[ix,"pixels"]
-            x = [ el[0] for el in x ] , [ el[1] for el in x ]
-            traces[i] = movie_[i0:ie, x[0], x[1] ].mean(axis=1)
+            sl = (slice(i0,ie), ) + tuple([ el[j] for el in x ] for j in range(len(x[0])))
+            traces[i] = movie_[sl].mean(axis=1)
         self.df["trace"] = list(traces)
         time = np.arange(len(movie_))/movie_.fr
         self.time = time[i0:ie]
