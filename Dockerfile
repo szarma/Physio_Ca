@@ -21,6 +21,7 @@ COPY scripts /opt/islets/Physio_Ca_framework/scripts
 
 WORKDIR /opt/islets/Physio_Ca_framework/
 ENV PATH="${HOME}/.local/bin:${PATH}"
-# RUN poetry config virtualenvs.create false
-RUN poetry build --format wheel
-RUN pip install --no-cache dist/*.whl
+RUN poetry config virtualenvs.create false
+RUN poetry install
+
+WORKDIR ${HOME}
