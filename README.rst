@@ -2,7 +2,7 @@
 Physio_Ca
 =========
 
-A toolbox to analyze and interact with Ca imaging data, developed within the Cell and Tissue Networks research group led by `prof. Marjan Slak-Rupnik <https://www.meduniwien.ac.at/web/index.php?id=688&res_id=37&name=Marjan_Slak%20Rupnik>` at the Medical University of Vienna. 
+A toolbox to analyze and interact with Ca imaging data, developed within the Cell and Tissue Networks research group led by `prof. Marjan Slak-Rupnik <https://www.meduniwien.ac.at/web/index.php?id=688&res_id=37&name=Marjan_Slak%20Rupnik>`_ at the Medical University of Vienna. 
 
 https://user-images.githubusercontent.com/2512087/162633046-b26d7c49-3501-4e78-9a33-433119157537.mp4
 
