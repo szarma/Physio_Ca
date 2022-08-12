@@ -89,12 +89,10 @@ class HBclass:
         plt.switch_backend('Agg')
         fig = plt.figure(figsize=(0.1,0.1))
         HB = plt.hexbin(self.df[xshow], self.df[yshow], **hexbin_kwargs)
-        #plt.savefig("/tmp/tmp.png")
         plt.show()
         plt.switch_backend(currentBackend)
 
         hexagon_vertices, offsets, mpl_facecolors, counts = get_hexbin_attributes(HB)
-        # cell_color = pl_cell_color(mpl_facecolors)
         shapes = []
         centers = []
         for k in range(len(offsets)):
@@ -138,21 +136,13 @@ class HBclass:
                                 ),
                    text=text, 
                    hoverinfo='text'
-                  )             
-
-    #     axis = dict(showgrid=False,
-    #                showline=False,
-    #                zeroline=False,
-    #                ticklen=4 
-    #                )
+                  )
 
         layout = go.Layout(
                            width=550, height=500,
                            xaxis=dict(title=self.df.columns[0],showgrid=True),
                            yaxis=dict(title=self.df.columns[1]),
                            hovermode='closest',
-                           # shapes=shapes,
-#                            plot_bgcolor='white',
                            dragmode='lasso',
                           )
         fig = go.Figure(data=[trace], layout=layout)
@@ -197,20 +187,7 @@ class HBclass:
                              "display":"inline-block"
                                }
                        )]
-#                 out += [html.Pre(
-#                         json.dumps(list(self.df.columns), indent=4),
-#                          style={
-#                              "overflowX":"scroll",
-#                              "overflowY":"scroll",
-#                              "border": "thin red solid",
-#                              "width":"30%",
-#                              "height":"200px",
-#                              "display":"inline-block"
-#                                }
-#                        )]
                 subdf = self.df[self.df.bin_id.isin([pt["pointIndex"] for pt in selData["points"]])]
-#                 subdf = subdf.to_dict("records")
-#                 subdf = {col:list(subdf[col].values) for col in subdf.columns[:2]}
                 subdf = list(subdf.index)
                 out += [html.Pre(
                         json.dumps(subdf, indent=4),
@@ -225,10 +202,6 @@ class HBclass:
                                }
                        )]
                 return out
-    #             if selData is not None:
-    #                 return json.dumps(selData)
-    #             else:
-    #                 return "".join(np.random.choice("abc ",10000))
             except:
                 out +=["Oops"]
             return out
@@ -243,10 +216,9 @@ def hexbin(df=None, x=None, y=None,
     ):
     hb_ = HBclass(df,x,y,)
     return hb_._hexbin(
-           debug=debug,
-           log_x=log_x,
-           log_y=log_y,
-           sizeScaling=sizeScaling,
-           **hexbin_kwargs)
-
-
+               debug=debug,
+               log_x=log_x,
+               log_y=log_y,
+               sizeScaling=sizeScaling,
+               **hexbin_kwargs,
+    )
