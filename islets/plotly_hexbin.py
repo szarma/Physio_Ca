@@ -52,7 +52,7 @@ def get_hexbin_attributes(hb):
 
 class HBclass:
     def __init__(self, df, x, y):
-        self.df = df[[x,y]].copy()
+        self.df = df#[[x,y]].copy()
     
 #     @classmethod
     def _hexbin(self, df=None, x=None, y=None,
@@ -70,7 +70,7 @@ class HBclass:
         if y is None:
             y = self.df.columns[1]
         hexbin_kwargs.update(mincnt=1)
-        hexbin_kwargs["gridsize"] = hexbin_kwargs.get("gridsize",(30,20))
+        hexbin_kwargs["gridsize"] = hexbin_kwargs.get("gridsize",(50,50))
         hexbin_kwargs["bins"] = hexbin_kwargs.get("bins","log")
 
         if log_x or log_y: raise NotImplementedError()
@@ -153,7 +153,7 @@ class HBclass:
                            hovermode='closest',
                            # shapes=shapes,
 #                            plot_bgcolor='white',
-                           dragmode='select',
+                           dragmode='lasso',
                           )
         fig = go.Figure(data=[trace], layout=layout)
         fig.update_layout({"margin":dict(l=10, r=10, t=20, b=40)})
