@@ -127,6 +127,8 @@ def extract_shifts_3d(
         raise ValueError(f"Mode can only assume one of the following values: {valid_modes}")
     if max_shifts is None:
         max_shifts = np.array([2,5,5])
+    else:
+        max_shifts = np.asanyarray(max_shifts)
     infer_template = template is None
     # _, z_i, h_i, w_i = movie.shape
     shifts = np.zeros(shape = (len(movie),3), dtype = float)
@@ -167,7 +169,9 @@ def extract_shifts_3d(
             shifts += dshifts
             # c = plot([])[0].get_color()
             # plot(shifts,c=c)
-            if all(np.abs(dshifts).max(0)<max_shifts):
+            maxDshifts = np.abs(dshifts).max(0)
+            maxDshifts = maxDshifts[max_shifts>0]
+            if all(maxDshifts<max_shifts[max_shifts>0]):
                 break
             else:
                 movie = apply_shifts_3d(movie, dshifts)

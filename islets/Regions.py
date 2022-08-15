@@ -1,3 +1,4 @@
+import logging
 import warnings
 import os
 import pickle
@@ -40,16 +41,16 @@ def load_regions(path,
         regions = pickle.load(f)
     if not hasattr(regions, "is_3D"):
         regions.is_3D = False
+    regions.pathToRois = path
+    pickleDir = os.path.split(path)[0]
+    # regions = Regions(regions)
+    try:
+        protocolFile = os.path.join(pickleDir, [f for f in os.listdir(pickleDir) if "protocol" in f][0])
+        regions.import_protocol(protocolFile)
+    except:
+        logging.warning(f"Could not read the protocol file from {pickleDir}")
     try:
         regions.update()
-        regions.pathToRois = path
-        pickleDir = os.path.split(path)[0]
-        #regions = Regions(regions)
-        try:
-            protocolFile = os.path.join(pickleDir, [f for f in os.listdir(pickleDir) if "protocol" in f][0])
-            regions.import_protocol(protocolFile)
-        except:
-            pass
         if not baremin:
             regions.detrend_traces()
             regions.infer_TwoParFit(plot=plot)
