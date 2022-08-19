@@ -843,7 +843,7 @@ class Regions:
         else:
             self.FrameRange = FrameRange
         i0,ie = FrameRange
-        traces = np.ones((len(self.df),(ie-i0)))*np.nan
+        traces = np.ones((len(self.df),(ie-i0)), dtype=np.float16)*np.nan
         for i,ix in enumerate(self.df.index):
             x = self.df.loc[ix,"pixels"]
             sl = (slice(i0,ie), ) + tuple([ el[j] for el in x ] for j in range(len(x[0])))
