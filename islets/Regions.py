@@ -9,10 +9,12 @@ from itertools import product
 from pathlib import Path
 from sys import exc_info
 from typing import Union
+
+import h5py._hl.group
 import matplotlib.pyplot as plt
 import networkx as nx
-import numpy as np
 import pandas as pd
+import numpy as np
 from scipy.stats import median_abs_deviation
 import plotly.graph_objects as go
 from matplotlib.colors import LogNorm
@@ -142,6 +144,62 @@ class Regions:
                                #use_restricted=use_restricted
                               )
 
+    def to_hdf(self,
+               buffer: h5py._hl.group.Group,
+               save_cols=None,
+               verbose: bool = False,
+               overwrite: bool = False,
+               ):
+        assert hasattr(buffer,'create_group')
+        if save_cols is None:
+            save_cols = ["trace"]
+
+        from islets.serialization.simple import df2hdf, write_to_hdf, dict2hdf, fig2hdf
+        ######### simple attributes
+        simples = {k: getattr(self, k) for k in
+                   ['mode', "filterSize", "trange", "FrameRange", "is_3D", "Freq", "TwoParFit", ] if
+                   hasattr(self, k)}
+        dict2hdf(simples, buffer, 'attributes', overwrite = overwrite, verbose = verbose)
+        ### dataframe
+        columnsToSave = ["peak", "pixels", "peakValue", "tag"] + save_cols
+        df_to_save = self.df[[col for col in self.df.columns if col in columnsToSave]]
+        df2hdf(df_to_save, buffer, verbose=verbose, overwrite = overwrite)
+        ### filtered image
+        write_to_hdf(self.image, buffer, "image", overwrite=overwrite, verbose=verbose)
+        ### statImages
+        if hasattr(self, "statImages"):
+            dict2hdf(self.statImages, buffer, "statImages", in_attrs = False, overwrite = overwrite, verbose = verbose)
+            for k in self.statImages:
+                buffer['statImages'][k].attrs['CLASS'] = "IMAGE"
+                buffer['statImages'][k].attrs['IMAGE_SUBCLASS'] = "IMAGE_GRAYSCALE"
+                buffer['statImages'][k].attrs['IMAGE_MINMAXRANGE'] = [0, self.statImages[k].max()]
+        ### metadata
+        if hasattr(self, 'metadata'):
+            skip = ["individual Series"]
+            md_simples = { ix: self.metadata[ix] for ix in self.metadata.index if ix not in skip}
+            for ix in ["Start time", "End time"]:# "Duration"]:
+                md_simples[ix]  = md_simples[ix].strftime('%Y-%m-%d %H:%M:%S')
+            md_simples["Duration"] = md_simples["Duration"].total_seconds()
+
+            print (md_simples)
+            dict2hdf(md_simples, buffer, "metadata", in_attrs = True, overwrite = overwrite, verbose = verbose)
+            # if verbose:
+            #     print(f"metadata ({list(md_simples.keys())}) saved in 'metadata.")
+            for ix in self.metadata.index:
+                if ix in md_simples: continue
+                if isinstance(self.metadata[ix], pd.DataFrame):
+                    df2hdf(self.metadata[ix], buffer['metadata'], ix, verbose = verbose, overwrite = overwrite)
+        ### protocol
+        if hasattr(self,'protocol'):
+            df2hdf(self.protocol, buffer, 'protocol', verbose = verbose, overwrite = overwrite)
+        ### preview image
+        fig = plt.figure(figsize=(4,4))
+        ax = fig.add_axes([0,0,1,1])
+        self.plotEdges(ax=ax)
+        fig2hdf(fig, buffer, "preview", overwrite = overwrite)
+        if verbose:
+            print(f"Preview image saved in '{buffer.name}/preview'")
+
     @staticmethod
     def load(file_path: Union[str, Path],
              file_format: str = 'infer') -> object:
@@ -171,52 +229,52 @@ class Regions:
         serializer = get_serializer(file_path=file_path, file_format=file_format)
         return serializer.load()
 
-    def save(self,
-             file_path: Union[str, Path],
-             file_format: str = 'infer',
-             movie: np.ndarray = None,
-             columns: Optional[List[str]] = None,
-             add_date: bool = True,
-             **kwargs) -> None:
-        """Stores a regions object into a supported file format.
+#     def save(self,
+#              file_path: Union[str, Path],
+#              file_format: str = 'infer',
+#              movie: np.ndarray = None,
+#              columns: Optional[List[str]] = None,
+#              add_date: bool = True,
+#              **kwargs) -> None:
+#         """Stores a regions object into a supported file format.
 
-        This function is intended to store data into a supported file type into a ready-to-use regions object.
-        Supported file types are:
-          - HDF5-files
-            - HDF5-files will have two collections. One collection contains the dataframe at "/df". The other
-              collection contains the class dictionary at "/__dict__".
-          - JSON-files
-            - JSON-files will be encoded in UTF-8.
-            - compressed JSON-files are supported to save disk space.
+#         This function is intended to store data into a supported file type into a ready-to-use regions object.
+#         Supported file types are:
+#           - HDF5-files
+#             - HDF5-files will have two collections. One collection contains the dataframe at "/df". The other
+#               collection contains the class dictionary at "/__dict__".
+#           - JSON-files
+#             - JSON-files will be encoded in UTF-8.
+#             - compressed JSON-files are supported to save disk space.
 
-        Parameters
-        ----------
-        file_path : Union[str, Path]
-            Path of the file, which shall be deserialized.
-        file_format : {'hdf5', 'json', 'infer'}, default: 'infer'
-            Format, which shall be used to load the file. If 'infer' is passed, the function will automatically try to
-            use the right format by guessing based on the file suffix.
-        movie : numpy.ndarray
-            Movie, which shall be applied as an update before saving regions.
-        columns : List[str], optional
-            Columns of the dataframe to save except the necessary ones.
-        add_date : bool
-            Determines whether the current date should get added to the name of the saved file.
-        kwargs
-            Arguments to pass, which are special to the serializers. Please consult the save functions of the to check
-            which parameters are supported.
+#         Parameters
+#         ----------
+#         file_path : Union[str, Path]
+#             Path of the file, which shall be deserialized.
+#         file_format : {'hdf5', 'json', 'infer'}, default: 'infer'
+#             Format, which shall be used to load the file. If 'infer' is passed, the function will automatically try to
+#             use the right format by guessing based on the file suffix.
+#         movie : numpy.ndarray
+#             Movie, which shall be applied as an update before saving regions.
+#         columns : List[str], optional
+#             Columns of the dataframe to save except the necessary ones.
+#         add_date : bool
+#             Determines whether the current date should get added to the name of the saved file.
+#         kwargs
+#             Arguments to pass, which are special to the serializers. Please consult the save functions of the to check
+#             which parameters are supported.
 
-        Returns
-        -------
-        None
-        """
+#         Returns
+#         -------
+#         None
+#         """
 
-        serializer = get_serializer(file_path=file_path, file_format=file_format)
-        serializer.save(self,
-                        movie=movie,
-                        columns_to_save=columns,
-                        add_date=add_date,
-                        **kwargs)
+#         serializer = get_serializer(file_path=file_path, file_format=file_format)
+#         serializer.save(self,
+#                         movie=movie,
+#                         columns_to_save=columns,
+#                         add_date=add_date,
+#                         **kwargs)
 
     def defineImage(self, mode, gSig_filt=None, ):
         from .numeric import robust_max
@@ -843,7 +901,7 @@ class Regions:
         else:
             self.FrameRange = FrameRange
         i0,ie = FrameRange
-        traces = np.ones((len(self.df),(ie-i0)))*np.nan
+        traces = np.ones((len(self.df),(ie-i0)), dtype=np.float16)*np.nan
         for i,ix in enumerate(self.df.index):
             x = self.df.loc[ix,"pixels"]
             sl = (slice(i0,ie), ) + tuple([ el[j] for el in x ] for j in range(len(x[0])))
