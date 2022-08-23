@@ -228,7 +228,7 @@ def beautify_protocol(protocol):
     protocol = protocol.copy()
     colors = []
     for i in protocol.index:
-        colors += [protocolColorScheme[(protocol.loc[i, "compound"], protocol.loc[i, "concentration"])]]
+        colors += [protocolColorScheme.get((protocol.loc[i, "compound"], protocol.loc[i, "concentration"]), "white")]
     protocol["color"] = colors
     for comp, df in protocol.groupby("compound"):
         units = df["unit"].unique()
@@ -238,7 +238,7 @@ def beautify_protocol(protocol):
             protocol.loc[df.index, "concentration"] = [df["concentration"].iloc[0]] + [f"{c}" for c in df["conc"][1:]]
     # protocol = protocol.replace("Ca [mM]", r"Ca${}^{2\!+}$[mM] ")
     protocol = protocol.replace("Ca", r"Ca${}^{2\!+}$ ")
-    protocol = Protocol(protocol)
+    # protocol = Protocol(protocol)
     return protocol
 
 

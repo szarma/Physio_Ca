@@ -97,6 +97,9 @@ class Protocol(pd.DataFrame):
                 raise ValueError("Inconsistent times, there is at least one gap in the protocol times. Edit the file and try again.")
         return out
 
+    def replace(self,*args):
+        return Protocol(pd.DataFrame.replace(self,*args))
+
     def get_scheme(self, symbolDict):
         prtl = []
         legs = self.get_legs(parse_output = True)
