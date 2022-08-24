@@ -20,25 +20,37 @@ The main elements of our pipeline are the following:
 
 .. image:: https://user-images.githubusercontent.com/2512087/162617713-efd571a5-784e-4b2c-99ee-663f25457527.png
 
+
 Documentation
 =============
+
 The usage of the framework in practical terms is documented in the original repository at `https://github.com/szarma/Physio_Ca/<https://github.com/szarma/Physio_Ca/>`_
+
 
 Features
 --------
 
 One of our most used tools is the _''roi examiner''_ for live interaction with the ROIs and their traces within a jupyter notebook.
-![examiner_demo](https://user-images.githubusercontent.com/2512087/162623035-c054b171-c222-47b0-905e-6f91fcb0caab.gif)
+.. image:: https://user-images.githubusercontent.com/2512087/162623035-c054b171-c222-47b0-905e-6f91fcb0caab.gif
 
 We have a similar app to examine line scans.
-![linescanner_demo](https://user-images.githubusercontent.com/2512087/162633612-ad71e643-14bb-4e62-b0f0-21188ec4c10c.gif)
+.. image:: https://user-images.githubusercontent.com/2512087/162633612-ad71e643-14bb-4e62-b0f0-21188ec4c10c.gif
 
 For examine detected events, one at a time, we also have a app.
-![events_examiner_demo](https://user-images.githubusercontent.com/2512087/162635307-6dea02ec-c56f-41ed-a275-efee595c1b9a.gif)
+.. image:: https://user-images.githubusercontent.com/2512087/162635307-6dea02ec-c56f-41ed-a275-efee595c1b9a.gif
 
 We have also built a dashboard for fast intreaction with our storage filesystem. Given a folder, it finds all processed recordings in it and its subfolders, collects metadata and presents it in a table form. It further enables entering of the experimental protocol, and additional data, which are then also searchable. It also provides a link to an automaticaly generated notebook for a brief glimpse into actual results of an experiment. See demo on youtube (https://youtu.be/tj4TjL_PJ1Q).
+
+Installation
+------------
+
+We are working on an easy way of installation. For this purpose we use poetry as install tool.
+However, there will be ready-to-go packages available on PyPI via pip.
+For easy deployment, there will be a docker image as well.
+Documentation will be updated as soon as it is ready.
 
 
 Docker
 ------
-We are working on a docker container with all important bits of our toolbox installed. Check the [docker directory](docker/) for more details.
+
+We are working on a docker container with all important bits of our toolbox installed.
