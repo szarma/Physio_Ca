@@ -7,8 +7,11 @@ RUN apt-get update --yes && \
     git \
     default-jdk
 RUN mkdir -p /opt/islets/Physio_Ca_framework
+RUN mkdir /data
 RUN /usr/local/bin/fix-permissions /opt/islets/
+RUN /usr/local/bin/fix-permissions /data
 RUN chown -R ${NB_UID}:users ${HOME}
+RUN chown -R ${NB_UID}:users /data
 
 USER ${NB_UID}
 RUN curl -sSL https://install.python-poetry.org | python3 -
