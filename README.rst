@@ -61,6 +61,6 @@ We are working on a docker container with all important bits of our toolbox inst
 A dockerfile is included in the root of the framework. It contains everything to run python code in the base environment. It can be built with the following command:
 
 .. code-block:: sh
-   :caption: Code to build the image
-   
+
    docker build -t ctn_server .
+
