@@ -56,11 +56,22 @@ Documentation will be updated as soon as it is ready.
 Docker
 ------
 
-We are working on a docker container with all important bits of our toolbox installed.
-
 A dockerfile is included in the root of the framework. It contains everything to run python code in the base environment. It can be built with the following command:
 
 .. code-block:: sh
 
    docker build -t ctn_server .
+
+If you do not want to build it yourself there is a prebuilt version on docker-hub. It can be pulled simly by:
+
+.. code-block:: sh
+
+   docker pull hannsen/cell-tissue-networks_server:latest
+
+As an example, to run the server with custom data and access it in a shell you can use it like this:
+
+.. code-block:: sh
+   
+   docker run -it -v /path/to/real/data:/data:rw hannsen/cell-tissue-networks_server:latest /bin/bash
+
 
