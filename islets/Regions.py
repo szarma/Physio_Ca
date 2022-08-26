@@ -1842,11 +1842,10 @@ class Regions:
             axs[0].set_yticks([])
             axs[0].set_xticks([])
             for sp in ["left","right","top"]: axs[1].spines[sp].set_visible(False)
-        if not protocol or not hasattr(self, "protocol"):
-            return None
-        else:
-            from .utils import add_protocol
-            add_protocol(traceAxes, self.protocol)
+        if protocol and  hasattr(self, "protocol"):
+            self.protocol.plot_protocol(traceAxes)
+        if createAxes:
+            return fig, axs
 
 
     def plot_trace(regions, indices, axratios = [1,2.5], figsize=5, freqShow=2, cols=["trace"], Offset=10, separate=False,showProtocol=True, spacing=.1):
