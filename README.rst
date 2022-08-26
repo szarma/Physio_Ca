@@ -53,7 +53,7 @@ Requirements
 ------------
 The module is intended to be used within a JupyterHub environment.
 It is possible to run in python without a jupyter instance, but features like our apps may not be working in this case.
-If you do not want to stress about installing a jupyter environment around it, just use our docker image or use it `bundled in JupyterHub <https://guthub.com/Hannnsen/Physio_Ca_JupyterHub/>`_.
+If you do not want to stress about installing a jupyter environment around it, just use our docker image or use it `bundled in JupyterHub <https://github.com/Hannnsen/Physio_Ca_JupyterHub/>`_.
 A java environment is mandatory due to usage of bioformats to convert image data.
 
 - JVM
