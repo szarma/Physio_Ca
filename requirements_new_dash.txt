@@ -22,3 +22,6 @@ nd2reader
 mgzip
 orjson
 openpyxl
+h5py
+# plotlydash-tornado-cmd # for dashboards
+# django-plotly-dash==1.6.1 # for the explorer to work
