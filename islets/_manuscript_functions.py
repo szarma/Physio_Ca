@@ -242,14 +242,17 @@ def beautify_protocol(protocol):
     return protocol
 
 
-def ruler(fig, margin=.5, grid=True):
+def ruler(fig, margin=.5, grid=True, **kwargs):
     from matplotlib.ticker import MultipleLocator
     figwidth = fig.get_figwidth()
     figheight = fig.get_figheight()
-    dax = fig.add_axes([0, 0, 1, 1],
-                       zorder = -2,
-                       facecolor = (.98,) * 3  # "whitesmoke"
-                       )
+    if "zorder" not in kwargs:
+        kwargs['zorder'] = -2
+
+    if "facecolor" not in kwargs:
+        kwargs['facecolor'] = (.98,) * 3
+
+    dax = fig.add_axes([0, 0, 1, 1], **kwargs)
     dax.axvline(margin, color = "salmon", lw = .5, )
     dax.axvline(figwidth - margin, color = "salmon", lw = .5, )
     dax.axhline(margin, color = "salmon", lw = .5, )
@@ -1415,6 +1418,18 @@ def get_axsrow(ax, naxs, height_in_inches,  spacing = .1, rel_offset = -1.5):
     axclspHeight = height_in_inches/figheight
     axclsp = [
         fig.add_axes([axpos.x0+(spacing+1)*axclspWidth*jx, axpos.y0+axclspHeight*rel_offset, axclspWidth, axclspHeight])
+        for jx in range(naxs)
+    ]
+    return axclsp
+
+def get_axscol(ax, naxs, width_in_inches,  spacing = .1, rel_offset = -1.5):
+    fig = ax.get_figure()
+    figwidth, figheight = fig.get_size_inches()
+    axpos = ax.get_position()
+    axclspHeight = axpos.height/(naxs+(naxs-1)*spacing)
+    axclspWidth = width_in_inches/figheight
+    axclsp = [
+        fig.add_axes([axpos.x0+axclspWidth*rel_offset, axpos.y0+(spacing+1)*axclspHeight*jx, axclspWidth, axclspHeight])
         for jx in range(naxs)
     ]
     return axclsp
