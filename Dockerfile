@@ -5,7 +5,8 @@ RUN apt-get update --yes && \
     apt-get install --yes --no-install-recommends \
     build-essential \
     git \
-    default-jdk
+    default-jdk && \
+    rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /opt/islets/Physio_Ca_framework
 RUN mkdir /data
 RUN /usr/local/bin/fix-permissions /opt/islets/
@@ -26,5 +27,6 @@ WORKDIR /opt/islets/Physio_Ca_framework/
 ENV PATH="${HOME}/.local/bin:${PATH}"
 RUN poetry config virtualenvs.create false
 RUN poetry install
+RUN poetry cache clear pypi --all --no-interaction
 
 WORKDIR ${HOME}
