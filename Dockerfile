@@ -28,5 +28,6 @@ ENV PATH="${HOME}/.local/bin:${PATH}"
 RUN poetry config virtualenvs.create false
 RUN poetry install
 RUN poetry cache clear pypi --all --no-interaction
+RUN jupyter lab build && jupyter lab clean
 
 WORKDIR ${HOME}
