@@ -95,11 +95,11 @@ As an example, to run the server with custom data and access it in a shell you c
 .. |Docker Image Version badge| image:: https://img.shields.io/docker/v/hannsen/cell-tissue-networks_server/latest?logo=docker
    :alt: Docker Image Version (tag latest semver)
 
-.. |Docker Image Size badge| image:: https://img.shields.io/docker/image-size/hannsen/cell-tissue-networks_server/latest
-   :alt: Docker Image Size (tag)
+.. |Docker Image Size badge| image:: https://img.shields.io/docker/image-size/hannsen/cell-tissue-networks_server?logo=docker
+   :alt: Docker Image Size (latest semver)
    
-.. |PyPI Version badge| image:: https://img.shields.io/pypi/v/islets
+.. |PyPI Version badge| image:: https://img.shields.io/pypi/v/islets?logo=pypi
    :alt: PyPI
    
-.. |PyPI Python Version badge| image:: https://img.shields.io/pypi/pyversions/islets
+.. |PyPI Python Version badge| image:: https://img.shields.io/pypi/pyversions/islets?logo=python
    :alt: PyPI - Python Version
