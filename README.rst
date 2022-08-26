@@ -30,7 +30,7 @@ The usage of the framework in practical terms is documented in the original repo
 
 
 Features
---------
+========
 
 One of our most used tools is the _''roi examiner''_ for live interaction with the ROIs and their traces within a jupyter notebook.
 
@@ -47,17 +47,32 @@ For examine detected events, one at a time, we also have a app.
 We have also built a dashboard for fast intreaction with our storage filesystem. Given a folder, it finds all processed recordings in it and its subfolders, collects metadata and presents it in a table form. It further enables entering of the experimental protocol, and additional data, which are then also searchable. It also provides a link to an automaticaly generated notebook for a brief glimpse into actual results of an experiment. See demo on youtube (https://youtu.be/tj4TjL_PJ1Q).
 
 Installation
-------------
+============
 
-We are working on an easy way of installation. For this purpose we use poetry as install tool.
-However, there will be ready-to-go packages available on PyPI via pip.
-For easy deployment, there will be a docker image as well.
-Documentation will be updated as soon as it is ready.
+Requirements
+------------
+The module is intended to be used within a JupyterHub environment.
+It is possible to run in python without a jupyter instance, but features like our apps may not be working in this case.
+If you do not want to stress about installing a jupyter environment around it, just use our docker image or use it `bundled in JupyterHub <https://guthub.com/Hannnsen/Physio_Ca_JupyterHub/>`_.
+A java environment is mandatory due to usage of bioformats to convert image data.
+
+- JVM
+- Python >=3.8, <3.11
+- Modules (and their dependencies) listed in pyproject.toml
+
+PyPI
+----
+We offer a pre-built version of our software package.
+If your system meets the requirements, you can install it easily with a package manager (e.g. pip, poetry, conda) of your choice.
+In our hands, poetry was the easiest deployment tool, so we would install it like this into its standard environment:
+
+.. code-block:: sh
+    
+    poetry install islets
 
 
 Docker
 ------
-
 A dockerfile is included in the root of the framework. It contains everything to run python code in the base environment. It can be built with the following command:
 
 .. code-block:: sh
