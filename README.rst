@@ -2,12 +2,7 @@
 Physio_Ca
 =========
 
-.. image:: https://img.shields.io/docker/v/hannsen/cell-tissue-networks_server/latest?logo=docker
-   :alt: Docker Image Version (tag latest semver)
-
-.. image:: https://img.shields.io/docker/image-size/hannsen/cell-tissue-networks_server/latest
-   :alt: Docker Image Size (tag)
-
+|Docker Image Version badge| |Docker Image Size badge|
 
 A toolbox to analyze and interact with Ca imaging data, developed within the Cell and Tissue Networks research group led by `prof. Marjan Slak-Rupnik <https://www.meduniwien.ac.at/web/index.php?id=688&res_id=37&name=Marjan_Slak%20Rupnik>`_ at the Medical University of Vienna. 
 
@@ -82,3 +77,8 @@ As an example, to run the server with custom data and access it in a shell you c
    docker run -it -v /path/to/real/data:/data:rw hannsen/cell-tissue-networks_server:latest /bin/bash
 
 
+.. |Docker Image Version badge| image:: https://img.shields.io/docker/v/hannsen/cell-tissue-networks_server/latest?logo=docker
+   :alt: Docker Image Version (tag latest semver)
+
+.. |Docker Image Size badge| image:: https://img.shields.io/docker/image-size/hannsen/cell-tissue-networks_server/latest
+   :alt: Docker Image Size (tag)
