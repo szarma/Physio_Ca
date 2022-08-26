@@ -2,7 +2,7 @@
 Physio_Ca
 =========
 
-|Docker Image Version badge| |Docker Image Size badge|
+|PyPI Version badge| |PyPI Python Version badge| |Docker Image Version badge| |Docker Image Size badge|
 
 A toolbox to analyze and interact with Ca imaging data, developed within the Cell and Tissue Networks research group led by `prof. Marjan Slak-Rupnik <https://www.meduniwien.ac.at/web/index.php?id=688&res_id=37&name=Marjan_Slak%20Rupnik>`_ at the Medical University of Vienna. 
 
@@ -82,3 +82,9 @@ As an example, to run the server with custom data and access it in a shell you c
 
 .. |Docker Image Size badge| image:: https://img.shields.io/docker/image-size/hannsen/cell-tissue-networks_server/latest
    :alt: Docker Image Size (tag)
+   
+.. |PyPI Version badge| image:: https://img.shields.io/pypi/v/islets
+   :alt: PyPI
+   
+.. |PyPI Python Version badge| image:: https://img.shields.io/pypi/pyversions/islets
+   :alt: PyPI - Python Version
