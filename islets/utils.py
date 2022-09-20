@@ -1181,11 +1181,12 @@ def _init_logger():
 def getStatImages(movie_, debleach=False, downsampleFreq=1):
     if movie_.fr>downsampleFreq:
         n_rebin = int(np.round(movie_.fr/downsampleFreq))
+        print(n_rebin, movie_.shape)
         if n_rebin>3:
             # m_for_image = movie_.resize(1,1, 1/n_rebin)
             from .movies import movie as cmovie
             from .numeric import rebin
-            m_for_image = cmovie(rebin(movie_,n_rebin), fr=movie_/n_rebin)
+            m_for_image = cmovie(rebin(movie_,n_rebin), fr=movie_.fr/n_rebin)
         else:
             m_for_image = movie_
     else:
