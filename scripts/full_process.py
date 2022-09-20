@@ -19,6 +19,7 @@ def trcbk():
     print(excinfo[1])
     print (out)
     return out
+
 # Token for the bot, which will be used to post in slack for notifications
 SLACK_BOT_TOKEN = open("/usr/share/slackbot.token").read()
 
