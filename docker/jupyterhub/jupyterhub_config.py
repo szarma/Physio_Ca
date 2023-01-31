@@ -8,7 +8,7 @@ c = get_config()
 
 c.JupyterHub.log_level = 'DEBUG'
 c.JupyterHub.admin_access = True
-c.JupyterHub.hub_ip = os.environ['HUB_IP']
+c.JupyterHub.hub_ip = '0.0.0.0'
 c.JupyterHub.allow_named_servers = True
 
 c.JupyterHub.template_paths = CDS_TEMPLATE_PATHS
