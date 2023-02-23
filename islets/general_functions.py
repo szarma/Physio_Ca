@@ -218,9 +218,6 @@ def stochasticMaximize(fun, x0, steps=10000, temp=1., step=.1):
     return outPars, fun(outPars)
 
 
-from collections import Mapping, Container
-from sys import getsizeof
-
 
 def deep_getsizeof(o, ids):
     """Find the memory footprint of a Python object
@@ -237,6 +234,8 @@ def deep_getsizeof(o, ids):
     :param ids:
     :return:
     """
+    from collections import Mapping, Container
+    from sys import getsizeof
     d = deep_getsizeof
     if id(o) in ids:
         return 0
