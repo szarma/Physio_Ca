@@ -101,7 +101,6 @@ class Regions:
                 if verbose:
                     print ("Initiating from a movie.")
                 self.movie = movie_
-                self.is_3D = movie_.ndim>3
                 time = np.arange(len(movie_))/movie_.fr
                 if FrameRange is None:
                     FrameRange = [0, len(movie_)]
@@ -143,6 +142,20 @@ class Regions:
                                #excludePixels=excludePixels,
                                #use_restricted=use_restricted
                               )
+
+    @property
+    def is_3D(self):
+        if not hasattr(self, "_is_3D"):
+            peakDims = self.df['peak'].apply(len)
+            assert peakDims.std()==0
+            self._is_3D = peakDims.iloc[0]
+        return self._is_3D
+
+    # @is_3D.setter
+    # def is_3D(self):
+    #     peakDims = self.df['peak'].apply(len)
+    #     assert peakDims.std()==0
+    #     self._is_3D = peakDims.iloc[0]
 
     def to_hdf(self,
                buffer: h5py._hl.group.Group,
