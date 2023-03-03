@@ -147,8 +147,11 @@ class Regions:
     def is_3D(self):
         if not hasattr(self, "_is_3D"):
             peakDims = self.df['peak'].apply(len)
-            assert peakDims.std()==0
-            self._is_3D = peakDims.iloc[0]
+            assert peakDims.nunique() == 1
+            if peakDims.iloc[0] == 3:
+                self._is_3D = True
+            else:
+                self._is_3D = False
         return self._is_3D
 
     # @is_3D.setter
