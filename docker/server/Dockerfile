@@ -1,26 +1,37 @@
 FROM ideonate/containds-all-scipy:latest
 
+# Switch to root user to install tools to build islets and to run bioformats JVM
 USER root
+
+# Install binaries to install and execute the islets module
 RUN apt-get update --yes && \
     apt-get install --yes --no-install-recommends \
     build-essential \
     git \
     default-jdk
+
+# Create a directory to copy the islets source into it.
+# The directory will have fixed permissions.
 RUN mkdir /opt/islets/
 RUN /usr/local/bin/fix-permissions /opt/islets/
 RUN chown -R ${NB_UID}:users ${HOME}
 
+# Switch back to the default user as we do not need root rights anymore and don't want to give them to the user.
 USER ${NB_UID}
-RUN pip install --no-cache \
-        ffmpeg \
-        tifffile
 
+# Upgrade pip and install ffmpeg and tiff dependencies
+RUN pip install --upgrade --no-cache pip && \
+    pip install --upgrade --no-cache ffmpeg tifffile
+
+# Install JupyterDash, the corresponding proxy to stream webapps, and needed labextension
+RUN pip install --upgrade --no-cache dash jupyter-dash jupyter-server-proxy
+RUN jupyter labextension install jupyterlab-plotly
+RUN jupyter lab build
+
+# Install the islets module
 WORKDIR /opt/islets/
-RUN git clone https://github.com/szarma/Physio_Ca.git
-
+RUN git clone --depth=1 https://github.com/szarma/Physio_Ca.git
 WORKDIR /opt/islets/Physio_Ca/
 RUN pip install .
 
 WORKDIR ${HOME}
-RUN mkdir -p ${HOME}/work/app/
-RUN cp /opt/islets/Physio_Ca/app/explorer.py ${HOME}/work/app/explorer.py
