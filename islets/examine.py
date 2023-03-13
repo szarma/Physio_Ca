@@ -216,7 +216,7 @@ def examine(self,
 
     # Fix needed for distributed docker configurations
     if mode == 'jupyter-dash':
-        app.default_requests_pathname_prefix = os.environ['JUPYTERHUB_SERVICE_PREFIX'] + 'proxy/8050'
+        app.default_requests_pathname_prefix = os.environ['JUPYTERHUB_SERVICE_PREFIX'] + 'proxy/8050/'
         app.default_server_url = 'https://' + os.environ['URL'] + '/'
         app.server_url = 'https://' + os.environ['URL'] + '/'
         app.infer_jupyter_proxy_config()
