@@ -229,7 +229,7 @@ def examine(self,
         [Input("create-closeup", "n_clicks"),],
         [State("selected-rois", "value")],
         )
-    def create_closeup(n_clicks,selectedData):
+    def create_closeup(n_clicks,selectedData, **kwargs):
         if debug:
             output = [f"Start n_clicks: {n_clicks}; {selectedData}"]
         else:
@@ -261,7 +261,7 @@ def examine(self,
         [State("tag-drop", "value"),
          State("selected-rois", "value")]
         )
-    def tag(n_clicks,tags,selectedData):
+    def tag(n_clicks,tags,selectedData, **kwargs):
         try:
             if n_clicks>0:
                 if "tag" not in self.df.columns:
@@ -283,7 +283,7 @@ def examine(self,
         Output("save-feedback","children"),
         [Input("save-button", "n_clicks"),],
         )
-    def save(n_clicks):
+    def save(n_clicks, **kwargs):
         from os.path import split
         try:
             if n_clicks>0:
@@ -296,7 +296,7 @@ def examine(self,
         Output("selected-rois", "value"),
         [Input("roi-selector", "selectedData"),],
         )
-    def showSelected(selData):
+    def showSelected(selData, **kwargs):
         if selData is None:
             ix = self.df.index
         else:
@@ -317,7 +317,7 @@ def examine(self,
          State("hidden","children"),
          State("roi-selector", "relayoutData")]
                  )
-    def mark_discard_callback(discard_unsel_clicks,discard_sel_clicks,mark_clicks,merge_clicks,selspec,selected,curnc,rlout):
+    def mark_discard_callback(discard_unsel_clicks,discard_sel_clicks,mark_clicks,merge_clicks,selspec,selected,curnc,rlout, **kwargs):
         out = ["-"*40]
         fig = getFigure()
         outcurns = "nothing"
@@ -434,7 +434,7 @@ def examine(self,
              Input("sum-checklist","value")],
             [State("trace-show","relayoutData")]
                      )
-        def plot_callback(selected,shownRois,cols,nRebin,offset,checklist,rlod):
+        def plot_callback(selected,shownRois,cols,nRebin,offset,checklist,rlod, **kwargs):
             from sys import exc_info
             out = ""
             try:
@@ -600,7 +600,7 @@ def examine(self,
             [Input("filter-button","n_clicks")],
             [State("filter-input","value")]
                      )
-        def filter_callback(n_clicks,filtTs):
+        def filter_callback(n_clicks,filtTs, **kwargs):
             from sys import exc_info
             out = ""
             try:
