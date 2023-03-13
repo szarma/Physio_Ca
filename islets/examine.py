@@ -1,6 +1,7 @@
 import json
 import traceback
 import numpy as np
+import os
 from .numeric import rebin
 from .utils import getFigure
 from .utils import saveRois
@@ -8,10 +9,10 @@ from .utils import saveRois
 def trcbk():
     return repr(traceback.format_tb())
 
-def examine(self, 
-            max_rois=10, 
-            imagemode=None, 
-            debug=False, 
+def examine(self,
+            max_rois=10,
+            imagemode=None,
+            debug=False,
             startShow="all",
             mode="jupyter",
             name=None,
@@ -55,7 +56,7 @@ def examine(self,
     # getPeak2BoundaryDF = getattr(module, "getPeak2BoundaryDF")
     # getGraph_of_ROIs_to_Merge = getattr(module, "getGraph_of_ROIs_to_Merge")
     # mergeBasedOnGraph = getattr(module, "mergeBasedOnGraph")
-    
+
     roisImage = getFigure()#showRoisOnly(self,indices=self.df.index, im=self.statImages[imagemode], lw=lw)
     roisImage.update_layout({"dragmode":'lasso'},)
     if hasattr(self,"time"):
@@ -82,7 +83,7 @@ def examine(self,
         ),
         html.Div([
             html.Button('Mark for merging', id='mark-button', n_clicks=0,style={"display":"block"}),
-            html.Button('Merge', id='merge-button', n_clicks=0),], 
+            html.Button('Merge', id='merge-button', n_clicks=0),],
             style={"display":"inline-block","width":"200px"},
         ),
         html.Pre(id="discard-feedback",children="_",
@@ -109,7 +110,7 @@ def examine(self,
             self.detrend_traces()
         except:
             pass
-    
+
     FilterBox = html.Div([
         html.Div([
            "Choose columns",
@@ -161,13 +162,13 @@ def examine(self,
         ]),
     ])
     initNcs = {"discard_unsel":0,"discard_sel":0,"mark":0,"merge":0}
-    
+
     movieCloseup = [
         # html.H3("Movie closeup", style={"display":"inline-block"}),
         html.Button("generate closeup", id="create-closeup", n_clicks=0,title="[!experimental feature!] Works only if the regions have the associated movie."),
         html.Div(id="closeup-output")
                    ]
-    
+
     APP_LAYOUT = [
         html.Div([
             html.Div([
@@ -202,7 +203,7 @@ def examine(self,
         ) for ks in [["roi-selector","range-pickers",
     #                   "roi-hover"
                      ]
-                     
+
                     ]
     ]
     if mode=="jupyter":
@@ -213,6 +214,12 @@ def examine(self,
     else:
         app = Dash(name)
 
+    # Fix needed for distributed docker configurations
+    if mode == 'jupyter-dash':
+        app.default_requests_pathname_prefix = os.environ['JUPYTERHUB_SERVICE_PREFIX'] + 'proxy/8050'
+        app.default_server_url = 'https://' + os.environ['URL'] + '/'
+        app.server_url = 'https://' + os.environ['URL'] + '/'
+        app.infer_jupyter_proxy_config()
 
     app.layout = html.Div(children=APP_LAYOUT,
                           style={"family":"Arial"}
@@ -247,7 +254,7 @@ def examine(self,
         except:
             output+=[trcbk()]
         return output
-        
+
     @app.callback(
         Output("tag-feedback","children"),
         [Input("tag-button", "n_clicks"),],
@@ -270,9 +277,8 @@ def examine(self,
                 return f"Successfully applied tags for {len(selected)} rois."
         except:
             return trcbk()
-        
-        
-        
+
+
     @app.callback(
         Output("save-feedback","children"),
         [Input("save-button", "n_clicks"),],
@@ -285,7 +291,7 @@ def examine(self,
                 return saveRois(self,folder,fname.replace("_rois.pkl",""),formats=["vienna"])
         except:
             return trcbk()
-            
+
     @app.callback(
         Output("selected-rois", "value"),
         [Input("roi-selector", "selectedData"),],
@@ -297,7 +303,6 @@ def examine(self,
             ix = np.array( [p["hovertext"] for p in selData["points"]]).astype(int)
         ix = np.unique(ix)
         return ",".join(ix.astype(str))
-
 
     @app.callback(
         [Output("discard-feedback", "children"),
@@ -369,7 +374,7 @@ def examine(self,
                 seeIndices = [isee for isee in seeIndices if isee in self.df.index]
                 # out += [html.Br(),seeIndices.__repr__()]
                 fig = showRoisOnly(self, im=self.statImages[imagemode], showall=True, lw=lw, indices=seeIndices,fill=fill)
-        
+
             ##########
 #             if mode=="plot":
 #                 fig = showRoisOnly(self, indices=self.df.index, im=self.statImages[imagemode], showall=False)
@@ -415,9 +420,9 @@ def examine(self,
 
         except:
             out += [html.Br(),"  "+trcbk()]
-            
-        
+
         return out, outcurns, fig
+
     if hasattr(self,"time"):
         @app.callback(
             Output("trace-show","figure"),

@@ -1,4 +1,4 @@
-FROM ideonate/containds-all-scipy:latest
+FROM jupyter/scipy-notebook:hub-3.1.1
 
 # Switch to root user to install tools to build islets and to run bioformats JVM
 USER root
@@ -34,4 +34,6 @@ RUN git clone --depth=1 https://github.com/szarma/Physio_Ca.git
 WORKDIR /opt/islets/Physio_Ca/
 RUN pip install .
 
-WORKDIR ${HOME}
+# Link to data and set the home directory as default work directory
+RUN ln -s /data ${HOME}/work/local_data
+WORKDIR ${HOME}/work

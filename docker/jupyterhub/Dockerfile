@@ -10,5 +10,3 @@ RUN pip install --upgrade pip && \
 
 # Copy the JupyterHub configuration in the container
 COPY jupyterhub/jupyterhub_config.py .
-
-RUN mkdir /data

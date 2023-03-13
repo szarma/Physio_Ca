@@ -35,7 +35,7 @@ services:
     networks:
       - default
     volumes:
-      - jupyterhub_data:/data/:rw
+      - jupyterhub_data:/data:rw                                # Add a data partition for data storage.
     command: echo
 
   # config for Hub
@@ -53,7 +53,6 @@ services:
       - /etc/group:/etc/group                                    # For authentication we need to give information about groups,
       - /etc/passwd:/etc/passwd                                  # the users itself,
       - /etc/shadow:/etc/shadow                                  # and shadowed/encrypted passwords.
-      - jupyterhub_data:/data/:rw                                # Add a data partition for data storage.
     environment:                                                 # Env variables passed to the Hub process.
       - DOCKER_JUPYTER_CONTAINER=${SERVER_IMAGE_NAME}
       - DOCKER_NETWORK_NAME=${COMPOSE_PROJECT_NAME}_default
