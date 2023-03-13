@@ -15,7 +15,23 @@ class CustomDockerSpawner(dockerspawner.DockerSpawner):
         return super().create_object()
 
 
-c.JupyterHub.log_level = 'DEBUG'
+c.JupyterHub.log_level = 'INFO'
+c.JupyterHub.logging_config = {
+    'handlers': {
+        'file': {
+            'class': 'logging.FileHandler',
+            'level': 'INFO',
+            'filename': '/var/log/jupyterhub.log',
+        }
+    },
+    'loggers': {
+        'jupyterhub_log': {
+            'level': 'INFO',
+            'handlers': ['console', 'file'],
+        }
+    }
+}
+
 c.JupyterHub.admin_access = True
 c.JupyterHub.hub_ip = '0.0.0.0'
 c.JupyterHub.hub_connect_ip = os.environ.get('HUB_IP') or 'jupyterhub'

@@ -5,7 +5,10 @@ services:
   reverse-proxy:
     image: traefik:latest
     command:
-      - "--log.level=DEBUG"
+      - "--log.filePath=/var/log/traefik.log"
+      - "--log.level=WARN"
+      - "--accesslog=true"
+      - "--accesslog.filePath=/var/log/traefik_access.log"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=true"
       - "--providers.docker.watch=true"
@@ -20,6 +23,8 @@ services:
       - 8080:8080
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/log/traefik.log:/var/log/traefik.log
+      - /var/log/traefik_access.log:/var/log/traefik_access.log
       - /etc/ssl/:/etc/ssl:ro
       - /etc/traefik/dynamic/:/etc/traefik/dynamic/
 
@@ -50,6 +55,7 @@ services:
     container_name: ${HUB_CONTAINER_NAME}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock                # Give access to Docker socket.
+      - /var/log/jupyterhub.log:/var/log/jupyterhub.log          # Give access to the jupyterhub logfile.
       - /etc/group:/etc/group                                    # For authentication we need to give information about groups,
       - /etc/passwd:/etc/passwd                                  # the users itself,
       - /etc/shadow:/etc/shadow                                  # and shadowed/encrypted passwords.
