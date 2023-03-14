@@ -30,7 +30,10 @@ RUN jupyter lab build
 
 # Install the islets module
 WORKDIR /opt/islets/
-RUN git clone --depth=1 https://github.com/szarma/Physio_Ca.git
+RUN git clone --branch=docker \
+              --depth=1 \
+              --single-branch \
+              https://github.com/szarma/Physio_Ca.git
 WORKDIR /opt/islets/Physio_Ca/
 RUN pip install .
 
