@@ -7,17 +7,21 @@ import tomli
 c = get_config()
 
 def get_allowed_images(spawner):
-    users = []
     images = {}
 
     with open('/etc/jupyterhub/user_config.toml', 'rb') as f:
         toml = tomli.load(f)
-        users = list(toml['users'].keys())
+        users = [user['name'] for user in toml['users']]
         if spawner.user in users:
-            if toml['users'][spawner.user]['admin']:
+            user = toml['users'][users.index(spawner.user)]
+            if user['developer'] == True:
                 images = {
                     'stable': os.environ['DOCKER_JUPYTER_CONTAINER'] + ':' + os.environ['ISLETS_VERSION'],
                     'development': os.environ['DOCKER_JUPYTER_CONTAINER'] + '_dev:' + os.environ['ISLETS_VERSION'],
+                }
+            else:
+                images = {
+                    'stable': os.environ['DOCKER_JUPYTER_CONTAINER'] + ':' + os.environ['ISLETS_VERSION'],
                 }
 
     return images
@@ -61,11 +65,11 @@ notebook_dir = os.environ.get('DOCKER_NOTEBOOK_DIR', default='/home/jovyan/work'
 c.DockerSpawner.notebook_dir = notebook_dir
 c.DockerSpawner.environment = {'URL': os.getenv('HOST', default='ctn2.physiologie.meduniwien.ac.at')}
 c.DockerSpawner.volumes = {
-    'jupyterhub-user-{username}': notebook_dir,
     '/data': {
         'bind': '/data',
         'mode': 'rw',
-    }
+    },
+    'jupyterhub-user-{username}': notebook_dir,
 }
 c.DockerSpawner.name_template = "{prefix}-{username}"
 c.DockerSpawner.debug = True
