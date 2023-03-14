@@ -3,6 +3,7 @@ FROM jupyterhub/jupyterhub:3.1.1
 # Install dependencies (for culling and spawning)
 RUN pip install --upgrade pip && \
     pip install --no-cache \
+    tomli \
     dockerspawner \
     oauthenticator \
     jupyter-server-proxy \

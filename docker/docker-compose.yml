@@ -33,12 +33,23 @@ services:
       context: ./
       dockerfile: ./server/Dockerfile
       args:
-        - SERVER_DOCKER_PATH=./jupyter_server
         - ISLETS_VERSION=${ISLETS_VERSION}
     image: ${SERVER_IMAGE_NAME}:${ISLETS_VERSION}
     networks:
       - default
     command: echo
+
+  # config for development server
+  server_dev:
+    build:
+      context: ./
+      dockerfile: ./server_dev/Dockerfile
+      args:
+        - ISLETS_VERSION=${ISLETS_VERSION}
+    image: ${SERVER_IMAGE_NAME}_dev:${ISLETS_VERSION}
+    networks:
+      - default
+    commando: echo
 
   # config for Hub
   jupyterhub:
