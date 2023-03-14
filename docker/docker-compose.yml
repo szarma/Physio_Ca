@@ -23,8 +23,7 @@ services:
       - 8080:8080
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /var/log/traefik.log:/var/log/traefik.log
-      - /var/log/traefik_access.log:/var/log/traefik_access.log
+      - /var/log/:/var/log/
       - /etc/ssl/:/etc/ssl:ro
       - /etc/traefik/dynamic/:/etc/traefik/dynamic/
 
@@ -39,8 +38,6 @@ services:
     image: ${SERVER_IMAGE_NAME}:${ISLETS_VERSION}
     networks:
       - default
-    volumes:
-      - jupyterhub_data:/data:rw                                # Add a data partition for data storage.
     command: echo
 
   # config for Hub
@@ -55,7 +52,7 @@ services:
     container_name: ${HUB_CONTAINER_NAME}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock                # Give access to Docker socket.
-      - /var/log/jupyterhub.log:/var/log/jupyterhub.log          # Give access to the jupyterhub logfile.
+      - /var/log/:/var/log/                                      # Give access to the jupyterhub logfile.
       - /etc/group:/etc/group                                    # For authentication we need to give information about groups,
       - /etc/passwd:/etc/passwd                                  # the users itself,
       - /etc/shadow:/etc/shadow                                  # and shadowed/encrypted passwords.

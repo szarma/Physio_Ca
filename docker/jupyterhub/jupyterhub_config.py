@@ -44,7 +44,13 @@ c.LocalAuthenticator.create_system_users = True
 notebook_dir = os.environ.get('DOCKER_NOTEBOOK_DIR') or '/home/jovyan/work'
 c.DockerSpawner.notebook_dir = notebook_dir
 c.DockerSpawner.environment = {'URL': os.getenv('HOST', default='ctn2.physiologie.meduniwien.ac.at')}
-c.DockerSpawner.volumes = {'jupyterhub-user-{username}': notebook_dir}
+c.DockerSpawner.volumes = {
+    'jupyterhub-user-{username}': notebook_dir,
+    '/data': {
+        'bind': '/data',
+        'mode': 'rw',
+    }
+}
 c.DockerSpawner.name_template = "{prefix}-{username}"
 c.DockerSpawner.debug = True
 c.DockerSpawner.image = os.environ['DOCKER_JUPYTER_CONTAINER'] + ':' + os.environ['ISLETS_VERSION']

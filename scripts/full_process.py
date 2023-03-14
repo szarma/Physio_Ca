@@ -1,4 +1,4 @@
-#!/opt/tljh/user/envs/physio_nc/bin/python
+#!/opt/conda/bin/python
 import os
 import bioformats
 import tifffile
@@ -20,11 +20,15 @@ def trcbk():
     print (out)
     return out
 
-# Token for the bot, which will be used to post in slack for notifications
-SLACK_BOT_TOKEN = open("/usr/share/slackbot.token").read()
+try:
+    # Token for the bot, which will be used to post in slack for notifications
+    SLACK_BOT_TOKEN = open("/usr/share/slackbot.token").read()
 
-# Member IDs of the users connected to slack
-SLACK_USER_IDS = dict(zip(*pd.read_csv("/usr/share/slack_users.txt", header=None).values.T))
+    # Member IDs of the users connected to slack
+    SLACK_USER_IDS = dict(zip(*pd.read_csv("/usr/share/slack_users.txt", header=None).values.T))
+except:
+    SLACK_BOT_TOKEN = None
+    SLACK_USER_IDS = None
 
 # noinspection PyBroadException
 def create_movie_from_tif(recording, frequency, restrict):
@@ -139,6 +143,9 @@ def create_movie(recording, frequency, restrict, series, input_type, channel, ve
 
 
 def slack_notify(text):
+    if (SLACK_BOT_TOKEN is None) or (SLACK_USER_IDS is None):
+        return
+
     client = WebClient(token = SLACK_BOT_TOKEN)
     try:
         user = []
