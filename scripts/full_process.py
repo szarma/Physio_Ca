@@ -210,8 +210,9 @@ def main(args):
     outputDir = os.path.join(args.recording + "_analysis", metadata["Name"])
     if not os.path.isdir(outputDir):
         os.makedirs(outputDir)
-        os.chown(outputDir, uid = -1, gid = 1002)
-        os.chmod(outputDir, mode = 0o775)
+        # Commented out the following 2 lines as it is not needed anymore in the docker container
+        #os.chown(outputDir, uid = -1, gid = 1002)
+        #os.chmod(outputDir, mode = 0o775)
     baseName = os.path.split(args.recording)[1] + "_" + metadata["Name"] + "_"
     baseName = os.path.join(outputDir, baseName)
 

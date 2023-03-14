@@ -36,6 +36,7 @@ RUN git clone --branch=docker \
               https://github.com/szarma/Physio_Ca.git
 WORKDIR /opt/islets/Physio_Ca/
 RUN pip install .
+RUN chmod +x /opt/islets/Physio_Ca/scripts/full_process.py
 
 # Link to data and set the home directory as default work directory
 RUN ln -s /data ${HOME}/work/local_data
