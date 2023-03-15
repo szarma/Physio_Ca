@@ -7,26 +7,75 @@ import tomli
 c = get_config()
 
 def get_allowed_images(spawner):
-    images = {}
+    """
+    Gets the images, which the user is allowed to spawn. In general, normal user will get the compiled stable image.
+    For developers, there will be an additional unstable image, which has an editable version of islets installed.
+    User information is read from the user config at `/etc/jupyterhub/user_config.toml` (read-only).
 
+    Parameters
+    ----------
+    spawner
+        The spawner object. It is used to retrieve the logged in user.
+
+    """
+
+    images = {}
     with open('/etc/jupyterhub/user_config.toml', 'rb') as f:
         toml = tomli.load(f)
         users = [user['name'] for user in toml['users']]
-        if spawner.user in users:
-            user = toml['users'][users.index(spawner.user)]
+        if spawner.user.name in users:
+            user = toml['users'][users.index(spawner.user.name)]
             if user['developer'] == True:
                 images = {
-                    'stable': os.environ['DOCKER_JUPYTER_CONTAINER'] + ':' + os.environ['ISLETS_VERSION'],
-                    'development': os.environ['DOCKER_JUPYTER_CONTAINER'] + '_dev:' + os.environ['ISLETS_VERSION'],
+                    'Stable (normal productive use)': os.environ['DOCKER_JUPYTER_CONTAINER'] + ':' + os.environ['ISLETS_VERSION'],
+                    'Development (Development of new features, UNSTABLE!)': os.environ['DOCKER_JUPYTER_CONTAINER'] + '_dev:' + os.environ['ISLETS_VERSION'],
                 }
             else:
                 images = {
-                    'stable': os.environ['DOCKER_JUPYTER_CONTAINER'] + ':' + os.environ['ISLETS_VERSION'],
+                    'Stable (normal productive use)': os.environ['DOCKER_JUPYTER_CONTAINER'] + ':' + os.environ['ISLETS_VERSION'],
                 }
 
     return images
 
+def get_admin_users():
+    """
+    Gets the verified admin users.
+    User information is read from the user config at `/etc/jupyterhub/user_config.toml` (read-only).
+
+    """
+
+    admin_users = {}
+    with open('/etc/jupyterhub/user_config.toml', 'rb') as f:
+        toml = tomli.load(f)
+        admin_users = { user['name'] for user in toml['users'] if user['admin'] == True }
+
+    return admin_users
+
+def get_allowed_users():
+    """
+    Gets the users, which are allowed to sign in.
+    User information is read from the user config at `/etc/jupyterhub/user_config.toml` (read-only).
+
+    """
+
+    allowed_users = {}
+    with open('/etc/jupyterhub/user_config.toml', 'rb') as f:
+        toml = tomli.load(f)
+        allowed_users = { user['name'] for user in toml['users'] }
+
+    return allowed_users
+
+
 class CustomDockerSpawner(dockerspawner.DockerSpawner):
+    """
+    Customized DockerSpawner to expose port 8050 of the spawned image in addition to the default port 8888.
+
+    Methods
+    -------
+    create_object()
+        Hook, which gets called when the spawner gets created.
+
+    """
     def create_object(self):
         self.extra_create_kwargs['ports'] = {
             "%i/tcp" % self.port: None,
@@ -35,6 +84,8 @@ class CustomDockerSpawner(dockerspawner.DockerSpawner):
         return super().create_object()
 
 
+# Add log support for the jupyterhub.
+# It will log information and more severe stuff to "/var/log/jupyterhub.log"
 c.JupyterHub.log_level = 'INFO'
 c.JupyterHub.logging_config = {
     'handlers': {
@@ -58,8 +109,9 @@ c.JupyterHub.hub_connect_ip = os.environ.get('HUB_IP') or 'jupyterhub'
 c.JupyterHub.allow_named_servers = False
 c.JupyterHub.spawner_class = CustomDockerSpawner
 
-c.Authenticator.admin_users = {'johannes'}
-c.LocalAuthenticator.create_system_users = True
+c.Authenticator.admin_users = get_admin_users()
+# c.Authenticator.admin_users = {'johannes'}
+# c.LocalAuthenticator.create_system_users = True
 
 notebook_dir = os.environ.get('DOCKER_NOTEBOOK_DIR', default='/home/jovyan/work')
 c.DockerSpawner.notebook_dir = notebook_dir
@@ -67,7 +119,7 @@ c.DockerSpawner.environment = {'URL': os.getenv('HOST', default='ctn2.physiologi
 c.DockerSpawner.volumes = {
     '/data': {
         'bind': '/data',
-        'mode': 'rw',
+        'mode': 'z',
     },
     'jupyterhub-user-{username}': notebook_dir,
 }

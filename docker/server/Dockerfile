@@ -24,7 +24,9 @@ RUN pip install --upgrade --no-cache pip && \
     pip install --upgrade --no-cache ffmpeg tifffile
 
 # Install JupyterDash, the corresponding proxy to stream webapps, and needed labextension
-RUN pip install --upgrade --no-cache dash jupyter-dash jupyter-server-proxy
+RUN pip install --upgrade --no-cache \
+        dash jupyter-dash jupyter-server-proxy \
+        jupyterlab-drawio jupyter-archive
 RUN jupyter labextension install jupyterlab-plotly
 RUN jupyter lab build
 
@@ -39,5 +41,5 @@ RUN pip install .
 RUN chmod +x /opt/islets/Physio_Ca/scripts/full_process.py
 
 # Link to data and set the home directory as default work directory
-RUN ln -s /data ${HOME}/work/local_data
 WORKDIR ${HOME}/work
+RUN ln -s /data local_data

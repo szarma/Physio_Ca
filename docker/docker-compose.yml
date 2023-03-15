@@ -49,7 +49,7 @@ services:
     image: ${SERVER_IMAGE_NAME}_dev:${ISLETS_VERSION}
     networks:
       - default
-    commando: echo
+    command: echo
 
   # config for Hub
   jupyterhub:
@@ -67,6 +67,7 @@ services:
       - /etc/group:/etc/group                                    # For authentication we need to give information about groups,
       - /etc/passwd:/etc/passwd                                  # the users itself,
       - /etc/shadow:/etc/shadow                                  # and shadowed/encrypted passwords.
+      - /etc/jupyterhub/user_config.toml:/etc/jupyterhub/user_config.toml:ro
     environment:                                                 # Env variables passed to the Hub process.
       - DOCKER_JUPYTER_CONTAINER=${SERVER_IMAGE_NAME}
       - DOCKER_NETWORK_NAME=${COMPOSE_PROJECT_NAME}_default
