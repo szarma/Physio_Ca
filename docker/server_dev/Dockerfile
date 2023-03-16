@@ -8,7 +8,8 @@ RUN apt-get update --yes && \
     apt-get install --yes --no-install-recommends \
     build-essential \
     git \
-    default-jdk
+    default-jdk && \
+    apt-get clean
 
 # Create a directory to copy the islets source into it.
 # The directory will have fixed permissions.
@@ -37,9 +38,10 @@ RUN git clone --branch=docker \
               --single-branch \
               https://github.com/szarma/Physio_Ca.git
 WORKDIR /opt/islets/Physio_Ca/
-RUN pip install .
+RUN pip install --editable .
 RUN chmod +x /opt/islets/Physio_Ca/scripts/full_process.py
 
 # Link to data and set the home directory as default work directory
 WORKDIR ${HOME}/work
 RUN ln -s /data local_data
+RUN ln -s /opt/islets/Physio_Ca Physio_Ca

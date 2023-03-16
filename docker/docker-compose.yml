@@ -5,49 +5,74 @@ services:
   reverse-proxy:
     image: traefik:latest
     command:
-      - "--api.insecure=true"
+      - "--log.filePath=/var/log/traefik.log"
+      - "--log.level=WARN"
+      - "--accesslog=true"
+      - "--accesslog.filePath=/var/log/traefik_access.log"
       - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.exposedbydefault=true"
+      - "--providers.docker.watch=true"
+      - "--providers.file.directory=/etc/traefik/dynamic/"
+      - "--providers.file.filename=/etc/traefik/dynamic/certificates.yml"
+      - "--providers.file.watch=true"
       - "--entryPoints.http.address=:80"
+      - "--entryPoints.https.address=:443"
     ports:
-      - "80:80"
-      - "8080:8080"
+      - 80:80
+      - 443:443
+      - 8080:8080
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      # - /etc/certs:/etc/certs
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/log/:/var/log/
+      - /etc/ssl/:/etc/ssl:ro
+      - /etc/traefik/dynamic/:/etc/traefik/dynamic/
 
   # config for single user servers
   server:
-    build: 
+    build:
       context: ./
       dockerfile: ./server/Dockerfile
-      args: 
-        - SERVER_DOCKER_PATH=./jupyter_server
+      args:
         - ISLETS_VERSION=${ISLETS_VERSION}
     image: ${SERVER_IMAGE_NAME}:${ISLETS_VERSION}
     networks:
       - default
-    volumes:
-      - jupyterhub_data:/data/:rw
+    command: echo
+
+  # config for development server
+  server_dev:
+    build:
+      context: ./
+      dockerfile: ./server_dev/Dockerfile
+      args:
+        - ISLETS_VERSION=${ISLETS_VERSION}
+    image: ${SERVER_IMAGE_NAME}_dev:${ISLETS_VERSION}
+    networks:
+      - default
     command: echo
 
   # config for Hub
   jupyterhub:
     depends_on:
       - "reverse-proxy"
-    build: 
+    build:
       context: ./
       dockerfile: ./jupyterhub/Dockerfile
+    restart: unless-stopped
     image: ${HUB_CONTAINER_NAME}:${ISLETS_VERSION}
     container_name: ${HUB_CONTAINER_NAME}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock                # Give access to Docker socket.
-      - jupyterhub_data:/data/:rw                                # Add a data partition for data storage.
+      - /var/log/:/var/log/                                      # Give access to the jupyterhub logfile.
+      - /etc/group:/etc/group                                    # For authentication we need to give information about groups,
+      - /etc/passwd:/etc/passwd                                  # the users itself,
+      - /etc/shadow:/etc/shadow                                  # and shadowed/encrypted passwords.
+      - /etc/jupyterhub/user_config.toml:/etc/jupyterhub/user_config.toml:ro
     environment:                                                 # Env variables passed to the Hub process.
       - DOCKER_JUPYTER_CONTAINER=${SERVER_IMAGE_NAME}
       - DOCKER_NETWORK_NAME=${COMPOSE_PROJECT_NAME}_default
       - HUB_IP=${HUB_CONTAINER_NAME}
-      - HOST
+      - HOST=${HOST}
       - ISLETS_VERSION
     networks:
       - default
@@ -56,7 +81,9 @@ services:
       - "traefik.frontend.rule=Host:${HOST}"                      # apply rule for frontend
       - "traefik.docker.network=${COMPOSE_PROJECT_NAME}_default"  # use internal docker network
       - "traefik.http.routers.jupyterhub.rule=Host(`${HOST}`)"    # apply routing through traefik
-  
+      - "traefik.http.routers.jupyterhub.tls=true"
+      - "traefik.http.routers.jupyterhub.entrypoints=http,https"
+
 volumes:
   jupyterhub_data:
 

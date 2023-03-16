@@ -1,6 +1,7 @@
 import json
 import traceback
 import numpy as np
+import os
 from .numeric import rebin
 from .utils import getFigure
 from .utils import saveRois
@@ -8,10 +9,10 @@ from .utils import saveRois
 def trcbk():
     return repr(traceback.format_tb())
 
-def examine(self, 
-            max_rois=10, 
-            imagemode=None, 
-            debug=False, 
+def examine(self,
+            max_rois=10,
+            imagemode=None,
+            debug=False,
             startShow="all",
             mode="jupyter",
             name=None,
@@ -55,7 +56,7 @@ def examine(self,
     # getPeak2BoundaryDF = getattr(module, "getPeak2BoundaryDF")
     # getGraph_of_ROIs_to_Merge = getattr(module, "getGraph_of_ROIs_to_Merge")
     # mergeBasedOnGraph = getattr(module, "mergeBasedOnGraph")
-    
+
     roisImage = getFigure()#showRoisOnly(self,indices=self.df.index, im=self.statImages[imagemode], lw=lw)
     roisImage.update_layout({"dragmode":'lasso'},)
     if hasattr(self,"time"):
@@ -67,7 +68,7 @@ def examine(self,
                 dcc.Input(id="selected-rois",
                     type="text",
                     debounce=False,
-                    size=16,
+                    size="16",
                     value="",#.join(list(map(str,self.df.index[:max_rois]))),
                     ),
             ],style={"display":"block" if debug else "none"}),
@@ -82,7 +83,7 @@ def examine(self,
         ),
         html.Div([
             html.Button('Mark for merging', id='mark-button', n_clicks=0,style={"display":"block"}),
-            html.Button('Merge', id='merge-button', n_clicks=0),], 
+            html.Button('Merge', id='merge-button', n_clicks=0),],
             style={"display":"inline-block","width":"200px"},
         ),
         html.Pre(id="discard-feedback",children="_",
@@ -109,7 +110,7 @@ def examine(self,
             self.detrend_traces()
         except:
             pass
-    
+
     FilterBox = html.Div([
         html.Div([
            "Choose columns",
@@ -127,9 +128,9 @@ def examine(self,
         html.Div([
            "Filter Timescale",
             dcc.Input(id="filter-input",
-                type="str",
+                type="text",
                 debounce=True,
-                size=10,
+                size="10",
                 placeholder="30",
               style={"width":"20px","margin-right":"5px","margin-left":"3px"},
              ),
@@ -142,14 +143,14 @@ def examine(self,
            "rebin",
             dcc.Input(id="rebin-input",
                 debounce=True,
-                size=3,
+                size="3",
                 value=max(1,int(np.round(self.__dict__.get("Freq",1)/2))),
                 style={"display":"inline-block","margin-right":"20px","margin-left":"3px"}
              ),
            "offset",
             dcc.Input(id="offset-input",
                 debounce=True,
-                size=3,
+                size="3",
                 value=np.round(self.df["detrended"].apply(np.std).mean()*5) if "detrended" in self.df.columns else 0 ,
                 style={"display":"inline-block","margin-right":"20px","margin-left":"3px"}
              ),
@@ -161,13 +162,13 @@ def examine(self,
         ]),
     ])
     initNcs = {"discard_unsel":0,"discard_sel":0,"mark":0,"merge":0}
-    
+
     movieCloseup = [
         # html.H3("Movie closeup", style={"display":"inline-block"}),
         html.Button("generate closeup", id="create-closeup", n_clicks=0,title="[!experimental feature!] Works only if the regions have the associated movie."),
         html.Div(id="closeup-output")
                    ]
-    
+
     APP_LAYOUT = [
         html.Div([
             html.Div([
@@ -176,7 +177,7 @@ def examine(self,
                         dcc.Input(id="selectspec-rois",
                             type="text",
                             debounce=True,
-                            size=25,
+                            size="25",
                             value=startShow,
                             ),
                     ],),
@@ -202,7 +203,7 @@ def examine(self,
         ) for ks in [["roi-selector","range-pickers",
     #                   "roi-hover"
                      ]
-                     
+
                     ]
     ]
     if mode=="jupyter":
@@ -213,6 +214,12 @@ def examine(self,
     else:
         app = Dash(name)
 
+    # Fix needed for distributed docker configurations
+    if mode == 'jupyter-dash':
+        app.default_requests_pathname_prefix = os.environ['JUPYTERHUB_SERVICE_PREFIX'] + 'proxy/8050/'
+        app.default_server_url = 'https://' + os.environ['URL'] + '/'
+        app.server_url = 'https://' + os.environ['URL'] + '/'
+        app.infer_jupyter_proxy_config()
 
     app.layout = html.Div(children=APP_LAYOUT,
                           style={"family":"Arial"}
@@ -222,7 +229,7 @@ def examine(self,
         [Input("create-closeup", "n_clicks"),],
         [State("selected-rois", "value")],
         )
-    def create_closeup(n_clicks,selectedData):
+    def create_closeup(n_clicks,selectedData, **kwargs):
         if debug:
             output = [f"Start n_clicks: {n_clicks}; {selectedData}"]
         else:
@@ -247,14 +254,14 @@ def examine(self,
         except:
             output+=[trcbk()]
         return output
-        
+
     @app.callback(
         Output("tag-feedback","children"),
         [Input("tag-button", "n_clicks"),],
         [State("tag-drop", "value"),
          State("selected-rois", "value")]
         )
-    def tag(n_clicks,tags,selectedData):
+    def tag(n_clicks,tags,selectedData, **kwargs):
         try:
             if n_clicks>0:
                 if "tag" not in self.df.columns:
@@ -270,14 +277,13 @@ def examine(self,
                 return f"Successfully applied tags for {len(selected)} rois."
         except:
             return trcbk()
-        
-        
-        
+
+
     @app.callback(
         Output("save-feedback","children"),
         [Input("save-button", "n_clicks"),],
         )
-    def save(n_clicks):
+    def save(n_clicks, **kwargs):
         from os.path import split
         try:
             if n_clicks>0:
@@ -285,19 +291,18 @@ def examine(self,
                 return saveRois(self,folder,fname.replace("_rois.pkl",""),formats=["vienna"])
         except:
             return trcbk()
-            
+
     @app.callback(
         Output("selected-rois", "value"),
         [Input("roi-selector", "selectedData"),],
         )
-    def showSelected(selData):
+    def showSelected(selData, **kwargs):
         if selData is None:
             ix = self.df.index
         else:
             ix = np.array( [p["hovertext"] for p in selData["points"]]).astype(int)
         ix = np.unique(ix)
         return ",".join(ix.astype(str))
-
 
     @app.callback(
         [Output("discard-feedback", "children"),
@@ -312,7 +317,7 @@ def examine(self,
          State("hidden","children"),
          State("roi-selector", "relayoutData")]
                  )
-    def mark_discard_callback(discard_unsel_clicks,discard_sel_clicks,mark_clicks,merge_clicks,selspec,selected,curnc,rlout):
+    def mark_discard_callback(discard_unsel_clicks,discard_sel_clicks,mark_clicks,merge_clicks,selspec,selected,curnc,rlout, **kwargs):
         out = ["-"*40]
         fig = getFigure()
         outcurns = "nothing"
@@ -369,7 +374,7 @@ def examine(self,
                 seeIndices = [isee for isee in seeIndices if isee in self.df.index]
                 # out += [html.Br(),seeIndices.__repr__()]
                 fig = showRoisOnly(self, im=self.statImages[imagemode], showall=True, lw=lw, indices=seeIndices,fill=fill)
-        
+
             ##########
 #             if mode=="plot":
 #                 fig = showRoisOnly(self, indices=self.df.index, im=self.statImages[imagemode], showall=False)
@@ -415,9 +420,9 @@ def examine(self,
 
         except:
             out += [html.Br(),"  "+trcbk()]
-            
-        
+
         return out, outcurns, fig
+
     if hasattr(self,"time"):
         @app.callback(
             Output("trace-show","figure"),
@@ -429,7 +434,7 @@ def examine(self,
              Input("sum-checklist","value")],
             [State("trace-show","relayoutData")]
                      )
-        def plot_callback(selected,shownRois,cols,nRebin,offset,checklist,rlod):
+        def plot_callback(selected,shownRois,cols,nRebin,offset,checklist,rlod, **kwargs):
             from sys import exc_info
             out = ""
             try:
@@ -595,7 +600,7 @@ def examine(self,
             [Input("filter-button","n_clicks")],
             [State("filter-input","value")]
                      )
-        def filter_callback(n_clicks,filtTs):
+        def filter_callback(n_clicks,filtTs, **kwargs):
             from sys import exc_info
             out = ""
             try:

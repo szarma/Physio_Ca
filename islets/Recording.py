@@ -351,7 +351,7 @@ class Recording:
                     mode = "ram"
             if mode in ["memmap","tif"]:
                 if not hasattr(self, "tempdir"):
-                    user = os.environ["USER"].split("jupyter-")[-1]
+                    user = os.environ["JUPYTERHUB_USER"]
                     from datetime import date
                     today = date.today().strftime("%Y_%m_%d")
                     rndnumber = np.random.randint(int(1e10))
