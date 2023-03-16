@@ -109,8 +109,8 @@ c.JupyterHub.hub_connect_ip = os.environ.get('HUB_IP') or 'jupyterhub'
 c.JupyterHub.allow_named_servers = False
 c.JupyterHub.spawner_class = CustomDockerSpawner
 
+c.Authenticator.allowed_users = get_allowed_users()
 c.Authenticator.admin_users = get_admin_users()
-# c.Authenticator.admin_users = {'johannes'}
 # c.LocalAuthenticator.create_system_users = True
 
 notebook_dir = os.environ.get('DOCKER_NOTEBOOK_DIR', default='/home/jovyan/work')
