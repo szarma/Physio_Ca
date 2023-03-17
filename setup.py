@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-with open('requirements_docker.txt') as f:
+with open('requirements.txt') as f:
     requirements = f.read().splitlines()
 
 with open('README.md') as f:
