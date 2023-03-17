@@ -32,14 +32,11 @@ RUN jupyter lab build
 
 # Install the islets module
 WORKDIR /opt/islets/
-RUN git clone --branch=docker \
-              --depth=1 \
-              --single-branch \
-              https://github.com/szarma/Physio_Ca.git
+RUN git clone --depth=1 https://github.com/szarma/Physio_Ca.git
 WORKDIR /opt/islets/Physio_Ca/
 RUN pip install .
 RUN chmod +x /opt/islets/Physio_Ca/scripts/full_process.py
 
 # Link to data and set the home directory as default work directory
 WORKDIR ${HOME}/work
-RUN ln -s /data local_data
+RUN ln -s /data ${HOME}/work/local_data
