@@ -125,8 +125,8 @@ c.DockerSpawner.volumes = {
 }
 c.DockerSpawner.name_template = "{prefix}-{username}"
 #c.DockerSpawner.debug = True
+c.DockerSpawner.image = os.environ['DOCKER_JUPYTER_CONTAINER'] + ':' + os.environ['ISLETS_VERSION']
 c.DockerSpawner.allowed_images = get_allowed_images
-# c.DockerSpawner.image = os.environ['DOCKER_JUPYTER_CONTAINER'] + ':' + os.environ['ISLETS_VERSION']
 c.DockerSpawner.remove = True
 c.DockerSpawner.network_name = os.environ['DOCKER_NETWORK_NAME']
 c.DockerSpawner.use_internal_ip = True

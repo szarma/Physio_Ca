@@ -68,12 +68,13 @@ services:
       - /etc/passwd:/etc/passwd                                  # the users itself,
       - /etc/shadow:/etc/shadow                                  # and shadowed/encrypted passwords.
       - /etc/jupyterhub/user_config.toml:/etc/jupyterhub/user_config.toml:ro
+      - /srv/jupyterhub:/srv/jupyterhub                          # Make the JupyterHub service restartable as tokens persist throughout restart.
     environment:                                                 # Env variables passed to the Hub process.
       - DOCKER_JUPYTER_CONTAINER=${SERVER_IMAGE_NAME}
       - DOCKER_NETWORK_NAME=${COMPOSE_PROJECT_NAME}_default
       - HUB_IP=${HUB_CONTAINER_NAME}
       - HOST=${HOST}
-      - ISLETS_VERSION
+      - ISLETS_VERSION=${ISLETS_VERSION}
     networks:
       - default
     labels:                                                       # Traefik configuration.

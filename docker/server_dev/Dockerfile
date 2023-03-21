@@ -1,7 +1,20 @@
-FROM jupyter/scipy-notebook:hub-3.1.1
+FROM jupyter/datascience-notebook:hub-3.1.1
 
 # Switch to root user to install tools to build islets and to run bioformats JVM
 USER root
+
+RUN apt update --yes && \
+    apt upgrade --yes
+
+# Install bottom as resource monitor in the terminal
+RUN curl -LO https://github.com/ClementTsang/bottom/releases/download/0.8.0/bottom_0.8.0_amd64.deb
+RUN dpkg -i bottom_0.8.0_amd64.deb
+RUN rm bottom_0.8.0_amd64.deb
+
+# Install bat
+RUN apt update --yes && \
+    apt install --yes --no-install-recommends \
+    bat
 
 # Install binaries to install and execute the islets module
 RUN apt-get update --yes && \
@@ -14,7 +27,9 @@ RUN apt-get update --yes && \
 # Create a directory to copy the islets source into it.
 # The directory will have fixed permissions.
 RUN mkdir /opt/islets/
+RUN mkdir /data
 RUN /usr/local/bin/fix-permissions /opt/islets/
+RUN /usr/local/bin/fix-permissions /data
 RUN chown -R ${NB_UID}:users ${HOME}
 
 # Switch back to the default user as we do not need root rights anymore and don't want to give them to the user.
@@ -22,14 +37,20 @@ USER ${NB_UID}
 
 # Upgrade pip and install ffmpeg and tiff dependencies
 RUN pip install --upgrade --no-cache pip && \
-    pip install --upgrade --no-cache ffmpeg tifffile
+    pip install --upgrade --no-cache ffmpeg tifffile black isort
+
+# Make bat accessible to the user
+RUN mkdir -p ~/.local/bin
+RUN ln -s /usr/bin/batcat ~/.local/bin/bat
 
 # Install JupyterDash, the corresponding proxy to stream webapps, and needed labextension
 RUN pip install --upgrade --no-cache \
         dash jupyter-dash jupyter-server-proxy \
-        jupyterlab-drawio jupyter-archive
-RUN jupyter labextension install jupyterlab-plotly
+        jupyterlab-drawio jupyter-archive jupyter-resource-usage jupyterlab-spreadsheet-editor \
+        jupyterlab-code-formatter jupyterlab-system-monitor jupyterlab_templates jupyterlab_hdf hdf5plugin
+RUN jupyter labextension install jupyterlab-plotly @jupyterlab/hdf5
 RUN jupyter lab build
+RUN echo "c.JupyterLabTemplates.template_dirs = ['/data/Johannes/insulin_kit']" >> ${HOME}/.jupyter/jupyter_notebook_config.py
 
 # Install the islets module
 WORKDIR /opt/islets/
