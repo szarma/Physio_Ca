@@ -14,11 +14,12 @@ def examine(self,
             imagemode=None,
             debug=False,
             startShow="all",
-            mode="jupyter",
+            mode="jupyter-dash",
             name=None,
             lw=None,
             fill=False
            ):
+    mode = "jupyter-dash"
     if name is None:
         name = __name__
     if type(startShow)!=str:
@@ -632,6 +633,7 @@ def examine(self,
                 options = no_update
             return out, options
 
-
-    return app
-
+    try:
+        app.run_server(mode="inline", port=8050, debug=True)
+    except OSError:
+        print("Currently, only one instance of examine is supported. Please shutdown the other kernel, which is currently blocking the usage!")
