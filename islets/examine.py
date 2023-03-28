@@ -14,7 +14,7 @@ def examine(self,
             imagemode=None,
             debug=False,
             startShow="all",
-            mode="jupyter",
+            mode="inline",
             name=None,
             lw=None,
             fill=False
@@ -35,12 +35,8 @@ def examine(self,
         "font-size":"80%",
         "color":"grey",
         }
-    if mode=="jupyter":
-        from jupyter_plotly_dash import JupyterDash as Dash
-    if mode=="dash":
-        from dash import Dash
-    if mode=="jupyter-dash":
-        from jupyter_dash import JupyterDash as Dash
+
+    from jupyter_dash import JupyterDash as Dash
     from dash.dependencies import Input, Output, State
     try:
         from dash import dcc, html
@@ -206,20 +202,13 @@ def examine(self,
 
                     ]
     ]
-    if mode=="jupyter":
-        app = Dash(name,
-                  width=1200,
-                  height=700,
-                 )
-    else:
-        app = Dash(name)
+    app = Dash(name)
 
     # Fix needed for distributed docker configurations
-    if mode == 'jupyter-dash':
-        app.default_requests_pathname_prefix = os.environ['JUPYTERHUB_SERVICE_PREFIX'] + 'proxy/8050/'
-        app.default_server_url = 'https://' + os.environ['URL'] + '/'
-        app.server_url = 'https://' + os.environ['URL'] + '/'
-        app.infer_jupyter_proxy_config()
+    app.default_requests_pathname_prefix = os.environ['JUPYTERHUB_SERVICE_PREFIX'] + 'proxy/8050/'
+    app.default_server_url = 'https://' + os.environ['URL'] + '/'
+    app.server_url = 'https://' + os.environ['URL'] + '/'
+    app.infer_jupyter_proxy_config()
 
     app.layout = html.Div(children=APP_LAYOUT,
                           style={"family":"Arial"}
@@ -633,5 +622,9 @@ def examine(self,
             return out, options
 
 
-    return app
+    try:
+        app.run_server(mode=mode, port=8050, debug=True)
+    except OSError:
+        print("The app could not be started as port 8050 seems occupied. Please shut down the servers, "
+              "which already use the examine() webapp and try again.")
 
