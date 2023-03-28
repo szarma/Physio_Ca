@@ -1590,7 +1590,7 @@ class Regions:
         return protocol
 
     # noinspection PyUnresolvedReferences
-    def examine(self, max_rois=10, imagemode=None, debug=False, startShow='',mode="jupyter",name=None,lw=None, test=False,fill=False):
+    def examine(self, max_rois=10, imagemode=None, debug=False, startShow='',mode="inline",name=None,lw=None, test=False,fill=False):
         if test:
             from .examine_test import examine
         else:
