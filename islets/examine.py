@@ -1,6 +1,8 @@
+import errno
 import json
 import traceback
 import numpy as np
+import socket
 import os
 from .numeric import rebin
 from .utils import getFigure
@@ -621,10 +623,16 @@ def examine(self,
                 options = no_update
             return out, options
 
-
+    can_start_app = True
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-        app.run_server(mode=mode, port=8050, debug=True)
-    except OSError:
-        print("The app could not be started as port 8050 seems occupied. Please shut down the servers, "
-              "which already use the examine() webapp and try again.")
+        s.bind(("127.0.0.1", 8050))
+    except socket.error as e:
+        if e.errno == errno.EADDRINUSE:
+            print("Webapp is already in use by another kernel. Please stop the kernel and retry again here.")
+            can_start_app = False
+    finally:
+        s.close()
 
+    if can_start_app:
+        app.run_server(mode=mode, port=8050, debug=True)

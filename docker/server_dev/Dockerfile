@@ -50,7 +50,7 @@ RUN pip install --upgrade --no-cache \
         jupyterlab-code-formatter jupyterlab-system-monitor jupyterlab_templates jupyterlab_hdf hdf5plugin
 RUN jupyter labextension install jupyterlab-plotly @jupyterlab/hdf5
 RUN jupyter lab build
-RUN echo "c.JupyterLabTemplates.template_dirs = ['/data/Johannes/insulin_kit']" >> ${HOME}/.jupyter/jupyter_notebook_config.py
+RUN echo "c.JupyterLabTemplates.template_dirs = ['/data/useful/templates']" >> ${HOME}/.jupyter/jupyter_notebook_config.py
 
 # Install the islets module
 WORKDIR /opt/islets/
