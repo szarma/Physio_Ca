@@ -204,13 +204,30 @@ def examine(self,
 
                     ]
     ]
+
+    port = 8050
+    is_port_accessible: bool = False
+    while not is_port_accessible:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.bind(("127.0.0.1", port))
+            is_port_accessible = True
+        except socket.error as e:
+            if e.errno == errno.EADDRINUSE:
+                is_port_accessible = False
+            else:
+                print(e)
+            port += 1
+        finally:
+            s.close()
+
     app = Dash(name)
 
     # Fix needed for distributed docker configurations
-    app.default_requests_pathname_prefix = os.environ['JUPYTERHUB_SERVICE_PREFIX'] + 'proxy/8050/'
+    app.default_requests_pathname_prefix = os.environ['JUPYTERHUB_SERVICE_PREFIX'] + f'proxy/{port}/'
     app.default_server_url = 'https://' + os.environ['URL'] + '/'
     app.server_url = 'https://' + os.environ['URL'] + '/'
-    app.infer_jupyter_proxy_config()
+    # app.infer_jupyter_proxy_config()
 
     app.layout = html.Div(children=APP_LAYOUT,
                           style={"family":"Arial"}
@@ -623,16 +640,8 @@ def examine(self,
                 options = no_update
             return out, options
 
-    can_start_app = True
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-        s.bind(("127.0.0.1", 8050))
-    except socket.error as e:
-        if e.errno == errno.EADDRINUSE:
-            print("Webapp is already in use by another kernel. Please stop the kernel and retry again here.")
-            can_start_app = False
-    finally:
-        s.close()
-
-    if can_start_app:
-        app.run_server(mode=mode, port=8050, debug=True)
+        app.run_server(mode=mode, port=port, debug=True)
+    except TypeError:
+        app._server_threads.pop(("127.0.0.1", port))
+        app.run_server(mode=mode, port=port, debug=True)
