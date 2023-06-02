@@ -4,6 +4,7 @@ services:
   # config for reverse proxy
   reverse-proxy:
     image: traefik:latest
+    restart: always
     command:
       - "--log.filePath=/var/log/traefik.log"
       - "--log.level=WARN"
@@ -58,7 +59,7 @@ services:
     build:
       context: ./
       dockerfile: ./jupyterhub/Dockerfile
-    restart: unless-stopped
+    restart: always
     image: ${HUB_CONTAINER_NAME}:${ISLETS_VERSION}
     container_name: ${HUB_CONTAINER_NAME}
     volumes:

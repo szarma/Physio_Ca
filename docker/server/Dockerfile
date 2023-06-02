@@ -37,6 +37,9 @@ RUN ln -s /usr/bin/batcat ~/.local/bin/bat
 RUN pip install --upgrade --no-cache pip && \
     pip install --upgrade --no-cache ffmpeg tifffile black isort
 
+# Install graph-tool
+RUN conda install -c conda-forge graph-tool
+
 # Install JupyterDash, the corresponding proxy to stream webapps, and needed labextension
 RUN pip install --upgrade --no-cache \
         dash jupyter-dash jupyter-server-proxy \

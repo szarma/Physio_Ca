@@ -39,6 +39,9 @@ USER ${NB_UID}
 RUN pip install --upgrade --no-cache pip && \
     pip install --upgrade --no-cache ffmpeg tifffile black isort
 
+# Install graph-tool
+RUN conda install -c conda-forge graph-tool 
+
 # Make bat accessible to the user
 RUN mkdir -p ~/.local/bin
 RUN ln -s /usr/bin/batcat ~/.local/bin/bat

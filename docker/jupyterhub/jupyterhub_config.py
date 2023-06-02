@@ -138,7 +138,7 @@ c.JupyterHub.services = [
         'command': [
             sys.executable,
             '-m', 'jupyterhub_idle_culler',
-            '--timeout=3600'
+            '--timeout=86400'
         ],
     }
 ]
