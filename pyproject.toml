@@ -1,0 +1,44 @@
+[project]
+name = 'islets'
+dynamic = [
+  'version'
+]
+description = 'Analysis framework for calcium imaging data of pancreatic tissue slices, isolated islets and cells.'
+readme = 'README.md'
+authors = [
+  { name = 'Srdjan Sarikas' },
+  { name = 'Johannes Pfave', email = 'johannes.pfabe@meduniwien.ac.at' },
+]
+requires-python = '>=3.9'
+dependencies = [
+  "python-bioformats",
+  "jupyter-dash",
+  "matplotlib",
+  "opencv-python",
+  "pandas==1.3.5",
+  "scikit-learn",
+  "scikit-image",
+  "tqdm",
+  "bidict",
+  "scipy",
+  "statsmodels",
+  "numba",
+  "ffmpeg-python",
+  "nd2reader",
+  "mgzip",
+  "orjson",
+  "slack_sdk",
+  "openpyxl",
+  "h5py"
+]
+
+[project.urls]
+homepage = 'https://ctn2.physiologie.meduniwien.ac.at'
+repository = 'https://github.com/szarma/Physio_Ca'
+
+[tool.setuptools.dynamic]
+version = {file = "VERSION"}
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
