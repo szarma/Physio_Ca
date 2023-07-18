@@ -40,7 +40,7 @@ repository = 'https://github.com/szarma/Physio_Ca'
 packages = ["islets"]
 
 [tool.setuptools.dynamic]
-version = {file = "version"}
+version = {file = "VERSION"}
 
 [build-system]
 requires = ["setuptools>=61.0"]
