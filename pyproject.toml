@@ -36,8 +36,11 @@ dependencies = [
 homepage = 'https://ctn2.physiologie.meduniwien.ac.at'
 repository = 'https://github.com/szarma/Physio_Ca'
 
+[tool.setuptools]
+packages = ["islets"]
+
 [tool.setuptools.dynamic]
-version = {file = "VERSION"}
+version = {file = "version"}
 
 [build-system]
 requires = ["setuptools>=61.0"]

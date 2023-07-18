@@ -139,7 +139,8 @@ class PicklePicker:
                                 for opt in opts:
                                     lbl = opt["label"]
                                     lbl = lbl.split("-")[0]
-                                    if lbl not in rec.metadata.index: continue
+                                    if lbl not in rec.metadata.index:
+                                        continue
                                     if rec.metadata.loc[lbl, "line scan"] != "none":
                                         opt["label"] += "*"
                                 opts = opts[::-1]
@@ -182,22 +183,30 @@ class PicklePicker:
                     k = f.split("_rois.pkl")[0].replace(".", "+")
                     pathToRoi = os.path.join(pathToSer, f)
                     options += [{"label": k, "value": pathToRoi}]
-                    previewFile = pathToRoi.replace(f, ".image_" + f.replace("_rois.pkl", ".png"))
+                    previewFile = pathToRoi.replace(f,
+                        ".image_" + f.replace("_rois.pkl", ".png"))
                     if os.path.isfile(previewFile):
                         encoded_image = base64.b64encode(open(previewFile, 'rb').read())
-                        preview[k] = html.Img(src='data:image/png;base64,{}'.format(encoded_image.decode()),
-                                              width="%ipx" % (width * .9), height="%ipx" % (height * .8 + 20))
+                        preview[k] = html.Img(
+                            src='data:image/png;base64,{}'.format(encoded_image.decode()),
+                            width="%ipx" % (width * .9),
+                             height="%ipx" % (height * .8 + 20)
+                        )
             if len(options) > 0:
                 frase = 'Select filer size'
             else:
                 for f in sorted(os.listdir(pathToSer))[::-1]:
-                    if not f.endswith("png"): continue
+                    if not f.endswith("png"):
+                        continue
                     k = f.split("_")[-1].split(".")[0]
                     options += [{"label": k, "value": os.path.join(pathToSer, k)}]
                     previewFile = os.path.join(pathToSer, f)
                     encoded_image = base64.b64encode(open(previewFile, 'rb').read())
-                    preview[k] = html.Img(src='data:image/png;base64,{}'.format(encoded_image.decode()),
-                                          width="%ipx" % (width * .7), height="%ipx" % (height * .8 + 20))
+                    preview[k] = html.Img(
+                        src='data:image/png;base64,{}'.format(encoded_image.decode()),
+                        width="%ipx" % (width * .7),
+                        height="%ipx" % (height * .8 + 20)
+                    )
                 if len(options):
                     frase = "Select series"
 
@@ -205,13 +214,24 @@ class PicklePicker:
             #     val = options[0]["value"]
             # else:
             #     val = None
-            previews = [html.Div(children=[html.Div(k, style={"padding-left": "20px"}), preview[k]], style=dict(
-                height="%ipx" % height,
-                width="%ipx" % width,
-                display="inline-block",
-                border='thin lightgrey solid'
-            )) for k in preview]
-            return options, html.Div(previews, style={"width": "%ipx" % (width * 4.1)}), frase
+            previews = [
+                html.Div(children=[
+                    html.Div(
+                        k,
+                        style={"padding-left": "20px"}),
+                    preview[k]],
+                    style=dict(
+                        height="%ipx" % height,
+                        width="%ipx" % width,
+                        display="inline-block",
+                        border='thin lightgrey solid'
+                    )
+                ) for k in preview
+            ]
+            return options, html.Div(
+                previews, 
+                style={"width": "%ipx" % (width * 4.1)}
+            ), frase
 
         @app.callback(
             [Output("pickle-feedback", "children"),
@@ -248,7 +268,7 @@ class PicklePicker:
                     if self.showExamine:
                         japp = self.regions.examine(max_rois=self.max_rois)
                         japp._repr_html_()
-                        link2app = "https://ctn.physiologie.meduniwien.ac.at" + japp.get_app_root_url()
+                        link2app = "https://ctn2.physiologie.meduniwien.ac.at" + japp.get_app_root_url()
                 else:  ####### line scan ################
                     self.pathToRec, ser = os.path.split(path)
                     self.pathToRec = os.path.split(self.pathToRec)[0].split("_analysis")[0]
