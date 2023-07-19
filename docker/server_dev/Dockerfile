@@ -1,5 +1,5 @@
 # Use a separate build stage to clone github content
-FROM alpine:latest as git-puller
+FROM alpine:latest AS git-puller
 WORKDIR /opt/islets/
 RUN apk --no-cache add git
 RUN git clone --depth=1 https://github.com/szarma/Physio_Ca.git

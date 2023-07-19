@@ -6,7 +6,7 @@ with open('requirements.txt') as f:
 with open('README.md') as f:
     long_description = f.read()
 
-with open('version') as f:
+with open('VERSION') as f:
     version = f.read().strip()
 
 setup(
