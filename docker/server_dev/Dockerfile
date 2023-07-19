@@ -1,3 +1,9 @@
+# Use a separate build stage to clone github content
+FROM alpine:latest as git-puller
+WORKDIR /opt/islets/
+RUN apk --no-cache add git
+RUN git clone --depth=1 https://github.com/szarma/Physio_Ca.git
+
 FROM jupyter/datascience-notebook:hub-3.1.1
 
 # Switch to root user to install tools to build islets and to run bioformats JVM
@@ -57,7 +63,7 @@ RUN echo "c.JupyterLabTemplates.template_dirs = ['/data/useful/templates']" >> $
 
 # Install the islets module
 WORKDIR /opt/islets/
-RUN git clone --depth=1 https://github.com/szarma/Physio_Ca.git
+COPY --from=git-puller /opt/islets/ ./
 WORKDIR /opt/islets/Physio_Ca/
 RUN pip install --editable .
 RUN chmod +x /opt/islets/Physio_Ca/scripts/full_process.py
