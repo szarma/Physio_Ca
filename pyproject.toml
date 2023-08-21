@@ -1,13 +1,13 @@
 [project]
 name = 'islets'
 dynamic = [
-  'version'
+  'version',
+  'readme'
 ]
 description = 'Analysis framework for calcium imaging data of pancreatic tissue slices, isolated islets and cells.'
-readme = 'README.md'
 authors = [
   { name = 'Srdjan Sarikas' },
-  { name = 'Johannes Pfave', email = 'johannes.pfabe@meduniwien.ac.at' },
+  { name = 'Johannes Pfabe', email = 'johannes.pfabe@meduniwien.ac.at' },
 ]
 requires-python = '>=3.9'
 dependencies = [
@@ -40,7 +40,8 @@ repository = 'https://github.com/szarma/Physio_Ca'
 packages = ["islets"]
 
 [tool.setuptools.dynamic]
-version = {attr = "islets.__version__"}
+version = {file = "VERSION"}
+readme = {file = "README.md"}
 
 [build-system]
 requires = ["setuptools>=64.0"]

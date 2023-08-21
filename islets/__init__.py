@@ -7,10 +7,7 @@ with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=FutureWarning, )
     warnings.filterwarnings("ignore", category=RuntimeWarning, )
     # if importlib.util.find_spec("caiman") is not None:
-    try:
-        from caiman import movie as cmovie
-    except ModuleNotFoundError:
-        from .movies import movie as cmovie
+    from .movies import movie as cmovie
         # print("Managed to import cmovie from .movies")
     # try:
     #     from caiman import load as cload

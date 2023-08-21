@@ -1,0 +1,13 @@
+FROM jupyterhub/jupyterhub:3.1.1
+
+# Install dependencies (for culling and spawning)
+RUN pip install --upgrade pip && \
+    pip install --no-cache \
+    tomli \
+    dockerspawner \
+    oauthenticator \
+    jupyter-server-proxy \
+    jupyterhub-idle-culler
+
+# Copy the JupyterHub configuration in the container
+COPY docker/jupyterhub/jupyterhub_config.py .
